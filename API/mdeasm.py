@@ -46,9 +46,24 @@ class Workspaces:
         'assetSecurityPolicies':('policyName','description'),'attributes':('attributeType','attributeValue'),'banners':('banner','port'),'cookies':('cookieName'),'finalIpBlocks':('ipBlock'),'headers':('headerName','headerValue'),'ipBlocks':('ipBlock'),'location':('value,countrycode','value,countryname','value,latitude','value,longitude'),'reputations':('threatType','listName'),'resourceUrls':('url'),'responseHeaders':('headerName','headerValue'),'services':('port','scheme','portStates,value'),'soaRecords':('nameServer','email','serialNumber'),'sslServerConfig':('cipherSuites','tlsVersions'),'webComponents':('name','type','version'),'cveId':('webComponent','name','cvssScore')}
 
     def __init__(self, tenant_id=os.getenv("TENANT_ID"), subscription_id=os.getenv("SUBSCRIPTION_ID"), client_id=os.getenv("CLIENT_ID"), client_secret=os.getenv("CLIENT_SECRET"), workspace_name=os.getenv("WORKSPACE_NAME"), *args, **kwargs) -> None:
+        # Default timeout (connect, read). Callers doing bulk exports need protection from hangs.
+        self._http_timeout = (10, 60)
         if not (tenant_id and subscription_id and client_id and client_secret):
-            logging.error('missing a required argument. check your .env file for missing CLIENT_ID, CLIENT_SECRET, TENANT_ID, and/or SUBSCRIPTION_ID values')
-            raise Exception(f"CLIENT_ID: {client_id}, CLIENT_SECRET: {client_secret[:5] + ('*' * 30)}, TENANT_ID: {tenant_id}, SUBSCRIPTION_ID: {subscription_id}")
+            missing = []
+            if not tenant_id:
+                missing.append("TENANT_ID")
+            if not subscription_id:
+                missing.append("SUBSCRIPTION_ID")
+            if not client_id:
+                missing.append("CLIENT_ID")
+            if not client_secret:
+                missing.append("CLIENT_SECRET")
+            logging.error(
+                "missing required configuration (%s). check your .env file or pass args to Workspaces().",
+                ", ".join(missing),
+            )
+            # Never include secrets in exceptions/logs (even partial prefixes).
+            raise Exception(f"missing required configuration: {', '.join(missing)}")
         self._tenant_id = tenant_id
         self._subscription_id = subscription_id
         self._client_id = client_id
@@ -70,7 +85,7 @@ class Workspaces:
         else:
             data = {'grant_type': 'client_credentials', 'client_id': self._client_id, 'client_secret': self._client_secret, 'scope': 'https://management.azure.com/.default'}
             logging.info('control plane token retrieved')
-        r = requests.post(url, headers=headers, data=data)
+        r = requests.post(url, headers=headers, data=data, timeout=self._http_timeout)
         if r.status_code != 200:
             logging.error(r.status_code)
             raise Exception(r.text)
@@ -81,8 +96,9 @@ class Workspaces:
         try:
             expiry = jwt.decode(token, options={"verify_signature": False})['exp']
             now = int(time.time())
-            if now - 30 >= expiry:
-                logging.debug(f"{now} - 30 >= {expiry}")
+            # Refresh if token is expired or will expire "soon" (30s leeway).
+            if now + 30 >= expiry:
+                logging.debug(f"{now} + 30 >= {expiry}")
                 return(True)
             else:
                 return(False)
@@ -451,14 +467,14 @@ class Workspaces:
         for key in keys_to_del:
             delattr(self.filters, key)
 
-    def __workspace_query_helper__(self, calling_func, method, endpoint, url='', params={}, payload={}, data_plane=True, retry=True, max_retry=5, workspace_name=''):
+    def __workspace_query_helper__(self, calling_func, method, endpoint, url='', params=None, payload=None, data_plane=True, retry=True, max_retry=5, workspace_name=''):
         if data_plane:
             if self.__token_expiry__(self._dp_token):
                 self._dp_token = self.__bearer_token__(data_plane=True)
             token = self._dp_token
         else:
             if self.__token_expiry__(self._cp_token):
-                self._dp_token = self.__bearer_token__()
+                self._cp_token = self.__bearer_token__()
             token = self._cp_token
         if url:
             helper_url = f"{url}/{urllib.parse.quote(endpoint)}"
@@ -476,37 +492,67 @@ class Workspaces:
         if params:
             helper_params.update(params)
         
-        retry_counter = 1
-        while retry:
-            if retry_counter > max_retry:
-                logging.critical(f"called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- max attempts: {max_retry}")
-                raise Exception(f"called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- max attempts: {max_retry}")
+        attempts = max_retry if retry else 1
+        last_err = None
+        last_status = None
+        last_text = None
+        for attempt in range(1, attempts + 1):
             try:
-                if payload:
-                    helper_payload = payload
-                    r = requests.request(method=method, url=helper_url, headers=helper_headers, params=helper_params, json=helper_payload)
+                if payload is not None:
+                    r = requests.request(
+                        method=method,
+                        url=helper_url,
+                        headers=helper_headers,
+                        params=helper_params,
+                        json=payload,
+                        timeout=self._http_timeout,
+                    )
                 else:
-                    r = requests.request(method=method, url=helper_url, headers=helper_headers, params=helper_params)
-                
+                    r = requests.request(
+                        method=method,
+                        url=helper_url,
+                        headers=helper_headers,
+                        params=helper_params,
+                        timeout=self._http_timeout,
+                    )
+
                 if r.ok:
-                    retry=False
+                    return(r)
                 else:
-                    logging.warning(f"{r.status_code} -- called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- attempt: {retry_counter} of {max_retry} -- error: {r.text}")
-                    retry_counter += 1
+                    last_status = r.status_code
+                    last_text = r.text
+                    logging.warning(
+                        "%s -- called by: %s -- endpoint: %s -- page: %s -- attempt: %s of %s -- error: %s",
+                        r.status_code,
+                        calling_func,
+                        endpoint,
+                        helper_params.get('skip'),
+                        attempt,
+                        attempts,
+                        r.text,
+                    )
                     if data_plane:
-                        if self.__token_expiry__(self._dp_token):
+                        if r.status_code in (401, 403) or self.__token_expiry__(self._dp_token):
                             self._dp_token = self.__bearer_token__(data_plane=True)
                         token = self._dp_token
                         helper_headers = {'Authorization': f"Bearer {token}"}
                     else:
-                        if self.__token_expiry__(self._cp_token):
-                            self._dp_token = self.__bearer_token__()
+                        if r.status_code in (401, 403) or self.__token_expiry__(self._cp_token):
+                            self._cp_token = self.__bearer_token__()
                         token = self._cp_token
                         helper_headers = {'Authorization': f"Bearer {token}"}
 
             except Exception as e:
-                logging.warning(f"called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- attempt: {retry_counter} of {max_retry} -- error: {str(e)}")
-                retry_counter += 1
+                last_err = str(e)
+                logging.warning(
+                    "called by: %s -- endpoint: %s -- page: %s -- attempt: %s of %s -- error: %s",
+                    calling_func,
+                    endpoint,
+                    helper_params.get('skip'),
+                    attempt,
+                    attempts,
+                    str(e),
+                )
                 if data_plane:
                     if self.__token_expiry__(self._dp_token):
                         self._dp_token = self.__bearer_token__(data_plane=True)
@@ -514,10 +560,35 @@ class Workspaces:
                     helper_headers = {'Authorization': f"Bearer {token}"}
                 else:
                     if self.__token_expiry__(self._cp_token):
-                        self._dp_token = self.__bearer_token__()
+                        self._cp_token = self.__bearer_token__()
                     token = self._cp_token
                     helper_headers = {'Authorization': f"Bearer {token}"}
-        return(r)
+
+            # Backoff before next retry (respect Retry-After when present).
+            if attempt < attempts:
+                sleep_s = min(2 ** (attempt - 1), 30)
+                try:
+                    if 'r' in locals():
+                        ra = r.headers.get('Retry-After')
+                        if ra and str(ra).isdigit():
+                            sleep_s = min(int(ra), 60)
+                except Exception:
+                    pass
+                time.sleep(sleep_s)
+
+        logging.critical(
+            "called by: %s -- endpoint: %s -- page: %s -- max attempts: %s -- last_status: %s -- last_error: %s",
+            calling_func,
+            endpoint,
+            helper_params.get('skip'),
+            attempts,
+            last_status,
+            last_err,
+        )
+        raise Exception(
+            f"called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- "
+            f"max attempts: {attempts} -- last_status: {last_status} -- last_error: {last_err} -- last_text: {last_text}"
+        )
 
     def get_workspaces(self, workspace_name=''):
         url = f"https://management.azure.com/subscriptions/{self._subscription_id}/providers/Microsoft.Easm/"
