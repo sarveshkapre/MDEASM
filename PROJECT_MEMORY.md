@@ -9,6 +9,8 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Add `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only) + opt-in lazy data-plane token init | Multi-workspace environments need a safe discovery primitive; control-plane listing should not require data-plane permissions/scopes | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass); `python3 -m mdeasm_cli workspaces list --help >/dev/null` (pass) | cccd689 | high | trusted
+- 2026-02-10 | Stream asset exports for NDJSON and for CSV when columns are explicit | Improves performance and reliability for large inventories (constant memory + faster time-to-first-byte) without changing default JSON/CSV behavior | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass) | d07ab79 | high | trusted
 - 2026-02-10 | Add `mdeasm assets schema` to print observed columns (union-of-keys) | Enables deterministic `--columns-from` workflows and faster schema drift detection without exporting full inventories | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | c8f0525 | high | trusted
 - 2026-02-10 | Add opt-in CLI export integration smoke (`MDEASM_INTEGRATION_EXPORT=1`) | Exercises the end-to-end CLI export wrapper (stdout/stderr separation + encoding) with a tiny capped call while keeping CI credential-free | `source .venv/bin/activate && pytest` (pass; test skipped by default) | 07b9879 | medium | trusted
 - 2026-02-10 | Make example scripts import-safe via `main()` guards | Prevent accidental side effects (network calls, `sys.exit`) during imports by tooling/tests while preserving behavior when run as scripts | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | da78580 | high | trusted
@@ -54,6 +56,9 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` | `All checks passed!`; `53 passed, 3 skipped`; compile ok | pass
+- 2026-02-10 | `source .venv/bin/activate && python3 -m mdeasm_cli --version && python3 -m mdeasm_cli workspaces list --help >/dev/null && mdeasm --help >/dev/null` | prints `python3 -m mdeasm_cli 1.4.0`; help ok | pass
+- 2026-02-10 | `gh run watch 21874659739 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `d07ab79` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `48 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m mdeasm_cli --version && python -m mdeasm_cli assets schema --help >/dev/null && python -m mdeasm_cli assets export --help >/dev/null` | version prints `1.4.0`; CLI help ok | pass
 - 2026-02-10 | `gh run watch 21873437081 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `115145d` | pass

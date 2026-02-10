@@ -7,31 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **(Selected) CLI: `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only)**
-  - Scope: add a CLI command that lists available workspaces (names + endpoints) and never prints guidance to stdout; include `--format json|lines` and `--out -|path`.
-  - Why: makes multi-workspace environments less error-prone and improves automation/diagnostics; should not require data-plane permissions.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **(Selected) Performance: stream NDJSON exports (avoid storing all assets in-memory)**
-  - Scope: add a `Workspaces.stream_workspace_assets()` generator and make CLI `--format ndjson` write incrementally to stdout/file; preserve current JSON/CSV behavior.
-  - Why: reduces peak memory and improves time-to-first-byte for large inventories; NDJSON is a natural streaming format.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **(Selected) Performance: stream CSV exports when columns are explicit**
-  - Scope: when `--format csv` and columns are specified via `--columns`/`--columns-from`, stream rows as they arrive; keep the current union-of-keys header logic (in-memory) when columns are not specified.
-  - Why: large CSV exports are common; requiring explicit columns is already recommended for stable schemas and unlocks constant-memory exports.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Reliability: make data-plane token retrieval lazy (opt-in)**
-  - Scope: add a `init_data_plane_token=False` mode (or similar) so control-plane-only operations (like listing workspaces) don't fail due to missing data-plane permissions; keep default behavior unchanged.
-  - Why: reduces unnecessary permission coupling and improves diagnostics when onboarding new service principals.
-  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Performance: streaming asset export path (avoid storing all assets in-memory)**
-  - Scope: add a `stream_workspace_assets()` helper (or callback sink) so CLI exports can write rows incrementally (especially NDJSON/CSV) without collecting all rows first.
-  - Why: reduces peak memory and improves time-to-first-byte for large inventories.
-  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
-
 - [ ] **Server-side export via data-plane `assets:export` task**
   - Scope: add an opt-in CLI mode that uses the data-plane `POST /assets:export` endpoint (columns + filename) to kick off an export task, then poll until completion and download the artifact; fall back to the existing paginated GET export path.
   - Why: paginated client-side exports can be slow and memory-heavy; a first-class export job path is a common pattern in mature ASM products.
@@ -47,12 +22,17 @@
   - Why: reduces setup thrash and creates a standard "are my credentials wired correctly?" answer.
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **Docs: add guidance for large exports (streaming + column selection)**
-  - Scope: update `docs/exports.md` to explain streaming behavior, why `--columns`/`--columns-from` matters, and when the CLI needs to buffer.
-  - Why: prevents surprise memory use and makes "big export" workflows more reliable.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 ## Implemented
+- [x] **CLI: `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `API/mdeasm.py`, `tests/test_cli_export.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass); `python3 -m mdeasm_cli workspaces list --help >/dev/null` (pass); commit `cccd689`
+
+- [x] **Streaming export path (NDJSON; CSV when columns are explicit)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass); commit `d07ab79`
+
 - [x] **Export schema helper (`mdeasm assets schema`)**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`

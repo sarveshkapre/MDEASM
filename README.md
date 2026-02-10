@@ -27,6 +27,9 @@ python3 -m pip install -e . --upgrade
 # CLI help (no credentials required):
 mdeasm --help
 mdeasm --version
+
+# List workspaces (requires `.env` credentials):
+mdeasm workspaces list --format json --out -
 ```
 
 More details: `API/README.md`
