@@ -29,6 +29,7 @@
 - 2026-02-10 | `source .venv/bin/activate && pytest` | `3 passed` | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m compileall API` | compiled `API/` | pass
 - 2026-02-10 | `source .venv/bin/activate && python -c "import sys; from pathlib import Path; sys.path.insert(0, str(Path('API').resolve())); import mdeasm; ws=mdeasm.Workspaces.__new__(mdeasm.Workspaces); print(mdeasm._VERSION); print(ws.__validate_asset_id__('domain$$example.com')[1][:12])"` | prints `1.4` and base64 prefix | pass
+- 2026-02-10 | `gh run list -R sarveshkapre/MDEASM -L 3` | CI runs succeeded on `main` for commits `b6f98ae`, `6aec111`, `afd37f8` | pass
 
 ## Historical Summary
 - Keep compact summaries of older entries here when file compaction runs.
