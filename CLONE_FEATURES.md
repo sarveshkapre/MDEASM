@@ -7,16 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **(Selected, cycle 8) Export schema helper (`mdeasm assets schema`)**
-  - Scope: add a CLI command that prints the observed column set for a query (union-of-keys) without writing the full export payload; output should be consumable by `--columns-from`.
-  - Why: helps users choose `--columns` deterministically and detect schema drift early.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **(Selected, cycle 8) Add an opt-in “real export” integration smoke (skipped by default)**
-  - Scope: extend integration smoke to optionally run a tiny `mdeasm assets export --max-assets 1` call when `MDEASM_INTEGRATION_EXPORT=1` and required env vars are present.
-  - Why: catches data-plane export regressions earlier than unit tests without requiring creds in CI.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 3
-
 - [ ] **CLI: `mdeasm workspaces list` (stdout-safe JSON)**
   - Scope: add a CLI command that lists available workspaces (names + endpoints) and never prints guidance to stdout; include `--format json|lines`.
   - Why: makes multi-workspace environments less error-prone and improves automation/diagnostics.
@@ -38,6 +28,16 @@
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
 ## Implemented
+- [x] **Export schema helper (`mdeasm assets schema`)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `c8f0525`
+
+- [x] **Add an opt-in “real export” integration smoke (CLI)**
+  - Date: 2026-02-10
+  - Scope: `tests/test_integration_smoke.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest` (pass; integration test skipped by default); commit `07b9879`
+
 - [x] **Make example scripts import-safe (`main()` guards)**
   - Date: 2026-02-10
   - Scope: `API/affected_cvss_validation.py`, `API/bulk_asset_state_change.py`, `API/cisa_known_exploited_vulns.py`, `API/expired_certificates_validation.py`, `API/extract_associated_certNames_from_query.py`, `API/hosts_with_CNAME_no_IP_possible_subdomain_takeover.py`, `tests/test_example_scripts_imports.py`

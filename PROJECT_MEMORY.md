@@ -9,6 +9,8 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Add `mdeasm assets schema` to print observed columns (union-of-keys) | Enables deterministic `--columns-from` workflows and faster schema drift detection without exporting full inventories | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | c8f0525 | high | trusted
+- 2026-02-10 | Add opt-in CLI export integration smoke (`MDEASM_INTEGRATION_EXPORT=1`) | Exercises the end-to-end CLI export wrapper (stdout/stderr separation + encoding) with a tiny capped call while keeping CI credential-free | `source .venv/bin/activate && pytest` (pass; test skipped by default) | 07b9879 | medium | trusted
 - 2026-02-10 | Make example scripts import-safe via `main()` guards | Prevent accidental side effects (network calls, `sys.exit`) during imports by tooling/tests while preserving behavior when run as scripts | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | da78580 | high | trusted
 - 2026-02-10 | Harden `--http-timeout` parsing (reject NaN/inf) + add edge-case tests | Prevent misconfigured reliability knobs from producing confusing runtime failures; keep CLI inputs deterministic | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 8216474 | high | trusted
 - 2026-02-10 | Write CLI `--out` exports atomically | Avoid partial/corrupt export files on interruption; safer for scheduled jobs and pipelines | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | b0ce4cb | high | trusted
@@ -45,12 +47,15 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Consider `mdeasm assets schema` to make column selection deterministic and detect schema drift.
-- Add timeout parsing tests + docs for bulk export reliability tuning.
+- Consider `mdeasm workspaces list` (stdout-safe) to make multi-workspace environments easier to automate.
+- Consider a streaming asset export path for large inventories (avoid storing all rows in memory).
+- Consider server-side exports via `assets:export` task if the API contract is stable enough to support.
 - Decide whether to keep default `EASM_API_VERSION=2022-04-01-preview` or bump defaults after validating against current Microsoft Learn reference versions.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `48 passed, 3 skipped`; compile ok | pass
+- 2026-02-10 | `source .venv/bin/activate && python -m mdeasm_cli --version && python -m mdeasm_cli assets schema --help >/dev/null && python -m mdeasm_cli assets export --help >/dev/null` | version prints `1.4.0`; CLI help ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `45 passed, 2 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `44 passed, 2 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `26 passed, 2 skipped`; compile ok | pass
