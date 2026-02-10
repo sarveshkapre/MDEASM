@@ -152,3 +152,56 @@ def test_workspace_query_helper_prefers_requests_session_when_present():
 
     assert r.ok is True
     assert len(ws._session.calls) == 1
+
+
+def test_get_workspace_assets_status_to_stderr_and_max_assets_cap(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    # Two pages of 3 assets each, but we cap to 4 total.
+    responses = [
+        Resp({"totalElements": 6, "content": [{}, {}, {}], "last": False, "number": 0}),
+        Resp({"totalElements": 6, "content": [{}, {}, {}], "last": True, "number": 1}),
+    ]
+    calls = {"n": 0}
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **_kwargs):
+        idx = calls["n"]
+        calls["n"] += 1
+        return responses[idx]
+
+    def fake_asset_content_helper(response_object, asset_list_name="", **_kwargs):
+        for _ in response_object.json()["content"]:
+            getattr(ws, asset_list_name).assets.append(object())
+        return ws
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+    ws.__asset_content_helper__ = fake_asset_content_helper  # type: ignore[attr-defined]
+
+    ws.get_workspace_assets(
+        query_filter='kind = "domain"',
+        asset_list_name="assetList",
+        get_all=True,
+        max_page_size=3,
+        auto_create_facet_filters=False,
+        max_assets=4,
+        status_to_stderr=True,
+        no_track_time=True,
+    )
+
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert "assets identified by query" in out.err
+    assert "query complete" in out.err
+    assert len(ws.assetList.assets) == 4

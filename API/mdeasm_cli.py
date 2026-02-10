@@ -92,6 +92,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export.add_argument("--out", default="", help="Output path (default: stdout)")
     export.add_argument(
+        "--max-assets",
+        type=int,
+        default=0,
+        help="Stop after exporting at most N assets (0=unbounded)",
+    )
+    export.add_argument(
+        "--progress-every-pages",
+        type=int,
+        default=0,
+        help="Emit progress estimate every N pages (0=default helper behavior)",
+    )
+    export.add_argument(
         "--workspace-name",
         default="",
         help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
@@ -164,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
             ws_kwargs["backoff_max_s"] = args.backoff_max_s
 
         ws = mdeasm.Workspaces(**ws_kwargs)
-        ws.get_workspace_assets(
+        get_kwargs = dict(
             query_filter=args.filter,
             asset_list_name=args.asset_list_name,
             page=args.page,
@@ -173,12 +185,22 @@ def main(argv: list[str] | None = None) -> int:
             get_all=args.get_all,
             auto_create_facet_filters=not args.no_facet_filters,
             workspace_name=args.workspace_name,
+            # Keep machine-readable stdout clean; status/progress goes to stderr.
+            status_to_stderr=True,
+            max_assets=args.max_assets or 0,
         )
+        if args.progress_every_pages and args.progress_every_pages > 0:
+            get_kwargs["track_every_N_pages"] = args.progress_every_pages
+        else:
+            # Only emit the initial/final status lines by default.
+            get_kwargs["no_track_time"] = True
+
+        ws.get_workspace_assets(**get_kwargs)
 
         asset_list = getattr(ws, args.asset_list_name)
         rows = asset_list.as_dicts() if hasattr(asset_list, "as_dicts") else []
 
-        out_path = Path(args.out) if args.out else None
+        out_path = None if (not args.out or args.out == "-") else Path(args.out)
         if args.format == "json":
             _write_json(out_path, rows)
         else:

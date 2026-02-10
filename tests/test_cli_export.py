@@ -150,3 +150,86 @@ def test_cli_assets_export_wires_http_knobs(tmp_path, monkeypatch):
         "backoff_max_s": 1.5,
     }
     assert captured["get_kwargs"]["workspace_name"] == "ws1"
+
+
+def test_cli_assets_export_stdout_dash_and_status_to_stderr(monkeypatch, capsys):
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            captured["init_kwargs"] = dict(kwargs)
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            captured["get_kwargs"] = dict(kwargs)
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--out",
+            "-",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["init_kwargs"] == {}
+    assert captured["get_kwargs"]["status_to_stderr"] is True
+    # Default behavior should avoid periodic progress chatter.
+    assert captured["get_kwargs"]["no_track_time"] is True
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == [{"id": "domain$$example.com", "kind": "domain"}]
+
+
+def test_cli_assets_export_wires_max_assets_and_progress(monkeypatch):
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            captured["init_kwargs"] = dict(kwargs)
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            captured["get_kwargs"] = dict(kwargs)
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--out",
+            "-",
+            "--max-assets",
+            "10",
+            "--progress-every-pages",
+            "25",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["get_kwargs"]["max_assets"] == 10
+    assert captured["get_kwargs"]["track_every_N_pages"] == 25

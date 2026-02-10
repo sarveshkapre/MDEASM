@@ -18,7 +18,7 @@ _VERSION = 1.4
 #   cancel tasks
 
 
-import requests, time, urllib.parse, jwt, datetime, base64, uuid, re, binascii, logging, json, pathlib, os
+import requests, time, urllib.parse, jwt, datetime, base64, uuid, re, binascii, logging, json, pathlib, os, sys
 from dateutil import parser
 from dotenv import load_dotenv
 
@@ -737,7 +737,23 @@ class Workspaces:
         if date_range_end ('YYYY-MM-DD') is submitted without date_range_start, any asset details where 'lastSeen' is BEFORE the supplied date will be included
         
         if both date_range_start and date_range_end are submitted, any asset details that are seen, they will be evaluated together -- whether date_range_start is LATER THAN 'firstSeen' and date_range_end is EARLIER THAN 'lastSeen' -- and prevent any standalone date_range_start or date_range_end evaluation
+
+        Extra kwargs (optional):
+          - max_assets: int. Stop after collecting at most N assets (0/None means unbounded).
+          - status_to_stderr: bool. Print status/progress to stderr instead of stdout (useful for machine-readable stdout).
+          - quiet: bool. Suppress all status/progress printing.
+          - track_every_N_pages: int. Emit progress estimate every N pages (default 100).
+          - no_track_time: bool. Disable periodic progress estimate printing.
         """
+        quiet = bool(kwargs.get('quiet'))
+        status_fh = sys.stderr if kwargs.get('status_to_stderr') else sys.stdout
+        max_assets = int(kwargs.get('max_assets') or 0)
+
+        def _status(msg: str) -> None:
+            if quiet:
+                return
+            print(msg, file=status_fh)
+
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if self.__verify_workspace__(workspace_name):
@@ -758,6 +774,8 @@ class Workspaces:
             
             if max_page_count:
                 get_all=True
+            if max_assets:
+                get_all=True
             
             params = {'filter': query_filter, 'skip': page, 'maxpagesize': max_page_size}
             run_query=True
@@ -768,9 +786,14 @@ class Workspaces:
                 
                 total_assets = r.json()['totalElements']
                 if page_counter == 0:
-                    print(f"{time_counter_start.strftime('%d-%b-%y %H:%M:%S')} -- {total_assets} assets identified by query")
+                    _status(f"{time_counter_start.strftime('%d-%b-%y %H:%M:%S')} -- {total_assets} assets identified by query")
 
                 self.__asset_content_helper__(r, asset_list_name=asset_list_name, get_recent=get_recent, last_seen_days_back=last_seen_days_back, date_range_start=date_range_start, date_range_end=date_range_end)
+
+                if max_assets and len(getattr(self, asset_list_name).assets) >= max_assets:
+                    # Trim any overshoot from the last page.
+                    getattr(self, asset_list_name).assets = getattr(self, asset_list_name).assets[:max_assets]
+                    run_query = False
                 
                 page_counter+=1
                 
@@ -791,14 +814,14 @@ class Workspaces:
                         time_counter_diff = (datetime.datetime.now().replace(microsecond=0) - time_counter_start)
                         assets_so_far = (page_counter * max_page_size)
                         
-                        print(f"\nretrieved {assets_so_far} assets in {time_counter_diff}\nestimated time for remaining {total_assets - assets_so_far} assets: {str((time_counter_diff * (total_assets/assets_so_far)) - time_counter_diff).split('.')[0]}")
+                        _status(f"\nretrieved {assets_so_far} assets in {time_counter_diff}\nestimated time for remaining {total_assets - assets_so_far} assets: {str((time_counter_diff * (total_assets/assets_so_far)) - time_counter_diff).split('.')[0]}")
             
-            print(f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- query complete, {len(getattr(self, asset_list_name).assets)} assets retrieved\ncan check available asset lists via <mdeasm.Workspaces object>.asset_lists()")
+            _status(f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- query complete, {len(getattr(self, asset_list_name).assets)} assets retrieved\ncan check available asset lists via <mdeasm.Workspaces object>.asset_lists()")
             
             if auto_create_facet_filters:
-                print(f"\nautomatically creating facet filters for all assets in asset list: {asset_list_name}")
+                _status(f"\nautomatically creating facet filters for all assets in asset list: {asset_list_name}")
                 self.__facet_filter_helper__(asset_list_name=asset_list_name)
-                print(f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- facet filters created\ncan check available filters via <mdeasm.Workspaces object>.facet_filters()")
+                _status(f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- facet filters created\ncan check available filters via <mdeasm.Workspaces object>.facet_filters()")
 
         else:
             logging.error(f"{workspace_name} not found")

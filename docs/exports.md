@@ -15,6 +15,19 @@ python3 API/mdeasm_cli.py assets export \
   --no-facet-filters
 ```
 
+## Asset export (stdout)
+```bash
+source .venv/bin/activate
+
+# Machine-readable output goes to stdout; status/progress goes to stderr.
+python3 API/mdeasm_cli.py assets export \
+  --filter 'state = "confirmed" AND kind = "domain"' \
+  --format json \
+  --out - \
+  --get-all \
+  --no-facet-filters
+```
+
 ## Asset export (CSV)
 ```bash
 source .venv/bin/activate
@@ -29,5 +42,6 @@ python3 API/mdeasm_cli.py assets export \
 
 ## Notes
 - The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
-- For large exports, consider: `--max-page-size 100`, `--max-page-count N`, and `--no-facet-filters`.
+- For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.
+- For long-running exports, consider `--progress-every-pages 25` (status is printed to stderr).
 - For reliability tuning without code edits, see `python3 API/mdeasm_cli.py assets export --help` for: `--api-version`, `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
