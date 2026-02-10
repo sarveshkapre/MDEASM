@@ -50,6 +50,87 @@ def test_cli_assets_export_json_writes_file(tmp_path, monkeypatch):
     assert payload == [{"id": "domain$$example.com", "kind": "domain"}]
 
 
+def test_cli_assets_export_json_no_pretty_is_compact(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--no-pretty",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+
+    raw = out.read_text(encoding="utf-8")
+    assert "\n  " not in raw
+    payload = json.loads(raw)
+    assert payload == [{"id": "domain$$example.com", "kind": "domain"}]
+
+
+def test_cli_assets_export_ndjson_writes_file(tmp_path, monkeypatch):
+    out = tmp_path / "assets.ndjson"
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [
+                {"id": "domain$$example.com", "kind": "domain"},
+                {"id": "host$$www.example.com", "kind": "host"},
+            ]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind in ("domain","host")',
+            "--format",
+            "ndjson",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert [json.loads(l) for l in lines] == [
+        {"id": "domain$$example.com", "kind": "domain"},
+        {"id": "host$$www.example.com", "kind": "host"},
+    ]
+
+
 def test_cli_assets_export_csv_writes_file(tmp_path, monkeypatch):
     out = tmp_path / "assets.csv"
     captured = {}

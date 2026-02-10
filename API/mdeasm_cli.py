@@ -42,12 +42,26 @@ def _parse_http_timeout(value: str) -> tuple[float, float]:
     return (connect_s, read_s)
 
 
-def _write_json(path: Path | None, payload) -> None:
-    data = json.dumps(payload, indent=2, default=_json_default, sort_keys=True)
+def _write_json(path: Path | None, payload, *, pretty: bool) -> None:
+    if pretty:
+        data = json.dumps(payload, indent=2, default=_json_default, sort_keys=True)
+    else:
+        # Compact JSON is friendlier for pipes and large payloads.
+        data = json.dumps(payload, default=_json_default, sort_keys=True, separators=(",", ":"))
     if path is None:
         sys.stdout.write(data + "\n")
     else:
         path.write_text(data + "\n", encoding="utf-8")
+
+
+def _write_ndjson(path: Path | None, rows: list[dict]) -> None:
+    out_fh = sys.stdout if path is None else path.open("w", encoding="utf-8", newline="\n")
+    try:
+        for row in rows:
+            out_fh.write(json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":")) + "\n")
+    finally:
+        if path is not None:
+            out_fh.close()
 
 
 def _write_csv(path: Path | None, rows: list[dict]) -> None:
@@ -86,9 +100,15 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--filter", required=True, help="MDEASM query filter (string)")
     export.add_argument(
         "--format",
-        choices=["json", "csv"],
+        choices=["json", "ndjson", "csv"],
         default="json",
         help="Output format",
+    )
+    export.add_argument(
+        "--pretty",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Pretty-print JSON output (default: true; ignored for ndjson/csv)",
     )
     export.add_argument("--out", default="", help="Output path (default: stdout)")
     export.add_argument(
@@ -202,7 +222,9 @@ def main(argv: list[str] | None = None) -> int:
 
         out_path = None if (not args.out or args.out == "-") else Path(args.out)
         if args.format == "json":
-            _write_json(out_path, rows)
+            _write_json(out_path, rows, pretty=bool(args.pretty))
+        elif args.format == "ndjson":
+            _write_ndjson(out_path, rows)
         else:
             _write_csv(out_path, rows)
         return 0
