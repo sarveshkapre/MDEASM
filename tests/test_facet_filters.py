@@ -84,3 +84,24 @@ def test_facet_filters_special_cases_services_location_webcomponents_sslserverco
 
     assert ws.filters.sslServerConfig[("TLS_AES_128_GCM_SHA256", "1.2")]["count"] == 1
     assert ws.filters.sslServerConfig[("TLS_AES_256_GCM_SHA384", "1.3")]["count"] == 1
+
+
+def test_facet_filters_single_element_specs_are_tuples_not_strings():
+    ws = _new_ws()
+    ws.assetList = mdeasm.AssetList()
+
+    a = mdeasm.Asset()
+    a.id = "host$$facet.example"
+    a.kind = "host"
+    a.cookies = [{"cookieName": "sessionid"}]
+    a.ipBlocks = [{"ipBlock": "192.0.2.0/24"}]
+    a.finalIpBlocks = [{"ipBlock": "198.51.100.0/24"}]
+    a.resourceUrls = [{"url": "https://example.com/"}]
+
+    ws.assetList.assets = [a]
+    ws.__facet_filter_helper__(asset_list_name="assetList")
+
+    assert ws.filters.cookies[("sessionid",)]["count"] == 1
+    assert ws.filters.ipBlocks[("192.0.2.0/24",)]["count"] == 1
+    assert ws.filters.finalIpBlocks[("198.51.100.0/24",)]["count"] == 1
+    assert ws.filters.resourceUrls[("https://example.com/",)]["count"] == 1
