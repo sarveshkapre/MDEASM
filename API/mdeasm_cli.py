@@ -48,6 +48,21 @@ def _parse_http_timeout(value: str) -> tuple[float, float]:
     return (connect_s, read_s)
 
 
+def _find_dotenv_path(start: Path | None = None) -> Path | None:
+    """
+    Find a `.env` file by walking up from `start` (default: CWD).
+
+    This mirrors `python-dotenv`'s common "search parents" behavior and is useful for
+    producing actionable diagnostics in `mdeasm doctor`.
+    """
+    cur = (start or Path.cwd()).resolve()
+    for p in [cur, *cur.parents]:
+        cand = p / ".env"
+        if cand.is_file():
+            return cand
+    return None
+
+
 def _cli_version() -> str:
     # Prefer the installed distribution version (CI installs `-e .`), but fall back to the
     # upstream helper's `_VERSION` when running directly from a checkout.
@@ -356,6 +371,65 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"%(prog)s {_cli_version()}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    doctor = sub.add_parser("doctor", help="Environment/auth sanity checks (non-destructive)")
+    doctor.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    doctor.add_argument("--out", default="", help="Output path (default: stdout)")
+    doctor.add_argument(
+        "--probe",
+        action="store_true",
+        help="Attempt a tiny control-plane probe (list workspaces). Requires env credentials.",
+    )
+    doctor.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log verbosity (repeatable; maps to INFO/DEBUG)",
+    )
+    doctor.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    doctor.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    doctor.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    doctor.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    doctor.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="Disable HTTP retry/backoff (default: enabled)",
+    )
+    doctor.add_argument(
+        "--max-retry",
+        type=int,
+        default=None,
+        help="Max retry attempts when retry is enabled (default: helper default)",
+    )
+    doctor.add_argument(
+        "--backoff-max-s",
+        type=float,
+        default=None,
+        help="Max backoff sleep seconds between retries (default: helper default)",
+    )
+
     workspaces = sub.add_parser("workspaces", help="Workspace operations")
     workspaces_sub = workspaces.add_subparsers(dest="workspaces_cmd", required=True)
 
@@ -620,6 +694,95 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    if args.cmd == "doctor":
+        # Avoid importing `mdeasm` unless the user asked for a network probe; this keeps
+        # `mdeasm doctor` usable as a "what am I missing?" command even before install.
+        required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+        recommended = ["WORKSPACE_NAME"]
+        optional = ["EASM_API_VERSION", "EASM_CP_API_VERSION", "EASM_DP_API_VERSION"]
+
+        env_state = {}
+        missing_required: list[str] = []
+        for k in required + recommended + optional:
+            v = os.getenv(k)
+            if k == "CLIENT_SECRET":
+                env_state[k] = {"set": bool(v)}
+            else:
+                env_state[k] = {"set": bool(v), "value": (v if v else "")}
+        for k in required:
+            if not env_state[k]["set"]:
+                missing_required.append(k)
+
+        dotenv_path = _find_dotenv_path()
+        payload = {
+            "ok": len(missing_required) == 0,
+            "cwd": str(Path.cwd()),
+            "dotenv": str(dotenv_path) if dotenv_path else "",
+            "checks": {
+                "env": {
+                    "missing_required": missing_required,
+                    "required": required,
+                    "recommended": recommended,
+                    "optional": optional,
+                    "values": env_state,
+                }
+            },
+        }
+
+        if args.probe and not missing_required:
+            try:
+                import mdeasm  # type: ignore
+
+                level = None
+                if args.log_level:
+                    level = args.log_level
+                elif args.verbose >= 2:
+                    level = "DEBUG"
+                elif args.verbose == 1:
+                    level = "INFO"
+                if level and hasattr(mdeasm, "configure_logging"):
+                    mdeasm.configure_logging(level)
+
+                ws_kwargs = _build_ws_kwargs(args)
+                # Control-plane-only probe; do not require data-plane scope.
+                ws_kwargs["workspace_name"] = ""
+                ws_kwargs["init_data_plane_token"] = False
+                ws_kwargs["emit_workspace_guidance"] = False
+
+                ws = mdeasm.Workspaces(**ws_kwargs)
+                names = sorted(list((getattr(ws, "_workspaces", {}) or {}).keys()), key=str.lower)
+                payload["checks"]["probe"] = {
+                    "ok": True,
+                    "workspaces": {"count": len(names), "names": names},
+                }
+            except Exception as e:
+                payload["ok"] = False
+                payload["checks"]["probe"] = {"ok": False, "error": str(e)}
+
+        out_path = None if (not args.out or args.out == "-") else Path(args.out)
+        if args.format == "json":
+            _write_json(out_path, payload, pretty=True)
+        else:
+            lines: list[str] = []
+            if payload["ok"]:
+                lines.append("ok: true")
+            else:
+                lines.append("ok: false")
+            if payload.get("dotenv"):
+                lines.append(f"dotenv: {payload['dotenv']}")
+            if missing_required:
+                lines.append("missing required env vars: " + ", ".join(missing_required))
+            if args.probe:
+                probe = payload.get("checks", {}).get("probe") or {}
+                if probe.get("ok"):
+                    ws = probe.get("workspaces") or {}
+                    lines.append(f"probe: ok (workspaces={ws.get('count')})")
+                else:
+                    lines.append(f"probe: failed ({probe.get('error', '')})")
+            _write_lines(out_path, lines)
+
+        return 0 if payload["ok"] else 1
 
     if args.cmd == "workspaces" and args.workspaces_cmd == "list":
         import mdeasm

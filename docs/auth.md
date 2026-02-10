@@ -50,6 +50,23 @@ Keep access least-privilege:
 - `.env` is missing `TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, or `CLIENT_SECRET`.
 - Confirm you are running from the repo (so `.env` is discoverable) or pass args to `mdeasm.Workspaces(...)`.
 
+## Doctor (Sanity Checks)
+
+If you installed the repo in editable mode (`python3 -m pip install -e .`), you can run:
+```bash
+source .venv/bin/activate
+mdeasm doctor --format json
+```
+
+To also run a tiny control-plane probe (list workspaces):
+```bash
+mdeasm doctor --probe --format json
+```
+
+Notes:
+- Exit code is `0` when checks pass, `1` when required env vars are missing or the probe fails.
+- `CLIENT_SECRET` is never printed; only presence is reported.
+
 `401` (Unauthorized)
 - Bad client id/secret, wrong tenant, or token scope mismatch.
 - Rotate the client secret and confirm the app registration exists in the tenant referenced by `TENANT_ID`.
