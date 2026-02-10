@@ -1,0 +1,33 @@
+# Exports (CLI)
+
+This repo includes a small opt-in CLI for common automation flows.
+
+## Asset export (JSON)
+```bash
+source .venv/bin/activate
+
+# Ensure `.env` exists at repo root (see README/API docs), then:
+python3 API/mdeasm_cli.py assets export \
+  --filter 'state = "confirmed" AND kind = "domain"' \
+  --format json \
+  --out assets.json \
+  --get-all \
+  --no-facet-filters
+```
+
+## Asset export (CSV)
+```bash
+source .venv/bin/activate
+
+python3 API/mdeasm_cli.py assets export \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --format csv \
+  --out assets.csv \
+  --get-all \
+  --no-facet-filters
+```
+
+## Notes
+- The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
+- For large exports, consider: `--max-page-size 100`, `--max-page-count N`, and `--no-facet-filters`.
+

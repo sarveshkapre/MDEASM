@@ -25,6 +25,9 @@ python3 -m pip install -r requirements.txt --upgrade
 - `API/retreive_risk_observations.py` (legacy name)
 - `API/retrieve_risk_observations.py` (correctly spelled alias)
 
+## CLI exports (optional)
+See `docs/exports.md` for JSON/CSV export recipes using `API/mdeasm_cli.py`.
+
 ## Troubleshooting
 - `ModuleNotFoundError: No module named 'jwt'`: install `PyJWT` (import name is `jwt`).
 - `missing required configuration: ...`: ensure `.env` has `TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`.

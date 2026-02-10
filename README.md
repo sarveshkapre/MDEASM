@@ -5,6 +5,7 @@ Helpers and examples for Microsoft Defender External Attack Surface Management (
 - `API/`: Python helper (`API/mdeasm.py`) plus example scripts
 - `KQL/`: query samples for Log Analytics / Azure Data Explorer
 - `Workbook/`: Azure Workbook template + screenshots
+- `docs/exports.md`: CLI export recipes
 
 ## Quickstart (API)
 ```bash
