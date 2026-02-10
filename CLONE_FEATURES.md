@@ -7,21 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **CSV export column selection**
-  - Scope: add `--columns` (explicit list) and/or `--columns-from` (file) to reduce output size and stabilize schemas for pipelines.
-  - Why: most asset inventories have many fields; limiting columns reduces noise and cost.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Add a "safe logging" mode**
-  - Scope: avoid configuring root logging at import; add explicit opt-in config helpers and CLI verbosity knobs; ensure no secrets ever leak to logs.
-  - Why: improves operational safety in CI/logged environments and reduces surprising global side effects.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 4
-
-- [ ] **Treat API version drift as a first-class concern**
-  - Scope: separate control-plane vs data-plane `api-version` knobs (env/kwargs/CLI) and add a unit test to ensure the right version is used per plane; document override guidance and add an opt-in integration smoke for data-plane drift.
-  - Why: Defender EASM uses preview versions; drift can silently break automations.
-  - Score: Impact 4 | Effort 3 | Strategic fit 5 | Differentiation 0 | Risk 2 | Confidence 3
-
 - [ ] **Atomic export writes**
   - Scope: when `--out <path>` is used, write to a temp file and rename (best-effort) to avoid partial/corrupt files on interruption.
   - Why: makes scheduled exports safer and reduces downstream pipeline breakage.
@@ -43,6 +28,21 @@
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
 ## Implemented
+- [x] **CSV export column selection**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest` (pass); commit `6efb19a`
+
+- [x] **Add a "safe logging" mode**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest` (pass); commit `6520e6f`
+
+- [x] **Treat API version drift as a first-class concern**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_integration_smoke.py`, `docs/auth.md`, `API/README.md`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest` (pass; integration tests skipped by default); commits `2b0357f`, `0c8559b`
+
 - [x] **Keep CLI stdout clean when `WORKSPACE_NAME` is missing**
   - Date: 2026-02-10
   - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`

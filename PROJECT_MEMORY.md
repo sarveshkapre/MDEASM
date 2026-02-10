@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Add `--columns` / `--columns-from` for CSV exports | Stabilizes schemas and reduces noise/cost for automation pipelines without changing default export behavior | `source .venv/bin/activate && ruff check . && pytest` (pass) | 6efb19a | high | trusted
+- 2026-02-10 | Make logging configuration opt-in (`configure_logging`) and add CLI verbosity flags | Avoid surprising root-logger side effects at import while keeping a first-class debugging path in the CLI | `source .venv/bin/activate && ruff check . && pytest` (pass) | 6520e6f | high | trusted
+- 2026-02-10 | Split control-plane vs data-plane `api-version` knobs + add opt-in data-plane drift smoke | CP and DP preview versions can drift independently; separate knobs reduce breakage and the opt-in smoke provides a minimal regression probe | `source .venv/bin/activate && ruff check . && pytest` (pass; integration tests skipped by default) | 2b0357f, 0c8559b | high | trusted
 - 2026-02-10 | Keep CLI/machine-readable stdout clean by emitting missing-workspace guidance to stderr | `Workspaces.__init__` calls `get_workspaces()` and previously used `print()`, which could corrupt JSON/CSV pipelines when `WORKSPACE_NAME` was unset and multiple workspaces existed | `source .venv/bin/activate && ruff check . && pytest` (pass) | b937478 | high | trusted
 - 2026-02-10 | Make the helper pip-installable (editable) and add a console script (`mdeasm`) + CI packaging smoke | Reduce `sys.path`/`cwd` footguns and make CLI usage automation-friendly | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help >/dev/null` (pass) | b6a0599 | high | trusted
 - 2026-02-10 | Add compact JSON and NDJSON output modes to the CLI | Improve pipeline ergonomics (smaller JSON, line-oriented ingestion) without changing default behavior | `source .venv/bin/activate && ruff check . && pytest` (pass) | ec831f4 | high | trusted
@@ -37,11 +40,16 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Add an opt-in real integration smoke test (skipped by default) to catch auth/api-version drift early.
-- Decide whether to keep default `EASM_API_VERSION=2022-04-01-preview` or bump the default after validating against current Microsoft Learn reference versions.
+- Consider atomic export writes for `--out <path>` to avoid partial files on interruption.
+- Consider adding `--filter @path` to reduce shell-escaping and make long filters reviewable.
+- Decide whether to keep default `EASM_API_VERSION=2022-04-01-preview` or bump defaults after validating against current Microsoft Learn reference versions.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest` | `All checks passed!`; `25 passed, 2 skipped` | pass
+- 2026-02-10 | `source .venv/bin/activate && python -m compileall API` | compiled `API/` | pass
+- 2026-02-10 | `source .venv/bin/activate && python -m pip install -e . --upgrade && python -m mdeasm_cli --help >/dev/null && mdeasm --help >/dev/null` | editable install ok; CLI help ok | pass
+- 2026-02-10 | `gh run watch 21870700584 -R sarveshkapre/MDEASM --exit-status` | CI succeeded for commit `0c8559b` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && mdeasm --help >/dev/null && python -m mdeasm_cli --help >/dev/null` | `All checks passed!`; `19 passed, 1 skipped`; compile ok; CLI help ok | pass
 - 2026-02-10 | `gh run watch 21869443801 -R sarveshkapre/MDEASM --exit-status` | CI succeeded for commit `cbea835` | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -c "import mdeasm, mdeasm_cli; print('import ok')"` | `All checks passed!`; `16 passed, 1 skipped`; compile ok; import ok | pass
