@@ -205,3 +205,41 @@ def test_get_workspace_assets_status_to_stderr_and_max_assets_cap(capsys):
     assert "assets identified by query" in out.err
     assert "query complete" in out.err
     assert len(ws.assetList.assets) == 4
+
+
+def test_get_workspaces_missing_default_does_not_write_to_stdout(capsys):
+    ws = _new_ws()
+    ws._subscription_id = "sub0"
+    ws._default_workspace_name = ""
+    ws._workspaces = mdeasm.requests.structures.CaseInsensitiveDict()
+
+    class Resp:
+        def json(self):
+            # Minimal control-plane payload shape.
+            return {
+                "value": [
+                    {
+                        "name": "wsA",
+                        "properties": {"dataPlaneEndpoint": "https://dp.example/"},
+                        "id": "/subscriptions/sub0/resourceGroups/rg/providers/Microsoft.Easm/workspaces/wsA",
+                    },
+                    {
+                        "name": "wsB",
+                        "properties": {"dataPlaneEndpoint": "https://dp.example/"},
+                        "id": "/subscriptions/sub0/resourceGroups/rg/providers/Microsoft.Easm/workspaces/wsB",
+                    },
+                ]
+            }
+
+    def fake_query_helper(*_args, **_kwargs):
+        return Resp()
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    ws.get_workspaces(workspace_name="")
+
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert "no WORKSPACE_NAME set" in out.err
+    assert "\twsA" in out.err
+    assert "\twsB" in out.err

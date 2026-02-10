@@ -562,9 +562,15 @@ class Workspaces:
             if len(self._workspaces.keys()) == 1:
                 self.__set_default_workspace_name__(next(iter(self._workspaces)))
             else:
-                print("no WORKSPACE_NAME set in the ENVIRONMENT .env file\nmake sure to manually set one of the following as the default or provide it as a workspace_name='<XXX>' argument to a subsequent function\n")
+                # Avoid corrupting machine-readable stdout for CLI/workflows.
+                # This guidance is still useful for interactive use, so emit to stderr.
+                sys.stderr.write(
+                    "no WORKSPACE_NAME set in the ENVIRONMENT .env file\n"
+                    "make sure to manually set one of the following as the default or provide it as a "
+                    "workspace_name='<XXX>' argument to a subsequent function\n\n"
+                )
                 for k in self._workspaces.keys():
-                    print(f"\t{k}")
+                    sys.stderr.write(f"\t{k}\n")
 
     def create_workspace(self, resource_group_name=None, region=None, workspace_name=None):
         if not resource_group_name:
