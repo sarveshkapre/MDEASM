@@ -7,21 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **(Selected) Clarify `Asset.to_dict()` behavior (return value + optional printing)**
-  - Scope: make `Asset.to_dict()` return a dict while preserving current default "print" behavior; add a `print_` kwarg; update docs/examples; add unit test coverage.
-  - Why: removes a common papercut for programmatic usage without breaking interactive workflows.
-  - Score: Impact 3 | Effort 1 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **(Selected) Add `docs/auth.md` for `.env` + permissions troubleshooting**
-  - Scope: document required env vars, optional env vars, Azure roles/permissions at a high level, and common 401/403 failure modes; link from `README.md` and `API/README.md` while keeping those short.
-  - Why: reduces setup thrash and makes onboarding deterministic.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **(Selected) Add an opt-in real integration smoke test (skipped by default)**
-  - Scope: `pytest` integration test that runs only when `MDEASM_INTEGRATION=1` and required env vars are set; hit a lightweight endpoint (start with `get_workspaces`) and assert response shape.
-  - Why: catches auth/API-version regressions that unit tests cannot.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
 - [ ] **Add progress logging + `--max-assets` cap for CLI exports**
   - Scope: optional `--max-assets N` to cap results; periodic progress log (every N pages/assets) for long runs.
   - Why: makes large exports observable and prevents runaway automation.
@@ -48,6 +33,21 @@
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Clarify `Asset.to_dict()` behavior (return value + optional printing)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`, `API/README.md`
+  - Evidence (trusted: local tests): `ruff check . && pytest` (pass); commit `1f44548`
+
+- [x] **Add `docs/auth.md` for `.env` + permissions troubleshooting**
+  - Date: 2026-02-10
+  - Scope: `docs/auth.md`, `README.md`, `API/README.md`
+  - Evidence (trusted: local tests): `ruff check . && pytest` (pass); commit `539fc66`
+
+- [x] **Add an opt-in real integration smoke test (skipped by default)**
+  - Date: 2026-02-10
+  - Scope: `tests/test_integration_smoke.py`
+  - Evidence (trusted: local tests): `pytest` (pass; integration test skipped by default); commit `86b4128`
+
 - [x] **Expose CLI flags for HTTP reliability knobs**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`

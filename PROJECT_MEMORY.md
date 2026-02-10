@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Make `Asset.to_dict()` return a dict while preserving default printing | Remove a programmatic usage papercut without breaking existing interactive workflows | `ruff check . && pytest` (pass) | 1f44548 | high | trusted
+- 2026-02-10 | Add `docs/auth.md` (env vars + permissions + common failures) and link from READMEs | Reduce onboarding thrash and make auth/permission troubleshooting skimmable | `ruff check . && pytest` (pass) | 539fc66 | high | trusted
+- 2026-02-10 | Add opt-in integration smoke test (`MDEASM_INTEGRATION=1`) | Provide a realistic control-plane regression check without forcing credentials in CI | `pytest` (pass; test skipped by default) | 86b4128 | medium | trusted
 - 2026-02-10 | Expose CLI flags for HTTP reliability knobs | Reduce brittleness in automation and allow environment-specific tuning without code edits | `ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help` (pass) | dd9ae80 | high | trusted
 - 2026-02-10 | Remove `eval()` from facet filter construction; reuse a `requests.Session` | Security hardening + correctness fix for facet counts; improved HTTP performance for paginated exports | `ruff check .` (pass); `pytest` (11 passed); `python -m compileall API` (pass) | 34c636e | high | trusted
 - 2026-02-10 | Add dependency manifests + runnable quickstart docs | Make repo installable/runnable without guesswork; fix PyJWT naming confusion | `python -m compileall API` (pass) | d50f47a | high | trusted
@@ -33,6 +36,8 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `13 passed, 1 skipped`; compile ok | pass
+- 2026-02-10 | `gh run list -R sarveshkapre/MDEASM -L 5` | CI success for commits `86b4128`, `539fc66`, `d4984ca` (run ids `21867777681`, `21867755140`, `21867716197`) | pass
 - 2026-02-10 | `python3 -m venv .venv && source .venv/bin/activate && python -m pip install -r requirements-dev.txt` | deps installed (pytest, ruff, requests, PyJWT, dotenv, dateutil) | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
 - 2026-02-10 | `source .venv/bin/activate && pytest` | `3 passed` | pass
