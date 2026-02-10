@@ -7,20 +7,52 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
+Selected (cycle 10)
+- [ ] **CLI: `mdeasm doctor` (env + auth sanity checks)**
+  - Scope: add a non-destructive command that validates required env vars, prints configured api-versions, and optionally performs a small control-plane probe (list workspaces). Always keep stdout machine-readable when requested.
+  - Why: reduces setup thrash and creates a standard "are my credentials wired correctly?" answer.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **Saved filters: CRUD in helper + CLI (`mdeasm saved-filters ...`)**
+  - Scope: implement list/get/put/delete for data-plane saved filters; add CLI commands for automation flows and docs for common use (store a query once, reuse in exports).
+  - Why: saved filters are a first-class platform feature and reduce repeated brittle filter strings in scripts/CI.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+Backlog (keep deduped)
 - [ ] **Server-side export via data-plane `assets:export` task**
   - Scope: add an opt-in CLI mode that uses the data-plane `POST /assets:export` endpoint (columns + filename) to kick off an export task, then poll until completion and download the artifact; fall back to the existing paginated GET export path.
   - Why: paginated client-side exports can be slow and memory-heavy; a first-class export job path is a common pattern in mature ASM products.
-  - Score: Impact 3 | Effort 5 | Strategic fit 3 | Differentiation 1 | Risk 3 | Confidence 1
+  - Score: Impact 4 | Effort 5 | Strategic fit 4 | Differentiation 1 | Risk 4 | Confidence 2
 
-- [ ] **Promote upstream TODOs into scoped, testable work**
-  - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; asset snapshots; discovery group deletion if endpoint fixed).
+- [ ] **Tasks management: list/get/cancel/download (`mdeasm tasks ...`)**
+  - Scope: surface data-plane task operations (list, get, cancel, download) with safe defaults and structured output; reuse this for server-side exports and long-running operations.
+  - Why: async tasks are core to scaling workflows; having introspection/cancel is table-stakes reliability.
+  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+
+- [ ] **Data connections management (`mdeasm data-connections ...`)**
+  - Scope: list/create/delete data connections (Log Analytics / ADX) and validate parameters; document minimal happy path for exporting into Sentinel/ADX.
+  - Why: reduces manual portal steps and makes EASM data integration reproducible.
+  - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 2
+
+- [ ] **Promote remaining upstream TODOs into scoped, testable work**
+  - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (asset snapshots; discovery group deletion if endpoint fixed; cancel tasks; resource tagging).
   - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
-- [ ] **CLI: `mdeasm doctor` (env + auth sanity checks)**
-  - Scope: add a non-destructive command that validates required env vars, prints configured api-versions, and optionally performs a tiny control-plane probe; always keep stdout machine-readable when requested.
-  - Why: reduces setup thrash and creates a standard "are my credentials wired correctly?" answer.
-  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
+- [ ] **CLI ergonomics: shell completion + examples**
+  - Scope: ship `bash`/`zsh` completion generation and add 3-5 focused recipes for exports + saved filters + reliability flags.
+  - Why: reduces CLI friction and improves adoption for automation.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Reliability: make paging/resume first-class for large exports**
+  - Scope: add `--resume-skip` / checkpoint file support for long exports; ensure deterministic ordering via `orderby` when available.
+  - Why: reduces wasted time on flaky long-running export jobs.
+  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+
+- [ ] **Security: redact secrets from exceptions/logging across helper + CLI**
+  - Scope: add a single redaction utility that scrubs `CLIENT_SECRET` and bearer tokens from any raised/printed error payloads; extend tests to lock in behavior.
+  - Why: prevents accidental secret leakage in CI logs and shared terminals.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
 - [x] **Fix facet filter single-element tuple specs**
