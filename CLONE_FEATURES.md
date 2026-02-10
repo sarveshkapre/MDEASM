@@ -7,25 +7,35 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
+- [ ] **(Selected, cycle 8) Export schema helper (`mdeasm assets schema`)**
+  - Scope: add a CLI command that prints the observed column set for a query (union-of-keys) without writing the full export payload; output should be consumable by `--columns-from`.
+  - Why: helps users choose `--columns` deterministically and detect schema drift early.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **(Selected, cycle 8) Add an opt-in “real export” integration smoke (skipped by default)**
+  - Scope: extend integration smoke to optionally run a tiny `mdeasm assets export --max-assets 1` call when `MDEASM_INTEGRATION_EXPORT=1` and required env vars are present.
+  - Why: catches data-plane export regressions earlier than unit tests without requiring creds in CI.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **CLI: `mdeasm workspaces list` (stdout-safe JSON)**
+  - Scope: add a CLI command that lists available workspaces (names + endpoints) and never prints guidance to stdout; include `--format json|lines`.
+  - Why: makes multi-workspace environments less error-prone and improves automation/diagnostics.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Performance: streaming asset export path (avoid storing all assets in-memory)**
+  - Scope: add a `stream_workspace_assets()` helper (or callback sink) so CLI exports can write rows incrementally (especially NDJSON/CSV) without collecting all rows first.
+  - Why: reduces peak memory and improves time-to-first-byte for large inventories.
+  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+
 - [ ] **Server-side export via data-plane `assets:export` task**
   - Scope: add an opt-in CLI mode that uses the data-plane `POST /assets:export` endpoint (columns + filename) to kick off an export task, then poll until completion and download the artifact; fall back to the existing paginated GET export path.
   - Why: paginated client-side exports can be slow and memory-heavy; a first-class export job path is a common pattern in mature ASM products.
   - Score: Impact 3 | Effort 5 | Strategic fit 3 | Differentiation 1 | Risk 3 | Confidence 1
 
-- [ ] **Export schema helper (`mdeasm assets schema`)**
-  - Scope: add a CLI command that prints the observed column set for a query (union-of-keys) without writing the full export payload; output should be consumable by `--columns-from`.
-  - Why: helps users choose `--columns` deterministically and detect schema drift early.
-  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 2
-
 - [ ] **Promote upstream TODOs into scoped, testable work**
   - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; asset snapshots; discovery group deletion if endpoint fixed).
   - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
-
-- [ ] **Add an opt-in “real export” integration smoke (skipped by default)**
-  - Scope: extend integration smoke to optionally run a tiny `assets export --max-assets 1` call when `MDEASM_INTEGRATION=1` and required env vars are present.
-  - Why: catches data-plane export regressions earlier than unit tests without requiring creds in CI.
-  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
 
 ## Implemented
 - [x] **Make example scripts import-safe (`main()` guards)**
