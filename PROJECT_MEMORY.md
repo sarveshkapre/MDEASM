@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Make CLI asset exports stdout-safe (status to stderr) and add `--max-assets`/`--progress-every-pages` knobs | Prevent corrupted JSON/CSV when piping and make long exports controllable/observable | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` (pass) | dc5b59d | high | trusted
 - 2026-02-10 | Make `Asset.to_dict()` return a dict while preserving default printing | Remove a programmatic usage papercut without breaking existing interactive workflows | `ruff check . && pytest` (pass) | 1f44548 | high | trusted
 - 2026-02-10 | Add `docs/auth.md` (env vars + permissions + common failures) and link from READMEs | Reduce onboarding thrash and make auth/permission troubleshooting skimmable | `ruff check . && pytest` (pass) | 539fc66 | high | trusted
 - 2026-02-10 | Add opt-in integration smoke test (`MDEASM_INTEGRATION=1`) | Provide a realistic control-plane regression check without forcing credentials in CI | `pytest` (pass; test skipped by default) | 86b4128 | medium | trusted
@@ -25,6 +26,7 @@
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
+- 2026-02-10 | CLI exports to stdout could produce invalid JSON/CSV | `get_workspace_assets()` printed status/progress to stdout while the CLI also wrote machine-readable output to stdout | Add `status_to_stderr`/`quiet` knobs and make the CLI send status to stderr; add stdout-mode regression tests | Keep stdout-mode tests for CLI and keep status output configurable in helper methods | dc5b59d | high
 - 2026-02-10 | `__validate_asset_id__` could raise `UnboundLocalError` for invalid inputs | Base64 decode path didn't validate input and failed to raise when roundtrip check failed, leaving `verified_asset_id` unset | Use `base64.b64decode(..., validate=True)` and raise on non-canonical/non-base64 values | Keep unit tests for invalid asset ids and run `pytest` in CI | 8cd0881 | high
 - 2026-02-10 | `date_range_end`-only filtering referenced `date_start` | Copy/paste oversight in date-range condition and exception handling masked the bug | Use `date_end` in the end-only path and add a focused regression test | Add unit tests for each date-filter mode (start-only, end-only, start+end) before changing filtering logic | 1e35eb9 | high
 
@@ -36,6 +38,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` | `All checks passed!`; `16 passed, 1 skipped`; compile ok; CLI help ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `13 passed, 1 skipped`; compile ok | pass
 - 2026-02-10 | `gh run list -R sarveshkapre/MDEASM -L 5` | CI success for commits `86b4128`, `539fc66`, `d4984ca` (run ids `21867777681`, `21867755140`, `21867716197`) | pass
 - 2026-02-10 | `gh run watch 21867830161 -R sarveshkapre/MDEASM --exit-status` | CI succeeded for commit `ceb9bc5` | pass

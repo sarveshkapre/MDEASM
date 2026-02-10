@@ -7,11 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Add progress logging + `--max-assets` cap for CLI exports**
-  - Scope: optional `--max-assets N` to cap results; periodic progress log (every N pages/assets) for long runs.
-  - Why: makes large exports observable and prevents runaway automation.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Package the Python helper for ergonomic installs**
   - Scope: turn `API/mdeasm.py` into an installable module (minimal `pyproject` build config) while keeping existing examples working.
   - Why: removes the "copy into same directory" requirement and improves DX.
@@ -23,7 +18,7 @@
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Tighten output ergonomics for exports**
-  - Scope: allow `--out -` explicitly for stdout; add `--pretty/--no-pretty` for JSON; optionally add `ndjson` for streaming large outputs.
+  - Scope: add `--pretty/--no-pretty` for JSON; optionally add `ndjson` for streaming large outputs.
   - Why: improves composability in shell pipelines and large export performance.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
@@ -33,6 +28,11 @@
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Add progress logging + `--max-assets` cap for CLI exports**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `ruff check . && pytest && python -m compileall API` (pass); commit `dc5b59d`
+
 - [x] **Clarify `Asset.to_dict()` behavior (return value + optional printing)**
   - Date: 2026-02-10
   - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`, `API/README.md`
