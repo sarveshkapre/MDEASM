@@ -7,36 +7,20 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Add dependency manifests + fix docs for correct deps (PyJWT naming)**
-  - Scope: `requirements.txt`, `requirements-dev.txt`, `API/README.md`, root `README.md`
-  - Why now: repo currently has no installable dependency manifest; docs instruct installing `jwt` (wrong package name).
-  - Score: Impact 5 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 5
+- [ ] **Market parity exports (CSV/JSON) via a tiny CLI wrapper**
+  - Scope: add `API/mdeasm_cli.py` (opt-in) without breaking existing scripts.
+  - Why: most ASM products emphasize operational exports/integrations.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 2 | Confidence 3
 
-- [ ] **Add unit tests for critical helper behavior (token expiry, asset id validation, retry/backoff)**
-  - Scope: new `tests/` with request mocking; no real Azure calls.
-  - Why now: protects the recently-hardened auth/retry logic from regressions.
-  - Score: Impact 5 | Effort 3 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 4
+- [ ] **Package the Python helper for ergonomic installs**
+  - Scope: turn `API/mdeasm.py` into an installable module (`src/` layout or minimal `pyproject` build config).
+  - Why: removes the "copy into same directory" requirement and improves DX.
+  - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Add GitHub Actions CI (lint-lite + tests)**
-  - Scope: `.github/workflows/ci.yml` running ruff + pytest + compileall.
-  - Why now: keeps main green and gives fast feedback to future changes.
-  - Score: Impact 5 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Static quality bar (minimal, non-invasive)**
-  - Scope: `pyproject.toml` for ruff/pytest config (keep ruff rules narrow to avoid mass refactors).
-  - Score: Impact 4 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Add a correctly-spelled script alias for risk observations**
-  - Scope: add `API/retrieve_risk_observations.py` wrapper; keep `API/retreive_risk_observations.py` for compatibility.
-  - Score: Impact 3 | Effort 1 | Strategic fit 4 | Differentiation 0 | Risk 0 | Confidence 5
-
-- [ ] **Upgrade root README to be runnable (quickstart, config, common workflows)**
-  - Scope: `README.md` (root) + references to `API/README.md`, `KQL/README.md`, `Workbook/README.md`.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Docs: add a “Troubleshooting” section (token scopes, .env location, common API errors)**
-  - Scope: `API/README.md`, `README.md`.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **Configurable HTTP behavior**
+  - Scope: allow overriding `_http_timeout`, retry count, and backoff via `Workspaces(...)` args.
+  - Why: bulk exports and large workspaces benefit from tunable reliability settings.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
 ## Implemented
 - [x] **Fix auth/token refresh correctness + reliability hardening (highest impact)**
@@ -44,15 +28,40 @@
   - Scope: `API/mdeasm.py`
   - Evidence (trusted: local git history): commit `3a5164a` updates token expiry check, control-plane token refresh assignment, request timeouts, retry/backoff.
 
+- [x] **Add dependency manifests + runnable quickstart docs**
+  - Date: 2026-02-10
+  - Scope: `requirements.txt`, `requirements-dev.txt`, `README.md`, `API/README.md`
+  - Evidence (trusted: local git history): commit `d50f47a`
+
+- [x] **Fix asset id validation edge case + remove SyntaxWarning**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `API/extract_associated_certNames_from_query.py`
+  - Evidence (trusted: local git history): commit `8cd0881`
+
+- [x] **Static quality bar + unit tests**
+  - Date: 2026-02-10
+  - Scope: `pyproject.toml`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local git history; local tests): commit `54f1289`
+
+- [x] **Add GitHub Actions CI (lint-lite + tests + compile)**
+  - Date: 2026-02-10
+  - Scope: `.github/workflows/ci.yml`
+  - Evidence (trusted: local git history): commit `b6f98ae`
+
+- [x] **Add correctly-spelled risk observation script alias**
+  - Date: 2026-02-10
+  - Scope: `API/retrieve_risk_observations.py`, `API/README.md`
+  - Evidence (trusted: local git history): commit `6aec111`
+
 ## Insights
 - Market scan (untrusted: external web sources; links captured during session):
   - Microsoft Defender EASM exposes both control-plane (ARM) and data-plane endpoints and uses OAuth2 client credentials. This repo’s `Workspaces` helper aligns with that model.
   - Commercial ASM tools generally emphasize: continuous discovery, asset inventory, risk prioritization, exports/integrations, and operational reliability (timeouts/retries).
   - Sources reviewed (untrusted):
-    - Microsoft Learn: Defender EASM REST API overview
-    - Microsoft Learn: EASM authentication overview (Microsoft Entra ID)
-    - Censys ASM: exporting assets (CSV)
-    - Palo Alto Networks: Cortex Xpanse product overview
+    - Microsoft Learn: Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - Microsoft Learn: EASM authentication overview (Microsoft Entra ID): https://learn.microsoft.com/en-us/defender-easm/authentication
+    - Censys ASM: exporting assets (CSV): https://support.censys.io/hc/en-us/articles/35338966133524-Exporting-Assets-in-Censys-ASM
+    - Palo Alto Networks: Cortex Xpanse product overview: https://www.paloaltonetworks.com/cortex/cortex-xpanse
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
