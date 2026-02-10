@@ -604,7 +604,7 @@ class Workspaces:
                 sys.stderr.write(
                     "no WORKSPACE_NAME set in the ENVIRONMENT .env file\n"
                     "make sure to manually set one of the following as the default or provide it as a "
-                    "workspace_name='<XXX>' argument to a subsequent function\n\n"
+                    "workspace_name='<workspace_name>' argument to a subsequent function\n\n"
                 )
                 for k in self._workspaces.keys():
                     sys.stderr.write(f"\t{k}\n")

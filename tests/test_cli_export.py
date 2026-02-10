@@ -13,6 +13,39 @@ sys.path.insert(0, str(REPO_ROOT / "API"))
 import mdeasm_cli  # noqa: E402
 
 
+def test_parse_http_timeout_read_only():
+    assert mdeasm_cli._parse_http_timeout("30") == (10.0, 30.0)
+    assert mdeasm_cli._parse_http_timeout("  30  ") == (10.0, 30.0)
+
+
+def test_parse_http_timeout_connect_read():
+    assert mdeasm_cli._parse_http_timeout("5,30") == (5.0, 30.0)
+    assert mdeasm_cli._parse_http_timeout(" 5 , 30 ") == (5.0, 30.0)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        " ",
+        ",",
+        "5,",
+        ",30",
+        "0",
+        "0,30",
+        "-1",
+        "5,-1",
+        "nan",
+        "inf",
+        "5,nan",
+        "1e309",  # inf on most platforms
+    ],
+)
+def test_parse_http_timeout_invalid(value):
+    with pytest.raises(ValueError):
+        mdeasm_cli._parse_http_timeout(value)
+
+
 def test_cli_assets_export_json_writes_file(tmp_path, monkeypatch):
     out = tmp_path / "assets.json"
     captured = {}

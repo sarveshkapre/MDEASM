@@ -2,6 +2,7 @@
 import argparse
 import csv
 import json
+import math
 import os
 import sys
 import tempfile
@@ -40,6 +41,8 @@ def _parse_http_timeout(value: str) -> tuple[float, float]:
         connect_s = 10.0
         read_s = float(raw)
 
+    if not math.isfinite(connect_s) or not math.isfinite(read_s):
+        raise ValueError("timeouts must be finite")
     if connect_s <= 0 or read_s <= 0:
         raise ValueError("timeouts must be > 0")
     return (connect_s, read_s)
