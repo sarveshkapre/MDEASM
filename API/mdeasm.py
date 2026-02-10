@@ -46,8 +46,16 @@ class Workspaces:
         'assetSecurityPolicies':('policyName','description'),'attributes':('attributeType','attributeValue'),'banners':('banner','port'),'cookies':('cookieName'),'finalIpBlocks':('ipBlock'),'headers':('headerName','headerValue'),'ipBlocks':('ipBlock'),'location':('value,countrycode','value,countryname','value,latitude','value,longitude'),'reputations':('threatType','listName'),'resourceUrls':('url'),'responseHeaders':('headerName','headerValue'),'services':('port','scheme','portStates,value'),'soaRecords':('nameServer','email','serialNumber'),'sslServerConfig':('cipherSuites','tlsVersions'),'webComponents':('name','type','version'),'cveId':('webComponent','name','cvssScore')}
 
     def __init__(self, tenant_id=os.getenv("TENANT_ID"), subscription_id=os.getenv("SUBSCRIPTION_ID"), client_id=os.getenv("CLIENT_ID"), client_secret=os.getenv("CLIENT_SECRET"), workspace_name=os.getenv("WORKSPACE_NAME"), *args, **kwargs) -> None:
-        # Default timeout (connect, read). Callers doing bulk exports need protection from hangs.
-        self._http_timeout = (10, 60)
+        # Instance defaults (overridable via kwargs for reliability and future-proofing).
+        # Note: keep these as kwargs to avoid breaking the historic positional signature.
+        self._http_timeout = kwargs.pop("http_timeout", (10, 60))  # (connect, read)
+        self._api_version = kwargs.pop(
+            "api_version",
+            os.getenv("EASM_API_VERSION") or "2022-04-01-preview",
+        )
+        self._default_retry = kwargs.pop("retry", True)
+        self._default_max_retry = kwargs.pop("max_retry", 5)
+        self._backoff_max_s = kwargs.pop("backoff_max_s", 30)
         if not (tenant_id and subscription_id and client_id and client_secret):
             missing = []
             if not tenant_id:
@@ -471,7 +479,11 @@ class Workspaces:
         for key in keys_to_del:
             delattr(self.filters, key)
 
-    def __workspace_query_helper__(self, calling_func, method, endpoint, url='', params=None, payload=None, data_plane=True, retry=True, max_retry=5, workspace_name=''):
+    def __workspace_query_helper__(self, calling_func, method, endpoint, url='', params=None, payload=None, data_plane=True, retry=None, max_retry=None, workspace_name=''):
+        if retry is None:
+            retry = getattr(self, "_default_retry", True)
+        if max_retry is None:
+            max_retry = getattr(self, "_default_max_retry", 5)
         if data_plane:
             if self.__token_expiry__(self._dp_token):
                 self._dp_token = self.__bearer_token__(data_plane=True)
@@ -492,7 +504,7 @@ class Workspaces:
             helper_url = f"https://{self._workspaces[self._default_workspace_name][1]}/{urllib.parse.quote(endpoint)}"
             
         helper_headers = {'Authorization': f"Bearer {token}"}
-        helper_params = {'api-version': '2022-04-01-preview'}
+        helper_params = {'api-version': getattr(self, "_api_version", "2022-04-01-preview")}
         if params:
             helper_params.update(params)
         
@@ -570,7 +582,7 @@ class Workspaces:
 
             # Backoff before next retry (respect Retry-After when present).
             if attempt < attempts:
-                sleep_s = min(2 ** (attempt - 1), 30)
+                sleep_s = min(2 ** (attempt - 1), getattr(self, "_backoff_max_s", 30))
                 try:
                     if 'r' in locals():
                         ra = r.headers.get('Retry-After')
@@ -1487,6 +1499,9 @@ class Asset:
             dict_with_vals[k] = v
         print(dict_with_vals)
 
+    def as_dict(self):
+        return dict(vars(self))
+
     def pretty(self, indent=2):
         dict_with_vals = {}
         for k,v in vars(self).items():
@@ -1499,6 +1514,15 @@ class AssetList:
 
     def __add_asset__(self, cls):
         self.assets.append(cls)
+
+    def as_dicts(self):
+        out = []
+        for asset in self.assets:
+            if hasattr(asset, "as_dict"):
+                out.append(asset.as_dict())
+            else:
+                out.append(dict(vars(asset)))
+        return out
 
 class FacetFilter:
     def __init__(self, *args, **kwargs) -> None:
