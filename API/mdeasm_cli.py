@@ -154,6 +154,16 @@ def _write_ndjson(path: Path | None, rows: list[dict]) -> None:
         raise
 
 
+def _write_lines(path: Path | None, lines: list[str]) -> None:
+    if path is None:
+        out_fh = sys.stdout
+        for line in lines:
+            out_fh.write(str(line) + "\n")
+        return
+    data = "".join(f"{line}\n" for line in lines)
+    _atomic_write_text(path, data, encoding="utf-8")
+
+
 def _read_columns_file(path: Path) -> list[str]:
     cols: list[str] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -232,6 +242,27 @@ def _parse_columns_arg(values: list[str] | None) -> list[str]:
         seen.add(c)
         deduped.append(c)
     return deduped
+
+
+def _build_ws_kwargs(args) -> dict:
+    ws_kwargs = {}
+    if getattr(args, "workspace_name", ""):
+        ws_kwargs["workspace_name"] = args.workspace_name
+    if getattr(args, "api_version", None):
+        ws_kwargs["api_version"] = args.api_version
+    if getattr(args, "dp_api_version", None):
+        ws_kwargs["dp_api_version"] = args.dp_api_version
+    if getattr(args, "cp_api_version", None):
+        ws_kwargs["cp_api_version"] = args.cp_api_version
+    if getattr(args, "http_timeout", None) is not None:
+        ws_kwargs["http_timeout"] = args.http_timeout
+    if getattr(args, "no_retry", False):
+        ws_kwargs["retry"] = False
+    if getattr(args, "max_retry", None) is not None:
+        ws_kwargs["max_retry"] = args.max_retry
+    if getattr(args, "backoff_max_s", None) is not None:
+        ws_kwargs["backoff_max_s"] = args.backoff_max_s
+    return ws_kwargs
 
 
 def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None = None) -> None:
@@ -395,13 +426,86 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not auto-create facet filters (faster for exports)",
     )
 
+    schema = assets_sub.add_parser("schema", help="Print observed columns for a query (union-of-keys)")
+    schema.add_argument(
+        "--filter",
+        required=True,
+        help="MDEASM query filter (string) or @path (or @- for stdin)",
+    )
+    schema.add_argument(
+        "--format",
+        choices=["lines", "json"],
+        default="lines",
+        help="Output format (default: lines suitable for --columns-from)",
+    )
+    schema.add_argument("-v", "--verbose", action="count", default=0, help="Increase log verbosity (repeatable)")
+    schema.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    schema.add_argument("--out", default="", help="Output path (default: stdout)")
+    schema.add_argument(
+        "--max-assets",
+        type=int,
+        default=200,
+        help="Sample at most N assets to infer columns (0=unbounded; default: 200)",
+    )
+    schema.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    schema.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    schema.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    schema.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    schema.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    schema.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="Disable HTTP retry/backoff (default: enabled)",
+    )
+    schema.add_argument(
+        "--max-retry",
+        type=int,
+        default=None,
+        help="Max retry attempts when retry is enabled (default: helper default)",
+    )
+    schema.add_argument(
+        "--backoff-max-s",
+        type=float,
+        default=None,
+        help="Max backoff sleep seconds between retries (default: helper default)",
+    )
+    schema.add_argument("--page", type=int, default=0, help="Starting page (skip)")
+    schema.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
+    schema.add_argument("--max-page-count", type=int, default=0, help="Max pages to fetch (0=unbounded)")
+    schema.add_argument("--get-all", action="store_true", help="Fetch pages until exhausted (bounded by --max-assets)")
+
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    if args.cmd == "assets" and args.assets_cmd == "export":
+    if args.cmd == "assets" and args.assets_cmd in ("export", "schema"):
         # Import inside the command so `--help` works without requiring env/config.
         import mdeasm
 
@@ -414,24 +518,7 @@ def main(argv: list[str] | None = None) -> int:
             level = "INFO"
         if level and hasattr(mdeasm, "configure_logging"):
             mdeasm.configure_logging(level)
-
-        ws_kwargs = {}
-        if args.workspace_name:
-            ws_kwargs["workspace_name"] = args.workspace_name
-        if args.api_version:
-            ws_kwargs["api_version"] = args.api_version
-        if args.dp_api_version:
-            ws_kwargs["dp_api_version"] = args.dp_api_version
-        if args.cp_api_version:
-            ws_kwargs["cp_api_version"] = args.cp_api_version
-        if args.http_timeout is not None:
-            ws_kwargs["http_timeout"] = args.http_timeout
-        if args.no_retry:
-            ws_kwargs["retry"] = False
-        if args.max_retry is not None:
-            ws_kwargs["max_retry"] = args.max_retry
-        if args.backoff_max_s is not None:
-            ws_kwargs["backoff_max_s"] = args.backoff_max_s
+        ws_kwargs = _build_ws_kwargs(args)
 
         try:
             query_filter = _resolve_filter_arg(args.filter)
@@ -440,43 +527,72 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
         ws = mdeasm.Workspaces(**ws_kwargs)
-        get_kwargs = dict(
-            query_filter=query_filter,
-            asset_list_name=args.asset_list_name,
-            page=args.page,
-            max_page_size=args.max_page_size,
-            max_page_count=args.max_page_count,
-            get_all=args.get_all,
-            auto_create_facet_filters=not args.no_facet_filters,
-            workspace_name=args.workspace_name,
-            # Keep machine-readable stdout clean; status/progress goes to stderr.
-            status_to_stderr=True,
-            max_assets=args.max_assets or 0,
-        )
-        if args.progress_every_pages and args.progress_every_pages > 0:
-            get_kwargs["track_every_N_pages"] = args.progress_every_pages
-        else:
-            # Only emit the initial/final status lines by default.
-            get_kwargs["no_track_time"] = True
+        if args.assets_cmd == "export":
+            get_kwargs = dict(
+                query_filter=query_filter,
+                asset_list_name=args.asset_list_name,
+                page=args.page,
+                max_page_size=args.max_page_size,
+                max_page_count=args.max_page_count,
+                get_all=args.get_all,
+                auto_create_facet_filters=not args.no_facet_filters,
+                workspace_name=args.workspace_name,
+                # Keep machine-readable stdout clean; status/progress goes to stderr.
+                status_to_stderr=True,
+                max_assets=args.max_assets or 0,
+            )
+            if args.progress_every_pages and args.progress_every_pages > 0:
+                get_kwargs["track_every_N_pages"] = args.progress_every_pages
+            else:
+                # Only emit the initial/final status lines by default.
+                get_kwargs["no_track_time"] = True
 
-        ws.get_workspace_assets(**get_kwargs)
+            ws.get_workspace_assets(**get_kwargs)
 
-        asset_list = getattr(ws, args.asset_list_name)
-        rows = asset_list.as_dicts() if hasattr(asset_list, "as_dicts") else []
+            asset_list = getattr(ws, args.asset_list_name)
+            rows = asset_list.as_dicts() if hasattr(asset_list, "as_dicts") else []
 
-        out_path = None if (not args.out or args.out == "-") else Path(args.out)
-        if args.format == "json":
-            _write_json(out_path, rows, pretty=bool(args.pretty))
-        elif args.format == "ndjson":
-            _write_ndjson(out_path, rows)
-        else:
-            columns = _parse_columns_arg(args.columns)
-            if args.columns_from:
-                columns = _read_columns_file(Path(args.columns_from)) + columns
-                # Dedup while preserving file order first.
-                columns = _parse_columns_arg(columns)
-            _write_csv(out_path, rows, columns=(columns or None))
-        return 0
+            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            if args.format == "json":
+                _write_json(out_path, rows, pretty=bool(args.pretty))
+            elif args.format == "ndjson":
+                _write_ndjson(out_path, rows)
+            else:
+                columns = _parse_columns_arg(args.columns)
+                if args.columns_from:
+                    columns = _read_columns_file(Path(args.columns_from)) + columns
+                    # Dedup while preserving file order first.
+                    columns = _parse_columns_arg(columns)
+                _write_csv(out_path, rows, columns=(columns or None))
+            return 0
+
+        if args.assets_cmd == "schema":
+            get_kwargs = dict(
+                query_filter=query_filter,
+                asset_list_name="assetList",
+                page=args.page,
+                max_page_size=args.max_page_size,
+                max_page_count=args.max_page_count,
+                get_all=args.get_all,
+                auto_create_facet_filters=False,
+                workspace_name=args.workspace_name,
+                status_to_stderr=True,
+                max_assets=args.max_assets or 0,
+                # Only emit the initial/final status lines by default.
+                no_track_time=True,
+            )
+            ws.get_workspace_assets(**get_kwargs)
+
+            asset_list = getattr(ws, "assetList", None)
+            rows = asset_list.as_dicts() if asset_list and hasattr(asset_list, "as_dicts") else []
+
+            cols = sorted({k for r in rows for k in r.keys()})
+            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            if args.format == "json":
+                _write_json(out_path, cols, pretty=True)
+            else:
+                _write_lines(out_path, cols)
+            return 0
 
     sys.stderr.write("unknown command\n")
     return 2

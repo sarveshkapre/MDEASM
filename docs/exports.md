@@ -79,6 +79,23 @@ mdeasm assets export \
   --columns id,kind,displayName,domain,firstSeen,lastSeen
 ```
 
+## Export schema (columns file)
+```bash
+source .venv/bin/activate
+
+# Generate a newline-delimited columns file (suitable for --columns-from).
+mdeasm assets schema \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --out columns.txt
+
+# Use that schema deterministically in CSV exports.
+mdeasm assets export \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --format csv \
+  --out assets.csv \
+  --columns-from columns.txt
+```
+
 ## Notes
 - The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
 - When using `--out <path>`, exports are written atomically (temp file + replace) to avoid partial files on interruption.

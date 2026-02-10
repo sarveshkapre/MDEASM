@@ -164,6 +164,79 @@ def test_cli_assets_export_filter_at_stdin(tmp_path, monkeypatch):
     assert captured["get_kwargs"]["query_filter"] == 'state = "confirmed" AND kind = "domain"'
 
 
+def test_cli_assets_schema_lines_to_stdout(monkeypatch, capsys):
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [
+                {"id": "domain$$example.com", "kind": "domain", "displayName": "example.com"},
+                {"id": "domain$$example.net", "kind": "domain", "domain": "example.net"},
+            ]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            captured["init_kwargs"] = dict(kwargs)
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            captured["get_kwargs"] = dict(kwargs)
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["assets", "schema", "--filter", 'kind = "domain"', "--max-assets", "10"])
+    assert rc == 0
+    assert captured["init_kwargs"] == {}
+    assert captured["get_kwargs"]["auto_create_facet_filters"] is False
+    out = capsys.readouterr().out.splitlines()
+    assert out == ["displayName", "domain", "id", "kind"]
+
+
+def test_cli_assets_schema_lines_writes_file(tmp_path, monkeypatch):
+    out = tmp_path / "columns.txt"
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "x", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["assets", "schema", "--filter", 'kind = "domain"', "--out", str(out)])
+    assert rc == 0
+    assert out.read_text(encoding="utf-8") == "id\nkind\n"
+
+
+def test_cli_assets_schema_json_to_stdout(monkeypatch, capsys):
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "x", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["assets", "schema", "--filter", 'kind = "domain"', "--format", "json", "--out", "-"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == ["id", "kind"]
+
+
 def test_cli_version_flag_exits_cleanly(capsys):
     ver = mdeasm_cli._cli_version()
     with pytest.raises(SystemExit) as e:
