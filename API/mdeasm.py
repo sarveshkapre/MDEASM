@@ -24,9 +24,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-log_level = 'WARNING'   ## DEBUG,INFO,WARNING,ERROR,CRITICAL ##
+_DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
+_DEFAULT_LOG_DATEFMT = "%d-%b-%y %H:%M:%S"
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(funcName)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', level = getattr(logging, log_level))
+
+def configure_logging(level: str | int | None = None, *, force: bool = False) -> None:
+    """
+    Opt-in logging configuration.
+
+    The upstream script historically configured root logging on import. That is surprising and can
+    affect host applications/CLIs. Keep the default import side-effect free and allow explicit
+    configuration in callers (including this repo's CLI).
+    """
+    if level is None:
+        level = os.getenv("MDEASM_LOG_LEVEL") or "WARNING"
+    if isinstance(level, str):
+        lvl = getattr(logging, level.upper(), None)
+        if lvl is None:
+            raise ValueError(f"invalid log level: {level!r}")
+    else:
+        lvl = int(level)
+    logging.basicConfig(format=_DEFAULT_LOG_FORMAT, datefmt=_DEFAULT_LOG_DATEFMT, level=lvl, force=force)
 
 class Workspaces:
     _state_map = requests.structures.CaseInsensitiveDict({

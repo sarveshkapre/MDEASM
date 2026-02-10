@@ -319,6 +319,86 @@ def test_cli_assets_export_wires_http_knobs(tmp_path, monkeypatch):
     assert captured["get_kwargs"]["workspace_name"] == "ws1"
 
 
+def test_cli_assets_export_log_level_calls_configure_logging(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    def configure_logging(level, force=False):
+        captured["log_level"] = level
+        captured["force"] = force
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, configure_logging=configure_logging)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--out",
+            str(out),
+            "--log-level",
+            "DEBUG",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["log_level"] == "DEBUG"
+
+
+def test_cli_assets_export_verbose_sets_info(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    def configure_logging(level, force=False):
+        captured["log_level"] = level
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, configure_logging=configure_logging)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--out",
+            str(out),
+            "-v",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["log_level"] == "INFO"
+
+
 def test_cli_assets_export_stdout_dash_and_status_to_stderr(monkeypatch, capsys):
     captured = {}
 

@@ -140,6 +140,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format",
     )
     export.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log verbosity (repeatable; maps to INFO/DEBUG)",
+    )
+    export.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    export.add_argument(
         "--pretty",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -226,6 +238,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "assets" and args.assets_cmd == "export":
         # Import inside the command so `--help` works without requiring env/config.
         import mdeasm
+
+        level = None
+        if args.log_level:
+            level = args.log_level
+        elif args.verbose >= 2:
+            level = "DEBUG"
+        elif args.verbose == 1:
+            level = "INFO"
+        if level and hasattr(mdeasm, "configure_logging"):
+            mdeasm.configure_logging(level)
 
         ws_kwargs = {}
         if args.workspace_name:
