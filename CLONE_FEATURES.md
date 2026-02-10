@@ -7,20 +7,35 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Add a "safe logging" mode**
-  - Scope: avoid configuring root logging at import; add explicit opt-in config helpers and CLI verbosity knobs; ensure no secrets ever leak to logs.
-  - Why: improves operational safety in CI/logged environments.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
 - [ ] **CSV export column selection**
   - Scope: add `--columns` (explicit list) and/or `--columns-from` (file) to reduce output size and stabilize schemas for pipelines.
   - Why: most asset inventories have many fields; limiting columns reduces noise and cost.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **Add a "safe logging" mode**
+  - Scope: avoid configuring root logging at import; add explicit opt-in config helpers and CLI verbosity knobs; ensure no secrets ever leak to logs.
+  - Why: improves operational safety in CI/logged environments and reduces surprising global side effects.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 4
 
 - [ ] **Treat API version drift as a first-class concern**
-  - Scope: periodically validate the default `EASM_API_VERSION`; document recommended versions and when to override; add a tiny integration smoke to detect `api-version` breakage.
+  - Scope: separate control-plane vs data-plane `api-version` knobs (env/kwargs/CLI) and add a unit test to ensure the right version is used per plane; document override guidance and add an opt-in integration smoke for data-plane drift.
   - Why: Defender EASM uses preview versions; drift can silently break automations.
-  - Score: Impact 3 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 2 | Confidence 2
+  - Score: Impact 4 | Effort 3 | Strategic fit 5 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Atomic export writes**
+  - Scope: when `--out <path>` is used, write to a temp file and rename (best-effort) to avoid partial/corrupt files on interruption.
+  - Why: makes scheduled exports safer and reduces downstream pipeline breakage.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Filter input ergonomics (`--filter @file`)**
+  - Scope: allow `--filter @path` to read a query filter from disk (strip whitespace/comments), and document recommended patterns for long filters.
+  - Why: real EASM filters get long; files are easier to review/version than shell-escaped strings.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Export schema helper**
+  - Scope: add a CLI mode that prints the observed column set for a query (union-of-keys) without writing the full export.
+  - Why: helps users choose `--columns` deterministically and detect schema drift early.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 2
 
 - [ ] **Promote upstream TODOs into scoped, testable work**
   - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; discovery group deletion if endpoint fixed; asset snapshots).

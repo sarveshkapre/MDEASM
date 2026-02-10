@@ -64,9 +64,44 @@ def _write_ndjson(path: Path | None, rows: list[dict]) -> None:
             out_fh.close()
 
 
-def _write_csv(path: Path | None, rows: list[dict]) -> None:
-    # Union-of-keys header to avoid silently dropping columns.
-    fieldnames: list[str] = sorted({k for r in rows for k in r.keys()})
+def _read_columns_file(path: Path) -> list[str]:
+    cols: list[str] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        cols.append(line)
+    return cols
+
+
+def _parse_columns_arg(values: list[str] | None) -> list[str]:
+    """
+    Accept columns as either:
+      - repeated flags: --columns id --columns kind
+      - comma-separated: --columns id,kind
+    """
+    if not values:
+        return []
+    out: list[str] = []
+    for v in values:
+        for part in (v or "").split(","):
+            col = part.strip()
+            if col:
+                out.append(col)
+    # Dedup while preserving order.
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for c in out:
+        if c in seen:
+            continue
+        seen.add(c)
+        deduped.append(c)
+    return deduped
+
+
+def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None = None) -> None:
+    # Union-of-keys header to avoid silently dropping columns, unless columns are explicit.
+    fieldnames: list[str] = columns or sorted({k for r in rows for k in r.keys()})
 
     out_fh = sys.stdout if path is None else path.open("w", encoding="utf-8", newline="")
     try:
@@ -111,6 +146,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Pretty-print JSON output (default: true; ignored for ndjson/csv)",
     )
     export.add_argument("--out", default="", help="Output path (default: stdout)")
+    export.add_argument(
+        "--columns",
+        action="append",
+        default=None,
+        help="CSV only: column name(s) to include (repeatable or comma-separated)",
+    )
+    export.add_argument(
+        "--columns-from",
+        default="",
+        help="CSV only: path to a newline-delimited columns file (blank lines and #comments ignored)",
+    )
     export.add_argument(
         "--max-assets",
         type=int,
@@ -226,7 +272,12 @@ def main(argv: list[str] | None = None) -> int:
         elif args.format == "ndjson":
             _write_ndjson(out_path, rows)
         else:
-            _write_csv(out_path, rows)
+            columns = _parse_columns_arg(args.columns)
+            if args.columns_from:
+                columns = _read_columns_file(Path(args.columns_from)) + columns
+                # Dedup while preserving file order first.
+                columns = _parse_columns_arg(columns)
+            _write_csv(out_path, rows, columns=(columns or None))
         return 0
 
     sys.stderr.write("unknown command\n")

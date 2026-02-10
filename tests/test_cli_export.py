@@ -177,6 +177,92 @@ def test_cli_assets_export_csv_writes_file(tmp_path, monkeypatch):
     assert "host$$www.example.com" in text
 
 
+def test_cli_assets_export_csv_columns_limits_header(tmp_path, monkeypatch):
+    out = tmp_path / "assets.csv"
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [
+                {"id": "domain$$example.com", "kind": "domain"},
+                {"id": "host$$www.example.com", "kind": "host", "ports": [80, 443]},
+            ]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind in ("domain","host")',
+            "--format",
+            "csv",
+            "--out",
+            str(out),
+            "--columns",
+            "id",
+            "--columns",
+            "kind",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+
+    header = out.read_text(encoding="utf-8").replace("\r\n", "\n").splitlines()[0]
+    assert header == "id,kind"
+
+
+def test_cli_assets_export_csv_columns_from_file_preserves_order(tmp_path, monkeypatch):
+    out = tmp_path / "assets.csv"
+    cols = tmp_path / "cols.txt"
+    cols.write_text("kind\nid\nports\n", encoding="utf-8")
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [
+                {"id": "domain$$example.com", "kind": "domain"},
+                {"id": "host$$www.example.com", "kind": "host", "ports": [80, 443]},
+            ]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind in ("domain","host")',
+            "--format",
+            "csv",
+            "--out",
+            str(out),
+            "--columns-from",
+            str(cols),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+
+    header = out.read_text(encoding="utf-8").replace("\r\n", "\n").splitlines()[0]
+    assert header == "kind,id,ports"
+
+
 def test_cli_assets_export_wires_http_knobs(tmp_path, monkeypatch):
     out = tmp_path / "assets.json"
     captured = {}

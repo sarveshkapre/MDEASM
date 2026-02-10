@@ -46,6 +46,18 @@ mdeasm assets export \
   --no-facet-filters
 ```
 
+## Asset export (CSV with selected columns)
+```bash
+source .venv/bin/activate
+
+# Keep schemas stable for downstream pipelines by explicitly selecting columns.
+mdeasm assets export \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --format csv \
+  --out assets.csv \
+  --columns id,kind,displayName,domain,firstSeen,lastSeen
+```
+
 ## Notes
 - The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
 - For compact JSON in pipelines, consider `--no-pretty`. For line-oriented ingestion, consider `--format ndjson`.
