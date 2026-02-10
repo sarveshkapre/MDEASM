@@ -28,6 +28,11 @@
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
 
 ## Implemented
+- [x] **Make example scripts import-safe (`main()` guards)**
+  - Date: 2026-02-10
+  - Scope: `API/affected_cvss_validation.py`, `API/bulk_asset_state_change.py`, `API/cisa_known_exploited_vulns.py`, `API/expired_certificates_validation.py`, `API/extract_associated_certNames_from_query.py`, `API/hosts_with_CNAME_no_IP_possible_subdomain_takeover.py`, `tests/test_example_scripts_imports.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `da78580`
+
 - [x] **HTTP timeout parsing tests + docs**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`, `API/mdeasm.py`
