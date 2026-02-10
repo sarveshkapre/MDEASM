@@ -12,13 +12,24 @@ _VERSION = 1.4
 #   delete azure resource
 #   delete disco group (endpoint bugged)
 #   asset snapshots
-#   create/update saved filters
-#   get saved filters
-#   delete saved filters
 #   cancel tasks
 
 
-import requests, time, urllib.parse, jwt, datetime, base64, uuid, re, binascii, logging, json, pathlib, os, sys
+import base64
+import binascii
+import datetime
+import json
+import logging
+import os
+import pathlib
+import re
+import sys
+import time
+import urllib.parse
+import uuid
+
+import jwt
+import requests
 from dateutil import parser
 from dotenv import load_dotenv
 
