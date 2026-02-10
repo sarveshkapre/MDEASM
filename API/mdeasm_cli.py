@@ -143,6 +143,51 @@ def _read_columns_file(path: Path) -> list[str]:
     return cols
 
 
+def _read_filter_text(text: str) -> str:
+    """
+    Normalize a filter read from disk/stdin:
+    - strip leading/trailing whitespace
+    - drop blank lines and full-line `#` comments
+    - join remaining lines with spaces
+    """
+    parts: list[str] = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts.append(line)
+    return " ".join(parts).strip()
+
+
+def _resolve_filter_arg(value: str) -> str:
+    """
+    Accept `--filter` as either a literal filter string or `@path` (or `@-` for stdin).
+    """
+    raw = (value or "").strip()
+    if not raw:
+        raise ValueError("empty filter")
+
+    if not raw.startswith("@"):
+        return raw
+
+    src = raw[1:].strip()
+    if not src:
+        raise ValueError("empty @filter source")
+
+    if src == "-":
+        text = sys.stdin.read()
+        cooked = _read_filter_text(text)
+        if not cooked:
+            raise ValueError("empty filter read from stdin")
+        return cooked
+
+    text = Path(src).expanduser().read_text(encoding="utf-8")
+    cooked = _read_filter_text(text)
+    if not cooked:
+        raise ValueError(f"empty filter read from file: {src}")
+    return cooked
+
+
 def _parse_columns_arg(values: list[str] | None) -> list[str]:
     """
     Accept columns as either:
@@ -218,7 +263,11 @@ def build_parser() -> argparse.ArgumentParser:
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
 
     export = assets_sub.add_parser("export", help="Export assets matching a query filter")
-    export.add_argument("--filter", required=True, help="MDEASM query filter (string)")
+    export.add_argument(
+        "--filter",
+        required=True,
+        help="MDEASM query filter (string) or @path (or @- for stdin)",
+    )
     export.add_argument(
         "--format",
         choices=["json", "ndjson", "csv"],
@@ -363,9 +412,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.backoff_max_s is not None:
             ws_kwargs["backoff_max_s"] = args.backoff_max_s
 
+        try:
+            query_filter = _resolve_filter_arg(args.filter)
+        except Exception as e:
+            sys.stderr.write(f"invalid --filter: {e}\n")
+            return 2
+
         ws = mdeasm.Workspaces(**ws_kwargs)
         get_kwargs = dict(
-            query_filter=args.filter,
+            query_filter=query_filter,
             asset_list_name=args.asset_list_name,
             page=args.page,
             max_page_size=args.max_page_size,

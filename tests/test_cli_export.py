@@ -2,6 +2,7 @@ import json
 import sys
 import types
 from pathlib import Path
+import io
 
 import pytest
 
@@ -50,6 +51,84 @@ def test_cli_assets_export_json_writes_file(tmp_path, monkeypatch):
     assert captured["get_kwargs"]["auto_create_facet_filters"] is False
     payload = json.loads(out.read_text(encoding="utf-8"))
     assert payload == [{"id": "domain$$example.com", "kind": "domain"}]
+
+
+def test_cli_assets_export_filter_at_file(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    filter_path = tmp_path / "filter.txt"
+    filter_path.write_text(
+        '# domains\nstate = "confirmed" AND\nkind = "domain"\n',
+        encoding="utf-8",
+    )
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            captured["get_kwargs"] = dict(kwargs)
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            f"@{filter_path}",
+            "--format",
+            "json",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["get_kwargs"]["query_filter"] == 'state = "confirmed" AND kind = "domain"'
+
+
+def test_cli_assets_export_filter_at_stdin(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            captured["get_kwargs"] = dict(kwargs)
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(sys, "stdin", io.StringIO('state = "confirmed"\nAND kind = "domain"\n'))
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            "@-",
+            "--format",
+            "json",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["get_kwargs"]["query_filter"] == 'state = "confirmed" AND kind = "domain"'
 
 
 def test_cli_assets_export_json_no_pretty_is_compact(tmp_path, monkeypatch):

@@ -21,6 +21,27 @@ mdeasm assets export \
   --no-facet-filters
 ```
 
+## Long filters from a file (or stdin)
+```bash
+source .venv/bin/activate
+
+cat > filter.txt <<'EOF'
+# comments and blank lines are ignored
+state = "confirmed" AND
+kind = "domain"
+EOF
+
+mdeasm assets export \
+  --filter @filter.txt \
+  --format json \
+  --out assets.json \
+  --get-all \
+  --no-facet-filters
+
+# Or read from stdin:
+cat filter.txt | mdeasm assets export --filter @- --format json --out assets.json --get-all --no-facet-filters
+```
+
 ## Asset export (stdout)
 ```bash
 source .venv/bin/activate
