@@ -1431,11 +1431,17 @@ class Asset:
                         pass
         return(self)
 
-    def to_dict(self):
-        dict_with_vals = {}
-        for k,v in vars(self).items():
-            dict_with_vals[k] = v
-        print(dict_with_vals)
+    def to_dict(self, print_: bool = True):
+        """Return a dict view of this Asset.
+
+        Historic behavior: `to_dict()` printed the dict and returned None.
+        We preserve the default printing behavior, but also return the dict
+        so programmatic use doesn't require `as_dict()`.
+        """
+        dict_with_vals = dict(vars(self))
+        if print_:
+            print(dict_with_vals)
+        return dict_with_vals
 
     def as_dict(self):
         return dict(vars(self))

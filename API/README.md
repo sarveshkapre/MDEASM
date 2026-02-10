@@ -79,7 +79,8 @@ easm.asset_lists()
 owned_domains
 
 ```
-easm.hosts_with_cnames.assets[0].to_dict()
+easm.hosts_with_cnames.assets[0].as_dict()   # returns a dict
+easm.hosts_with_cnames.assets[0].to_dict()   # prints (and returns) a dict
 ```
 ```
 easm.owned_domains.assets[0].pretty()

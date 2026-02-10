@@ -59,6 +59,22 @@ def test_validate_asset_id_formats():
                 assert "not-a-uuid-or-base64" in str(e)
 
 
+def test_asset_to_dict_returns_dict_and_can_suppress_print(capsys):
+    a = mdeasm.Asset()
+    a.id = "domain$$example.com"
+    a.kind = "domain"
+
+    d = a.to_dict(print_=False)
+    assert d["id"] == "domain$$example.com"
+    assert d["kind"] == "domain"
+    assert capsys.readouterr().out == ""
+
+    d2 = a.to_dict()
+    out = capsys.readouterr().out
+    assert d2 == d
+    assert "domain$$example.com" in out
+
+
 def test_workspace_query_helper_retries_and_refreshes_token_on_401():
     ws = _new_ws()
 
