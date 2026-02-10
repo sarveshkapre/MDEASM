@@ -67,9 +67,23 @@ class Workspaces:
         # Instance defaults (overridable via kwargs for reliability and future-proofing).
         # Note: keep these as kwargs to avoid breaking the historic positional signature.
         self._http_timeout = kwargs.pop("http_timeout", (10, 60))  # (connect, read)
-        self._api_version = kwargs.pop(
-            "api_version",
-            os.getenv("EASM_API_VERSION") or "2022-04-01-preview",
+        api_version = kwargs.pop("api_version", None)
+        if api_version is None:
+            api_version = os.getenv("EASM_API_VERSION")
+        # Control-plane and data-plane API versions can drift independently (both are previewed).
+        # For backward compatibility, `api_version` (or `EASM_API_VERSION`) sets both unless
+        # a plane-specific override is provided.
+        self._dp_api_version = (
+            kwargs.pop("dp_api_version", None)
+            or os.getenv("EASM_DP_API_VERSION")
+            or api_version
+            or "2022-04-01-preview"
+        )
+        self._cp_api_version = (
+            kwargs.pop("cp_api_version", None)
+            or os.getenv("EASM_CP_API_VERSION")
+            or api_version
+            or "2022-04-01-preview"
         )
         self._default_retry = kwargs.pop("retry", True)
         self._default_max_retry = kwargs.pop("max_retry", 5)
@@ -459,7 +473,12 @@ class Workspaces:
             helper_url = f"https://{self._workspaces[self._default_workspace_name][1]}/{urllib.parse.quote(endpoint)}"
             
         helper_headers = {'Authorization': f"Bearer {token}"}
-        helper_params = {'api-version': getattr(self, "_api_version", "2022-04-01-preview")}
+        # Keep legacy fallback to `_api_version` for older instances/tests.
+        if data_plane:
+            api_version = getattr(self, "_dp_api_version", getattr(self, "_api_version", "2022-04-01-preview"))
+        else:
+            api_version = getattr(self, "_cp_api_version", getattr(self, "_api_version", "2022-04-01-preview"))
+        helper_params = {'api-version': api_version}
         if params:
             helper_params.update(params)
         

@@ -192,6 +192,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
     )
     export.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    export.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    export.add_argument(
         "--http-timeout",
         type=_parse_http_timeout,
         default=None,
@@ -254,6 +264,10 @@ def main(argv: list[str] | None = None) -> int:
             ws_kwargs["workspace_name"] = args.workspace_name
         if args.api_version:
             ws_kwargs["api_version"] = args.api_version
+        if args.dp_api_version:
+            ws_kwargs["dp_api_version"] = args.dp_api_version
+        if args.cp_api_version:
+            ws_kwargs["cp_api_version"] = args.cp_api_version
         if args.http_timeout is not None:
             ws_kwargs["http_timeout"] = args.http_timeout
         if args.no_retry:

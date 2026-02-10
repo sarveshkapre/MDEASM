@@ -63,5 +63,5 @@ mdeasm assets export \
 - For compact JSON in pipelines, consider `--no-pretty`. For line-oriented ingestion, consider `--format ndjson`.
 - For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.
 - For long-running exports, consider `--progress-every-pages 25` (status is printed to stderr).
-- For reliability tuning without code edits, see `mdeasm assets export --help` for: `--api-version`, `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
+- For reliability tuning without code edits, see `mdeasm assets export --help` for: `--api-version` (or `--cp-api-version`/`--dp-api-version`), `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
 - For debugging, use `-v`/`-vv` or `--log-level DEBUG`.

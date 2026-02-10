@@ -20,7 +20,9 @@ Recommended:
 - `WORKSPACE_NAME` (avoids interactive prompts/printing when multiple workspaces exist)
 
 Optional:
-- `EASM_API_VERSION` (defaults to `2022-04-01-preview`; can also be overridden per-run via the CLI `--api-version`)
+- `EASM_API_VERSION` (defaults to `2022-04-01-preview`; sets both control-plane and data-plane `api-version` unless overridden)
+- `EASM_CP_API_VERSION` (control-plane/ARM only override)
+- `EASM_DP_API_VERSION` (data-plane only override)
 - `RESOURCE_GROUP_NAME` (used by `create_workspace()`)
 - `EASM_REGION` (used by `create_workspace()`)
 

@@ -16,7 +16,7 @@ mdeasm --help
 
 Notes:
 - `API/mdeasm.py` uses `python-dotenv` (`load_dotenv()`) which will look for a `.env` in the current directory and parent directories, so a root `.env` works when running scripts from `API/`.
-- Optional env: `EASM_API_VERSION` (default: `2022-04-01-preview`).
+- Optional env: `EASM_API_VERSION` (default: `2022-04-01-preview`; sets both planes unless overridden), `EASM_CP_API_VERSION`, `EASM_DP_API_VERSION`.
 - Auth/setup details (env vars, permissions, common 401/403 troubleshooting): `docs/auth.md`
 
 ## Required Python package imports

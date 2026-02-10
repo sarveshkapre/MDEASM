@@ -319,6 +319,46 @@ def test_cli_assets_export_wires_http_knobs(tmp_path, monkeypatch):
     assert captured["get_kwargs"]["workspace_name"] == "ws1"
 
 
+def test_cli_assets_export_wires_plane_api_versions(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            captured["init_kwargs"] = dict(kwargs)
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--out",
+            str(out),
+            "--cp-api-version",
+            "cp-v1",
+            "--dp-api-version",
+            "dp-v1",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["init_kwargs"] == {"dp_api_version": "dp-v1", "cp_api_version": "cp-v1"}
+
+
 def test_cli_assets_export_log_level_calls_configure_logging(tmp_path, monkeypatch):
     out = tmp_path / "assets.json"
     captured = {}

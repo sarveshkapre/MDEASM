@@ -154,6 +154,49 @@ def test_workspace_query_helper_prefers_requests_session_when_present():
     assert len(ws._session.calls) == 1
 
 
+def test_workspace_query_helper_uses_plane_specific_api_versions():
+    ws = _new_ws()
+    ws._dp_api_version = "dp-v1"
+    ws._cp_api_version = "cp-v1"
+
+    class Resp:
+        def __init__(self, ok, status_code, text, headers=None):
+            self.ok = ok
+            self.status_code = status_code
+            self.text = text
+            self.headers = headers or {}
+
+    calls = []
+
+    def fake_request(**kwargs):
+        calls.append(kwargs)
+        return Resp(True, 200, "ok")
+
+    with mock.patch.object(mdeasm.requests, "request", side_effect=fake_request):
+        with mock.patch.object(ws, "__token_expiry__", return_value=False):
+            ws.__workspace_query_helper__(
+                "t",
+                method="get",
+                endpoint="assets/foo",
+                url="https://example.test",
+                data_plane=True,
+                retry=False,
+                max_retry=1,
+            )
+            ws.__workspace_query_helper__(
+                "t",
+                method="get",
+                endpoint="workspaces",
+                url="https://example.test",
+                data_plane=False,
+                retry=False,
+                max_retry=1,
+            )
+
+    assert calls[0]["params"]["api-version"] == "dp-v1"
+    assert calls[1]["params"]["api-version"] == "cp-v1"
+
+
 def test_get_workspace_assets_status_to_stderr_and_max_assets_cap(capsys):
     ws = _new_ws()
     ws._default_workspace_name = "ws1"
