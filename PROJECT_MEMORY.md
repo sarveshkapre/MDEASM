@@ -40,6 +40,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `gh run watch 21869443801 -R sarveshkapre/MDEASM --exit-status` | CI succeeded for commit `cbea835` | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -c "import mdeasm, mdeasm_cli; print('import ok')"` | `All checks passed!`; `16 passed, 1 skipped`; compile ok; import ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help >/dev/null && mdeasm --help >/dev/null` | `All checks passed!`; `18 passed, 1 skipped`; compile ok; CLI help ok | pass
 - 2026-02-10 | `gh run list -R sarveshkapre/MDEASM -L 2` | CI success for commits `ec831f4` and `b6a0599` (run ids `21869287738`, `21869249414`) | pass
