@@ -7,18 +7,7 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Selected (cycle 10)
-- [ ] **CLI: `mdeasm doctor` (env + auth sanity checks)**
-  - Scope: add a non-destructive command that validates required env vars, prints configured api-versions, and optionally performs a small control-plane probe (list workspaces). Always keep stdout machine-readable when requested.
-  - Why: reduces setup thrash and creates a standard "are my credentials wired correctly?" answer.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Saved filters: CRUD in helper + CLI (`mdeasm saved-filters ...`)**
-  - Scope: implement list/get/put/delete for data-plane saved filters; add CLI commands for automation flows and docs for common use (store a query once, reuse in exports).
-  - Why: saved filters are a first-class platform feature and reduce repeated brittle filter strings in scripts/CI.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
-Backlog (keep deduped)
+Next Up (keep deduped)
 - [ ] **Server-side export via data-plane `assets:export` task**
   - Scope: add an opt-in CLI mode that uses the data-plane `POST /assets:export` endpoint (columns + filename) to kick off an export task, then poll until completion and download the artifact; fall back to the existing paginated GET export path.
   - Why: paginated client-side exports can be slow and memory-heavy; a first-class export job path is a common pattern in mature ASM products.
@@ -55,6 +44,16 @@ Backlog (keep deduped)
   - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **CLI: `mdeasm doctor` (env + auth sanity checks)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `docs/auth.md`, `tests/test_cli_doctor.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `00ac4d0`
+
+- [x] **Saved filters: CRUD in helper + CLI (`mdeasm saved-filters ...`)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/saved_filters.md`, `docs/exports.md`, `API/README.md`, `tests/test_cli_saved_filters.py`, `tests/test_saved_filters_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `db068a2`
+
 - [x] **Fix facet filter single-element tuple specs**
   - Date: 2026-02-10
   - Scope: `API/mdeasm.py`, `tests/test_facet_filters.py`
@@ -249,6 +248,8 @@ Backlog (keep deduped)
     - Sources reviewed (untrusted):
       - Microsoft Learn: Defender EASM data-plane preview assets list (shows `api-version`, `skip`, `maxpagesize`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/list-asset-resource?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
       - Microsoft Learn: Defender EASM data-plane preview `assets:export` (server-side export task): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Microsoft Learn: Defender EASM saved filters (list): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/savedfilters/list-saved-filter?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Microsoft Learn: Defender EASM saved filters (create/replace): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/savedfilters/create-or-replace-saved-filter?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
       - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
       - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
       - Tenable Developer: Export assets in XLSX format (token + limits): https://developer.tenable.com/reference/io-asm-exports-assets-xlsx

@@ -9,6 +9,8 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Add `mdeasm doctor` (env + optional control-plane probe) | Provide a standard, non-destructive "is my configuration wired correctly?" command that stays stdout-safe for automation | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli doctor --help >/dev/null` (pass) | 00ac4d0 | high | trusted
+- 2026-02-10 | Add saved filters CRUD (data-plane) in helper + CLI | Reduce repetition of brittle filter strings by storing/reusing server-side filters; enable automation via `mdeasm saved-filters ...` | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli saved-filters --help >/dev/null` (pass) | db068a2 | high | trusted
 - 2026-02-10 | Fix facet filter single-element tuple specs + regression test | Single-element facet specs without a trailing comma become strings, causing incorrect facet keys/counts for attributes like `cookies`/`ipBlocks` | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 45c272d | high | trusted
 - 2026-02-10 | Add `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only) + opt-in lazy data-plane token init | Multi-workspace environments need a safe discovery primitive; control-plane listing should not require data-plane permissions/scopes | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass); `python3 -m mdeasm_cli workspaces list --help >/dev/null` (pass) | cccd689 | high | trusted
 - 2026-02-10 | Stream asset exports for NDJSON and for CSV when columns are explicit | Improves performance and reliability for large inventories (constant memory + faster time-to-first-byte) without changing default JSON/CSV behavior | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass) | d07ab79 | high | trusted
@@ -58,6 +60,8 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API` | `All checks passed!`; `... (tests passed; integration skipped)`; compile ok | pass
+- 2026-02-10 | `source .venv/bin/activate && python -m mdeasm_cli doctor --help >/dev/null && python -m mdeasm_cli saved-filters --help >/dev/null` | CLI help ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `54 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` | `All checks passed!`; `53 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && python3 -m mdeasm_cli --version && python3 -m mdeasm_cli workspaces list --help >/dev/null && mdeasm --help >/dev/null` | prints `python3 -m mdeasm_cli 1.4.0`; help ok | pass
