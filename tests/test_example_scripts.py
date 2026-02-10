@@ -27,10 +27,7 @@ def test_retrieve_risk_observations_main_calls_high_by_default():
 def test_legacy_retreive_script_delegates_to_retrieve_main():
     import retreive_risk_observations
 
-    with mock.patch(
-        "retrieve_risk_observations.main", autospec=True, return_value=0
-    ) as main_mock:
+    with mock.patch("retrieve_risk_observations.main", autospec=True, return_value=0) as main_mock:
         assert retreive_risk_observations.main() == 0
 
     main_mock.assert_called_once_with()
-

@@ -22,4 +22,3 @@ def test_example_scripts_are_import_safe():
     for name in modules:
         mod = importlib.import_module(name)
         assert hasattr(mod, "main")
-

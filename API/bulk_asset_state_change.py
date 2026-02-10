@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 import sys
 
-#easiest to import mdeasm.py if it is in the same directory as this retreive_risk_observations.py script
-#requires mdeasm.py VERSION 1.4
+# easiest to import mdeasm.py if it is in the same directory as this retreive_risk_observations.py script
+# requires mdeasm.py VERSION 1.4
 import mdeasm
+
 
 def main() -> int:
     if mdeasm._VERSION < 1.4:
@@ -13,10 +14,10 @@ def main() -> int:
 
     easm = mdeasm.Workspaces()
 
-    all_approved_assets = f"state = \"{easm._state_map['Approved']}\""
+    all_approved_assets = f'state = "{easm._state_map["Approved"]}"'
 
-    #enter one of: Candidate,Dependency,MonitorOnly,RequiresInvestigation,Dismissed
-    new_state = easm._state_map['']
+    # enter one of: Candidate,Dependency,MonitorOnly,RequiresInvestigation,Dismissed
+    new_state = easm._state_map[""]
 
     #####################################
     #####################################
@@ -35,19 +36,21 @@ def main() -> int:
     # DO NOT proceed until 100% complete
     easm.poll_asset_state_change(task_id=move_all_approved_assets_task)
 
-    assets_to_move_back_to_approved = f"state = \"{new_state}\""
+    assets_to_move_back_to_approved = f'state = "{new_state}"'
 
     # DO NOT run this until the poll above shows complete / 100% progress
     # this will get the first 200 assets in new_state
-    easm.get_workspace_assets(query_filter=assets_to_move_back_to_approved, max_page_size=100, max_page_count=2)
+    easm.get_workspace_assets(
+        query_filter=assets_to_move_back_to_approved, max_page_size=100, max_page_count=2
+    )
 
     for i in range(0, len(easm.assetList.assets), 50):
         asset_uiid_list = []
-        for asset in easm.assetList.assets[i:i+50]:
+        for asset in easm.assetList.assets[i : i + 50]:
             asset_uiid_list.append(asset.uuid)
         asset_uuid_str = '","'.join(asset_uiid_list)
-        update_state_query = f"uuid in (\"{asset_uuid_str}\") AND state !empty"
-        easm.update_assets(query_filter=update_state_query, new_state=easm._state_map['Approved'])
+        update_state_query = f'uuid in ("{asset_uuid_str}") AND state !empty'
+        easm.update_assets(query_filter=update_state_query, new_state=easm._state_map["Approved"])
 
     # this will take a few minutes to complete the change, even after function finishes
     # confirm in the UI that 200 assets are back in Approved state
@@ -62,18 +65,20 @@ def main() -> int:
     # get all approved assets except first 200
     # depending on total number of approved assets, this may take a while
     # ~1 minute per 1000 assets, depending on internet connection and any timeout errors
-    easm.get_workspace_assets(query_filter=all_approved_assets, page=2, max_page_size=100, get_all=True)
+    easm.get_workspace_assets(
+        query_filter=all_approved_assets, page=2, max_page_size=100, get_all=True
+    )
 
     # iterate through all Approved asset except first 200
     # and move 50 at a time to new_state
     # this will likely take even longer than query above
     for i in range(0, len(easm.assetList.assets), 50):
         asset_uiid_list = []
-        for asset in easm.assetList.assets[i:i+50]:
+        for asset in easm.assetList.assets[i : i + 50]:
             asset_uiid_list.append(asset.uuid)
 
         asset_uuid_str = '","'.join(asset_uiid_list)
-        update_state_query = f"uuid in (\"{asset_uuid_str}\") AND state !empty"
+        update_state_query = f'uuid in ("{asset_uuid_str}") AND state !empty'
         easm.update_assets(query_filter=update_state_query, new_state=new_state)
 
         # this will create several hundred state change tasks

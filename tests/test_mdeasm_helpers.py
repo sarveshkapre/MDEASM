@@ -139,7 +139,11 @@ def test_workspace_query_helper_prefers_requests_session_when_present():
     ws._session = DummySession()
 
     with mock.patch.object(ws, "__token_expiry__", return_value=False):
-        with mock.patch.object(mdeasm.requests, "request", side_effect=AssertionError("requests.request should not be used")):
+        with mock.patch.object(
+            mdeasm.requests,
+            "request",
+            side_effect=AssertionError("requests.request should not be used"),
+        ):
             r = ws.__workspace_query_helper__(
                 "t",
                 method="get",

@@ -43,7 +43,9 @@ def test_facet_filters_special_cases_services_location_webcomponents_sslserverco
     a = mdeasm.Asset()
     a.id = "host$$x.example"
     a.kind = "host"
-    a.services = [{"port": 80, "scheme": "http", "portStates": [{"value": "open"}, {"value": "filtered"}]}]
+    a.services = [
+        {"port": 80, "scheme": "http", "portStates": [{"value": "open"}, {"value": "filtered"}]}
+    ]
     a.location = [
         {
             "value": {
@@ -55,9 +57,19 @@ def test_facet_filters_special_cases_services_location_webcomponents_sslserverco
         }
     ]
     a.webComponents = [
-        {"name": "Apache", "type": "server", "version": "2.4", "cve": [{"name": "CVE-2020-1", "cvssScore": 9.8}]}
+        {
+            "name": "Apache",
+            "type": "server",
+            "version": "2.4",
+            "cve": [{"name": "CVE-2020-1", "cvssScore": 9.8}],
+        }
     ]
-    a.sslServerConfig = [{"cipherSuites": ["TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384"], "tlsVersions": ["1.2", "1.3"]}]
+    a.sslServerConfig = [
+        {
+            "cipherSuites": ["TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384"],
+            "tlsVersions": ["1.2", "1.3"],
+        }
+    ]
 
     ws.assetList.assets = [a]
     ws.__facet_filter_helper__(asset_list_name="assetList")
@@ -72,4 +84,3 @@ def test_facet_filters_special_cases_services_location_webcomponents_sslserverco
 
     assert ws.filters.sslServerConfig[("TLS_AES_128_GCM_SHA256", "1.2")]["count"] == 1
     assert ws.filters.sslServerConfig[("TLS_AES_256_GCM_SHA384", "1.3")]["count"] == 1
-

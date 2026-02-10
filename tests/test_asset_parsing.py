@@ -29,4 +29,3 @@ def test_parse_workspace_assets_date_range_end_only_filters_without_nameerror():
 
     assert hasattr(asset, "attributes")
     assert [x["value"] for x in asset.attributes] == ["a"]
-

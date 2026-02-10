@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 
+
 def main(severity: str = "high") -> int:
     """Retrieve and print workspace risk observations.
 
@@ -13,9 +14,7 @@ def main(severity: str = "high") -> int:
     import mdeasm
 
     if mdeasm._VERSION < 1.4:
-        sys.stderr.write(
-            f"requires mdeasm.py VERSION 1.4; current version: {mdeasm._VERSION}\n"
-        )
+        sys.stderr.write(f"requires mdeasm.py VERSION 1.4; current version: {mdeasm._VERSION}\n")
         return 2
 
     easm = mdeasm.Workspaces()
@@ -37,6 +36,7 @@ def main(severity: str = "high") -> int:
 
     easm.get_workspace_risk_observations(severity)
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

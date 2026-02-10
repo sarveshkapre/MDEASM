@@ -54,7 +54,9 @@ def test_integration_smoke_data_plane_assets():
 
     # If multiple workspaces exist and WORKSPACE_NAME isn't set, the helper doesn't pick a default.
     if not getattr(ws, "_default_workspace_name", ""):
-        pytest.skip("set WORKSPACE_NAME (or ensure only one workspace exists) to run data-plane smoke")
+        pytest.skip(
+            "set WORKSPACE_NAME (or ensure only one workspace exists) to run data-plane smoke"
+        )
 
     ws.get_workspace_assets(
         query_filter='kind = "domain"',

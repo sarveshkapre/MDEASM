@@ -132,14 +132,19 @@ def _write_ndjson(path: Path | None, rows: list[dict]) -> None:
     if path is None:
         out_fh = sys.stdout
         for row in rows:
-            out_fh.write(json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":")) + "\n")
+            out_fh.write(
+                json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":")) + "\n"
+            )
         return
 
     tmp_fh, tmp_path = _atomic_open_text(path, encoding="utf-8", newline="\n")
     try:
         with tmp_fh:
             for row in rows:
-                tmp_fh.write(json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":")) + "\n")
+                tmp_fh.write(
+                    json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":"))
+                    + "\n"
+                )
             tmp_fh.flush()
             try:
                 os.fsync(tmp_fh.fileno())
@@ -418,7 +423,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export.add_argument("--page", type=int, default=0, help="Starting page (skip)")
     export.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
-    export.add_argument("--max-page-count", type=int, default=0, help="Max pages to fetch (0=unbounded)")
+    export.add_argument(
+        "--max-page-count", type=int, default=0, help="Max pages to fetch (0=unbounded)"
+    )
     export.add_argument("--get-all", action="store_true", help="Fetch all pages until exhausted")
     export.add_argument(
         "--no-facet-filters",
@@ -426,7 +433,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not auto-create facet filters (faster for exports)",
     )
 
-    schema = assets_sub.add_parser("schema", help="Print observed columns for a query (union-of-keys)")
+    schema = assets_sub.add_parser(
+        "schema", help="Print observed columns for a query (union-of-keys)"
+    )
     schema.add_argument(
         "--filter",
         required=True,
@@ -438,7 +447,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="lines",
         help="Output format (default: lines suitable for --columns-from)",
     )
-    schema.add_argument("-v", "--verbose", action="count", default=0, help="Increase log verbosity (repeatable)")
+    schema.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Increase log verbosity (repeatable)"
+    )
     schema.add_argument(
         "--log-level",
         default="",
@@ -496,8 +507,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     schema.add_argument("--page", type=int, default=0, help="Starting page (skip)")
     schema.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
-    schema.add_argument("--max-page-count", type=int, default=0, help="Max pages to fetch (0=unbounded)")
-    schema.add_argument("--get-all", action="store_true", help="Fetch pages until exhausted (bounded by --max-assets)")
+    schema.add_argument(
+        "--max-page-count", type=int, default=0, help="Max pages to fetch (0=unbounded)"
+    )
+    schema.add_argument(
+        "--get-all",
+        action="store_true",
+        help="Fetch pages until exhausted (bounded by --max-assets)",
+    )
 
     return p
 

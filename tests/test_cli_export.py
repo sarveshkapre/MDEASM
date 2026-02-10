@@ -231,7 +231,9 @@ def test_cli_assets_schema_json_to_stdout(monkeypatch, capsys):
     fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
     monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
 
-    rc = mdeasm_cli.main(["assets", "schema", "--filter", 'kind = "domain"', "--format", "json", "--out", "-"])
+    rc = mdeasm_cli.main(
+        ["assets", "schema", "--filter", 'kind = "domain"', "--format", "json", "--out", "-"]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload == ["id", "kind"]

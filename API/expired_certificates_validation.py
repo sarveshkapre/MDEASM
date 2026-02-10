@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 import sys
 
-#easiest to import mdeasm.py if it is in the same directory as this retreive_risk_observations.py script
-#requires mdeasm.py VERSION 1.4
+# easiest to import mdeasm.py if it is in the same directory as this retreive_risk_observations.py script
+# requires mdeasm.py VERSION 1.4
 import mdeasm
+
 
 def main() -> int:
     if mdeasm._VERSION < 1.4:
@@ -14,13 +15,20 @@ def main() -> int:
     easm = mdeasm.Workspaces()
 
     # the certificate expiration queries that populate the dashboard
-    certs_expired_query = 'state = confirmed | kind = sslCert | sslCertExpiration = Expired'
-    certs_expire_30days_query = 'state = confirmed | kind = sslCert | sslCertExpiration = Expires30'
-    certs_expire_60days_query = 'state = confirmed | kind = sslCert | sslCertExpiration = Expires60'
-    certs_expire_90days_query = 'state = confirmed | kind = sslCert | sslCertExpiration = Expires90'
-    certs_expire_after90days_query = 'state = confirmed | kind = sslCert | sslCertExpiration = ExpiresAfter90'
+    certs_expired_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expired"
+    certs_expire_30days_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expires30"
+    certs_expire_60days_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expires60"
+    certs_expire_90days_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expires90"
+    certs_expire_after90days_query = (
+        "state = confirmed | kind = sslCert | sslCertExpiration = ExpiresAfter90"
+    )
 
-    easm.get_workspace_assets(query_filter=certs_expired_query, asset_list_name='expired_certs', max_page_size=100, get_all=True)
+    easm.get_workspace_assets(
+        query_filter=certs_expired_query,
+        asset_list_name="expired_certs",
+        max_page_size=100,
+        get_all=True,
+    )
 
     # the catch for this use case is that it will not produce valid results until
     # a second discovery has been run on the workspace (usually 7 or 8 days after creation)
@@ -32,25 +40,25 @@ def main() -> int:
     true_pos_counter = 0
     for cert in easm.expired_certs.assets:
         if parser.parse(cert.lastSeen) > parser.parse(cert.invalidAfter):
-            #print(f"\ncertificate {cert.name} invalid after: {cert.invalidAfter}")
-            #print(f"certificate {cert.name} last seen: {cert.lastSeen}")
-            #print(f"{cert.name} lastSeen is more recent than invalidAfter")
-            #print('performing additional validation check on the asset with this cert')
+            # print(f"\ncertificate {cert.name} invalid after: {cert.invalidAfter}")
+            # print(f"certificate {cert.name} last seen: {cert.lastSeen}")
+            # print(f"{cert.name} lastSeen is more recent than invalidAfter")
+            # print('performing additional validation check on the asset with this cert')
 
-            asset_id = cert.auditTrail[-1]['kind'] + '$$' + cert.auditTrail[-1]['name']
+            asset_id = cert.auditTrail[-1]["kind"] + "$$" + cert.auditTrail[-1]["name"]
             easm.get_workspace_asset_by_id(asset_id=asset_id)
             try:
                 for asset_cert in getattr(easm, asset_id).sslCerts:
-                    if asset_cert['sha1'] == cert.name:
-                        #print(f"{cert.name} found on asset {asset_id}")
-                        if asset_cert['recent']:
+                    if asset_cert["sha1"] == cert.name:
+                        # print(f"{cert.name} found on asset {asset_id}")
+                        if asset_cert["recent"]:
                             print(f"\nTrue Positive! {cert.name} IS recent on {asset_id}")
                             true_pos_counter += 1
                         else:
-                            #print(f"False Positive! {cert.name} is NOT recent on {asset_id}")
+                            # print(f"False Positive! {cert.name} is NOT recent on {asset_id}")
                             pass
             except AttributeError:
-                #print(f"{asset_id} has no recent certs, so False Positive!")
+                # print(f"{asset_id} has no recent certs, so False Positive!")
                 pass
 
     print(f"total true positives found: {true_pos_counter}")
