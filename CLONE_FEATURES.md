@@ -23,6 +23,11 @@
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
 
 ## Implemented
+- [x] **Fix facet filter single-element tuple specs**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `tests/test_facet_filters.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `45c272d`
+
 - [x] **CLI: `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only)**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `API/mdeasm.py`, `tests/test_cli_export.py`

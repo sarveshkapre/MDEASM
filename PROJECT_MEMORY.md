@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Fix facet filter single-element tuple specs + regression test | Single-element facet specs without a trailing comma become strings, causing incorrect facet keys/counts for attributes like `cookies`/`ipBlocks` | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 45c272d | high | trusted
 - 2026-02-10 | Add `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only) + opt-in lazy data-plane token init | Multi-workspace environments need a safe discovery primitive; control-plane listing should not require data-plane permissions/scopes | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass); `python3 -m mdeasm_cli workspaces list --help >/dev/null` (pass) | cccd689 | high | trusted
 - 2026-02-10 | Stream asset exports for NDJSON and for CSV when columns are explicit | Improves performance and reliability for large inventories (constant memory + faster time-to-first-byte) without changing default JSON/CSV behavior | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` (pass) | d07ab79 | high | trusted
 - 2026-02-10 | Add `mdeasm assets schema` to print observed columns (union-of-keys) | Enables deterministic `--columns-from` workflows and faster schema drift detection without exporting full inventories | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | c8f0525 | high | trusted
@@ -41,6 +42,7 @@
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
+- 2026-02-10 | Facet filters for certain list attributes could collapse into `(None, None, ...)` keys | Single-element facet specs in `_facet_filters` were written as `(\"cookieName\")` which is a string in Python, not a tuple, so code iterated characters instead of facet paths | Add trailing commas for single-element tuples and add a focused unit test that asserts the expected tuple keys | Add regression tests for any special-case parsing table (facet specs, schema maps) and ensure single-element tuples use trailing commas | 45c272d | high
 - 2026-02-10 | CLI `mdeasm assets export` could emit non-JSON/CSV text before the payload | `Workspaces.__init__` calls `get_workspaces()` which used `print()` to stdout when `WORKSPACE_NAME` was unset and multiple workspaces existed | Emit guidance to stderr instead of stdout; add regression test for stdout cleanliness | Keep stdout-clean tests for any codepath reachable before the CLI writes machine-readable output | b937478 | high
 - 2026-02-10 | CLI exports to stdout could produce invalid JSON/CSV | `get_workspace_assets()` printed status/progress to stdout while the CLI also wrote machine-readable output to stdout | Add `status_to_stderr`/`quiet` knobs and make the CLI send status to stderr; add stdout-mode regression tests | Keep stdout-mode tests for CLI and keep status output configurable in helper methods | dc5b59d | high
 - 2026-02-10 | `__validate_asset_id__` could raise `UnboundLocalError` for invalid inputs | Base64 decode path didn't validate input and failed to raise when roundtrip check failed, leaving `verified_asset_id` unset | Use `base64.b64decode(..., validate=True)` and raise on non-canonical/non-base64 values | Keep unit tests for invalid asset ids and run `pytest` in CI | 8cd0881 | high
@@ -56,6 +58,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `54 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python3 -m compileall API` | `All checks passed!`; `53 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && python3 -m mdeasm_cli --version && python3 -m mdeasm_cli workspaces list --help >/dev/null && mdeasm --help >/dev/null` | prints `python3 -m mdeasm_cli 1.4.0`; help ok | pass
 - 2026-02-10 | `gh run watch 21874659739 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `d07ab79` | pass
