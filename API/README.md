@@ -6,14 +6,19 @@ All these are based on the mdeasm.py helper. It is easiest to import it into the
 
 ## Environment file
 
-1. copy the `.env.template` file to `.env` in the project root directory
-2. modify with your specific tenant, subscription, service principal, etc
+1. Copy `API/.env.template` to `.env` at the repo root (recommended).
+2. Fill in your tenant, subscription, service principal, etc.
+
+Notes:
+- `API/mdeasm.py` uses `python-dotenv` (`load_dotenv()`) which will look for a `.env` in the current directory and parent directories, so a root `.env` works when running scripts from `API/`.
 
 ## Required Python package imports
 
-requests, jwt, python-dateutil, python-dotenv
-```
-python3 -m pip install requests jwt python-dateutil python-dotenv --upgrade
+requests, PyJWT (`import jwt`), python-dateutil, python-dotenv
+
+Recommended install:
+```bash
+python3 -m pip install -r requirements.txt --upgrade
 ```
 ### Initialize your mdeasm.Workspaces object:
 ```
