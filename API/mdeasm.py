@@ -1455,7 +1455,7 @@ class Asset:
                                         ('lastSeen' in sub_sub_val and parser.parse(sub_sub_val.get('lastSeen')) >= last_seen) or 
                                         (date_range_start and date_range_end and 'firstSeen' in sub_sub_val and 'lastSeen' in sub_sub_val and date_start.astimezone(tz=datetime.timezone.utc) >= parser.parse(sub_sub_val.get('firstSeen')) and parser.parse(sub_sub_val.get('lastSeen')) >= date_end.astimezone(tz=datetime.timezone.utc)) or 
                                         (date_range_start and not date_range_end and 'lastSeen' in sub_sub_val and parser.parse(sub_sub_val.get('lastSeen')) >= date_start.astimezone(tz=datetime.timezone.utc)) or 
-                                        (date_range_end and not date_range_start and 'lastSeen' in sub_sub_val and parser.parse(sub_sub_val.get('lastSeen')) <= date_start.astimezone(tz=datetime.timezone.utc))
+                                        (date_range_end and not date_range_start and 'lastSeen' in sub_sub_val and parser.parse(sub_sub_val.get('lastSeen')) <= date_end.astimezone(tz=datetime.timezone.utc))
                                     ):
                                         new_val = {k: sub_sub_val[k] for k in set(list(sub_sub_val.keys())) - self._exclude_keys}
                                         logging.debug(f"eval True: {sub_key} + {sub_sub_val}")
