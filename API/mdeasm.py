@@ -77,6 +77,8 @@ class Workspaces:
         self._client_id = client_id
         self._client_secret = client_secret
         self._default_workspace_name = workspace_name
+        # Reuse connections across requests (particularly helpful for paginated exports).
+        self._session = requests.Session()
         self._cp_token = self.__bearer_token__()
         self._dp_token = self.__bearer_token__(data_plane=True)
         self._workspaces = requests.structures.CaseInsensitiveDict()
@@ -93,7 +95,8 @@ class Workspaces:
         else:
             data = {'grant_type': 'client_credentials', 'client_id': self._client_id, 'client_secret': self._client_secret, 'scope': 'https://management.azure.com/.default'}
             logging.info('control plane token retrieved')
-        r = requests.post(url, headers=headers, data=data, timeout=self._http_timeout)
+        post_fn = self._session.post if hasattr(self, "_session") else requests.post
+        r = post_fn(url, headers=headers, data=data, timeout=self._http_timeout)
         if r.status_code != 200:
             logging.error(r.status_code)
             raise Exception(r.text)
@@ -212,6 +215,25 @@ class Workspaces:
         # create a nested function to avoid duplicating the entire code block below twice
         def __nested_filter_creator__(asset, attribute_name=''):
             logging.debug(asset.id)
+            def __inc_filter__(filter_name, facet_key):
+                # `facet_key` must be a tuple (even if single-valued).
+                d = getattr(self.filters, filter_name)
+                try:
+                    d[facet_key]['count'] += 1
+                    d[facet_key]['assets'].append(asset.id)
+                except KeyError:
+                    d[facet_key] = {'count':1, 'assets':[asset.id]}
+
+            def __nested_get__(obj, path):
+                # Support facet specs like "headerName" or "value,countrycode".
+                cur = obj
+                for part in path.split(','):
+                    if not isinstance(cur, dict):
+                        return None
+                    cur = cur.get(part)
+                    if cur is None:
+                        return None
+                return cur
 
             for key,val in vars(asset).items():
                 if key in _exclude_attributes:
@@ -312,146 +334,61 @@ class Workspaces:
                         continue
                     for list_item in getattr(asset, key):
                         logging.debug(list_item)
-                        eval_commands = []
                         if key == 'sslServerConfig':
-                            if list_item['tlsVersions']:
-                                for idx,tlsval in enumerate(list_item['tlsVersions']):
-                                    eval_commands = []
-                                    for facet in self._facet_filters[key]:
-                                        eval_commands.append(f"list_item.get('{facet}')[{idx}]")
-                                    eval_commands = ','.join(eval_commands)
-                                    logging.debug(f"eval command string: {eval_commands}")
-                                    try:
-                                        getattr(self.filters, key)[(eval(eval_commands))]['count'] += 1
-                                        getattr(self.filters, key)[(eval(eval_commands))]['assets'].append(asset.id)
-                                    
-                                    except KeyError:
-                                        getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                            tls_versions = list_item.get('tlsVersions') or []
+                            cipher_suites = list_item.get('cipherSuites') or []
+                            if tls_versions:
+                                for idx,_tlsval in enumerate(tls_versions):
+                                    cipher = cipher_suites[idx] if idx < len(cipher_suites) else None
+                                    tls = tls_versions[idx]
+                                    __inc_filter__(key, (cipher, tls))
                             else:
                                 logging.debug(f"empty sslServerConfig[tlsVersions] list in asset {asset.id}")
                                 pass
                         
                         elif key == 'webComponents':
-                            for facet in self._facet_filters[key]:
-                                eval_commands.append(f"list_item.get('{facet}')")
-                            eval_commands = ','.join(eval_commands)
-                            logging.debug(f"eval command string: {eval_commands}")
-                            try:
-                                getattr(self.filters, key)[(eval(eval_commands))]['count'] += 1
-                                getattr(self.filters, key)[(eval(eval_commands))]['assets'].append(asset.id)
-                                
-                            except KeyError:
-                                getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                            facets = self._facet_filters[key]
+                            facet_key = tuple([__nested_get__(list_item, f) for f in facets])
+                            __inc_filter__(key, facet_key)
                             
-                            if list_item['cve']:
-                                eval_commands = []
-                                for cveval in list_item['cve']:
-                                    eval_commands = ["list_item.get('name')"]
-                                    for cvefacet in self._facet_filters['cveId'][1:]:
-                                        eval_commands.append(f"cveval.get('{cvefacet}')")
-                                    eval_commands = ','.join(eval_commands)
-                                    logging.debug(f"eval command string: {eval_commands}")
-                                    try:
-                                        getattr(self.filters, 'cveId')[(eval(eval_commands))]['count'] += 1
-                                        getattr(self.filters, 'cveId')[(eval(eval_commands))]['assets'].append(asset.id)
-                                    
-                                    except KeyError:
-                                        getattr(self.filters, 'cveId')[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                            for cveval in (list_item.get('cve') or []):
+                                # CVEs are tracked in a separate dict keyed by (webComponent, cveName, cvssScore).
+                                __inc_filter__(
+                                    'cveId',
+                                    (list_item.get('name'), cveval.get('name'), cveval.get('cvssScore')),
+                                )
 
                         elif key == 'services':
-                            if list_item['portStates']:
-                                for idx,portval in enumerate(list_item['portStates']):
-                                    eval_commands = []
-                                    for facet in self._facet_filters[key]:
-                                        if ',' not in facet:
-                                            eval_commands.append(f"list_item.get('{facet}')")
-                                        else:
-                                            tmp_str = ['list_item']
-                                            for i in range(len(facet.split(','))):
-                                                tmp_str.append(".get('" + facet.split(',')[i] + "',{})")
-                                            tmp_str.insert(2, f"[{idx}]")
-                                            tmp_str = ''.join(tmp_str)
-                                            tmp_str = ''.join(tmp_str.rsplit(',{}', 1))
-                                            eval_commands.append(tmp_str)
-                                    eval_commands = ','.join(eval_commands)
-                                    logging.debug(f"eval command string: {eval_commands}")
-                                    try:
-                                        getattr(self.filters, key)[(eval(eval_commands))]['count'] += 1
-                                        getattr(self.filters, key)[(eval(eval_commands))]['assets'].append(asset.id)
-                                    
-                                    except KeyError:
-                                        getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
-                            
+                            port_states = list_item.get('portStates') or []
+                            if port_states:
+                                for port_state in port_states:
+                                    __inc_filter__(
+                                        key,
+                                        (list_item.get('port'), list_item.get('scheme'), port_state.get('value')),
+                                    )
                             else:
-                                for facet in self._facet_filters[key]:
-                                    if ',' not in facet:
-                                        eval_commands.append(f"list_item.get('{facet}')")
-                                    else:
-                                        eval_commands.append("list_item.get('dummy_value')")
-                                eval_commands = ','.join(eval_commands)
-                                logging.debug(f"eval command string: {eval_commands}")
-                                try:
-                                    getattr(self.filters, key)[(eval(eval_commands))]['count'] += 1
-                                    getattr(self.filters, key)[(eval(eval_commands))]['assets'].append(asset.id)
-                                
-                                except KeyError:
-                                    getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                                __inc_filter__(key, (list_item.get('port'), list_item.get('scheme'), None))
                         
                         elif key == 'location':
-                            if list_item['value']:
-                                eval_commands = []
-                                for facet in self._facet_filters[key]:
-                                    eval_commands.append(f"list_item.get('{facet.split(',')[0]}').get('{facet.split(',')[1]}')")
-                                eval_commands = ','.join(eval_commands)
-                                logging.debug(f"eval command string: {eval_commands}")
-                                try:
-                                    getattr(self.filters, key)[(eval(eval_commands))]['count'] += 1
-                                    getattr(self.filters, key)[(eval(eval_commands))]['assets'].append(asset.id)
-                                
-                                except KeyError:
-                                    getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                            value = list_item.get('value') or {}
+                            if value:
+                                facets = self._facet_filters[key]
+                                facet_key = tuple([__nested_get__(list_item, f) for f in facets])
+                                __inc_filter__(key, facet_key)
                             else:
                                 logging.debug(f"empty location[value] dict in asset {asset.id}")
                                 pass
                         
                         elif key == 'assetSecurityPolicies':
-                            if list_item['isAffected']:
-                                eval_commands = []
-                                for facet in self._facet_filters[key]:
-                                    eval_commands.append(f"list_item.get('{facet}')")
-                                eval_commands = ','.join(eval_commands)
-                                logging.debug(f"eval command string: {eval_commands}")
-                                try:
-                                    getattr(self.filters, key)[(eval(eval_commands))]['count'] += 1
-                                    getattr(self.filters, key)[(eval(eval_commands))]['assets'].append(asset.id)
-                                
-                                except KeyError:
-                                    getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                            if list_item.get('isAffected'):
+                                facets = self._facet_filters[key]
+                                facet_key = tuple([__nested_get__(list_item, f) for f in facets])
+                                __inc_filter__(key, facet_key)
                         
                         else:
-                            for list_item in getattr(asset, key):
-                                logging.debug(list_item)
-                                eval_commands = []
-                                if len(self._facet_filters[key]) == 1:
-                                    eval_commands = f"list_item.get('{self._facet_filters[key][0]}')"
-                                    logging.debug(f"eval command string: {eval_commands}")
-                                    try:
-                                        getattr(self.filters, key)[tuple([eval(eval_commands)])]['count'] += 1
-                                        getattr(self.filters, key)[tuple([eval(eval_commands)])]['assets'].append(asset.id)
-                                    
-                                    except KeyError:
-                                        getattr(self.filters, key)[tuple([eval(eval_commands)])] = {'count':1, 'assets':[asset.id]}
-                                else:
-                                    for facet in self._facet_filters[key]:
-                                        eval_commands.append(f"list_item.get('{facet}')")
-                                    eval_commands = ','.join(eval_commands)
-                                    logging.debug(f"eval command string: {eval_commands}")
-                                    try:
-                                        getattr(self.filters, key)[(eval(eval_commands),)]['count'] += 1
-                                        getattr(self.filters, key)[(eval(eval_commands),)]['assets'].append(asset.id)
-                                    
-                                    except KeyError:
-                                        getattr(self.filters, key)[(eval(eval_commands))] = {'count':1, 'assets':[asset.id]}
+                            facets = self._facet_filters[key]
+                            facet_key = tuple([__nested_get__(list_item, f) for f in facets])
+                            __inc_filter__(key, facet_key)
                     if attribute_name == key:
                         break
         
@@ -514,8 +451,9 @@ class Workspaces:
         last_text = None
         for attempt in range(1, attempts + 1):
             try:
+                request_fn = self._session.request if hasattr(self, "_session") else requests.request
                 if payload is not None:
-                    r = requests.request(
+                    r = request_fn(
                         method=method,
                         url=helper_url,
                         headers=helper_headers,
@@ -524,7 +462,7 @@ class Workspaces:
                         timeout=self._http_timeout,
                     )
                 else:
-                    r = requests.request(
+                    r = request_fn(
                         method=method,
                         url=helper_url,
                         headers=helper_headers,

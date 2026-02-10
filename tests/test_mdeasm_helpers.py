@@ -101,3 +101,38 @@ def test_workspace_query_helper_retries_and_refreshes_token_on_401():
     # Retry-After respected.
     sleep_mock.assert_called_once_with(1)
 
+
+def test_workspace_query_helper_prefers_requests_session_when_present():
+    ws = _new_ws()
+
+    class Resp:
+        def __init__(self, ok, status_code, text, headers=None):
+            self.ok = ok
+            self.status_code = status_code
+            self.text = text
+            self.headers = headers or {}
+
+    class DummySession:
+        def __init__(self):
+            self.calls = []
+
+        def request(self, **kwargs):
+            self.calls.append(kwargs)
+            return Resp(True, 200, "ok")
+
+    ws._session = DummySession()
+
+    with mock.patch.object(ws, "__token_expiry__", return_value=False):
+        with mock.patch.object(mdeasm.requests, "request", side_effect=AssertionError("requests.request should not be used")):
+            r = ws.__workspace_query_helper__(
+                "t",
+                method="get",
+                endpoint="assets/foo",
+                url="https://example.test",
+                data_plane=True,
+                retry=False,
+                max_retry=1,
+            )
+
+    assert r.ok is True
+    assert len(ws._session.calls) == 1
