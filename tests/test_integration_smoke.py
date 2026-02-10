@@ -9,6 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "API"))
 
 import mdeasm  # noqa: E402
+import mdeasm_cli  # noqa: E402
 
 
 def test_integration_smoke_get_workspaces():
@@ -68,3 +69,47 @@ def test_integration_smoke_data_plane_assets():
     )
 
     assert hasattr(ws, "smokeAssets")
+
+
+def test_integration_smoke_cli_assets_export():
+    """
+    Opt-in "real export" integration smoke.
+
+    This exercises the CLI wrapper (filter parsing + stdout/stderr separation + JSON encoding)
+    with a tiny export capped at 1 asset.
+    """
+    if os.getenv("MDEASM_INTEGRATION_EXPORT") != "1":
+        pytest.skip("set MDEASM_INTEGRATION_EXPORT=1 to enable CLI export integration smoke tests")
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    # This will call control-plane get_workspaces() on init.
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip("set WORKSPACE_NAME (or ensure only one workspace exists) to run export smoke")
+
+    # Run the CLI flow (writes JSON to stdout; status to stderr).
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--no-pretty",
+            "--out",
+            "-",
+            "--no-facet-filters",
+            "--max-assets",
+            "1",
+            "--max-page-size",
+            "1",
+            "--max-page-count",
+            "1",
+        ]
+    )
+    assert rc == 0
