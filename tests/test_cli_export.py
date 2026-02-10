@@ -3,6 +3,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "API"))
@@ -520,3 +522,21 @@ def test_cli_assets_export_wires_max_assets_and_progress(monkeypatch):
     assert rc == 0
     assert captured["get_kwargs"]["max_assets"] == 10
     assert captured["get_kwargs"]["track_every_N_pages"] == 25
+
+
+def test_write_json_is_atomic_on_replace_error(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    out.write_text("OLD\n", encoding="utf-8")
+
+    def boom(_src, _dst):
+        raise OSError("rename failed")
+
+    monkeypatch.setattr(mdeasm_cli.os, "replace", boom)
+
+    with pytest.raises(OSError):
+        mdeasm_cli._write_json(out, [{"id": "x"}], pretty=False)
+
+    # Atomic write should not truncate/overwrite the original file if rename fails.
+    assert out.read_text(encoding="utf-8") == "OLD\n"
+    # Temp file should be cleaned up on failure.
+    assert list(tmp_path.glob(f".{out.name}.*.tmp")) == []

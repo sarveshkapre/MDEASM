@@ -2,7 +2,9 @@
 import argparse
 import csv
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -42,6 +44,57 @@ def _parse_http_timeout(value: str) -> tuple[float, float]:
     return (connect_s, read_s)
 
 
+def _atomic_write_text(path: Path, data: str, *, encoding: str = "utf-8") -> None:
+    """
+    Best-effort atomic file write.
+
+    Write to a temp file in the destination directory, then replace the final path. This avoids
+    leaving partially-written output files if the process is interrupted mid-write.
+    """
+    tmp_fh = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding=encoding,
+        newline="\n",
+        delete=False,
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_fh.name)
+    try:
+        with tmp_fh:
+            tmp_fh.write(data)
+            tmp_fh.flush()
+            try:
+                os.fsync(tmp_fh.fileno())
+            except OSError:
+                # Some filesystems may not support fsync; atomic replace still helps.
+                pass
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
+
+def _atomic_open_text(path: Path, *, encoding: str = "utf-8", newline: str | None = None):
+    """
+    Open a temp file handle for atomic writes. Caller must write/close, then we replace `path`.
+    """
+    tmp_fh = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding=encoding,
+        newline=newline,
+        delete=False,
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    return tmp_fh, Path(tmp_fh.name)
+
+
 def _write_json(path: Path | None, payload, *, pretty: bool) -> None:
     if pretty:
         data = json.dumps(payload, indent=2, default=_json_default, sort_keys=True)
@@ -51,17 +104,33 @@ def _write_json(path: Path | None, payload, *, pretty: bool) -> None:
     if path is None:
         sys.stdout.write(data + "\n")
     else:
-        path.write_text(data + "\n", encoding="utf-8")
+        _atomic_write_text(path, data + "\n", encoding="utf-8")
 
 
 def _write_ndjson(path: Path | None, rows: list[dict]) -> None:
-    out_fh = sys.stdout if path is None else path.open("w", encoding="utf-8", newline="\n")
-    try:
+    if path is None:
+        out_fh = sys.stdout
         for row in rows:
             out_fh.write(json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":")) + "\n")
-    finally:
-        if path is not None:
-            out_fh.close()
+        return
+
+    tmp_fh, tmp_path = _atomic_open_text(path, encoding="utf-8", newline="\n")
+    try:
+        with tmp_fh:
+            for row in rows:
+                tmp_fh.write(json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":")) + "\n")
+            tmp_fh.flush()
+            try:
+                os.fsync(tmp_fh.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
 
 
 def _read_columns_file(path: Path) -> list[str]:
@@ -103,8 +172,7 @@ def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None
     # Union-of-keys header to avoid silently dropping columns, unless columns are explicit.
     fieldnames: list[str] = columns or sorted({k for r in rows for k in r.keys()})
 
-    out_fh = sys.stdout if path is None else path.open("w", encoding="utf-8", newline="")
-    try:
+    def write_rows(out_fh) -> None:
         writer = csv.DictWriter(out_fh, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         for row in rows:
@@ -116,9 +184,27 @@ def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None
                 else:
                     cooked[k] = v
             writer.writerow(cooked)
-    finally:
-        if path is not None:
-            out_fh.close()
+
+    if path is None:
+        write_rows(sys.stdout)
+        return
+
+    tmp_fh, tmp_path = _atomic_open_text(path, encoding="utf-8", newline="")
+    try:
+        with tmp_fh:
+            write_rows(tmp_fh)
+            tmp_fh.flush()
+            try:
+                os.fsync(tmp_fh.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
 
 
 def build_parser() -> argparse.ArgumentParser:
