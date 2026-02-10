@@ -7,11 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Atomic export writes**
-  - Scope: when `--out <path>` is used, write to a temp file and rename (best-effort) to avoid partial/corrupt files on interruption.
-  - Why: makes scheduled exports safer and reduces downstream pipeline breakage.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Filter input ergonomics (`--filter @file`)**
   - Scope: allow `--filter @path` to read a query filter from disk (strip whitespace/comments), and document recommended patterns for long filters.
   - Why: real EASM filters get long; files are easier to review/version than shell-escaped strings.
@@ -28,6 +23,11 @@
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
 ## Implemented
+- [x] **Atomic export writes**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `b0ce4cb`
+
 - [x] **CSV export column selection**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`

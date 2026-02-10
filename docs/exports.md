@@ -60,6 +60,7 @@ mdeasm assets export \
 
 ## Notes
 - The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
+- When using `--out <path>`, exports are written atomically (temp file + replace) to avoid partial files on interruption.
 - For compact JSON in pipelines, consider `--no-pretty`. For line-oriented ingestion, consider `--format ndjson`.
 - For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.
 - For long-running exports, consider `--progress-every-pages 25` (status is printed to stderr).
