@@ -19,6 +19,15 @@ $EDITOR .env
 python3 API/retrieve_risk_observations.py
 ```
 
+## Optional: Install + CLI
+```bash
+source .venv/bin/activate
+python3 -m pip install -e . --upgrade
+
+# CLI help (no credentials required):
+mdeasm --help
+```
+
 More details: `API/README.md`
 
 Auth/setup details (env vars, permissions, common 401/403 troubleshooting): `docs/auth.md`

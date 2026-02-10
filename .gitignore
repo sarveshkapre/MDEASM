@@ -3,6 +3,9 @@ data
 .venv
 .pytest_cache
 .ruff_cache
+*.egg-info
+build
+dist
 **/__pycache__
 **/testing
 **/testing.py

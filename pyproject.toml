@@ -1,3 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mdeasm"
+version = "1.4.0"
+description = "Helpers and examples for Microsoft Defender External Attack Surface Management (EASM)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "requests>=2.31.0",
+  "python-dateutil>=2.8.2",
+  "python-dotenv>=1.0.1",
+  "PyJWT>=2.8.0",
+]
+
+[project.scripts]
+# Exposes the repo's CLI helper as an installable command.
+mdeasm = "mdeasm_cli:main"
+
+[tool.setuptools]
+py-modules = ["mdeasm", "mdeasm_cli"]
+package-dir = { "" = "API" }
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
@@ -9,4 +34,3 @@ line-length = 100
 [tool.ruff.lint]
 # Keep rules minimal to avoid forcing a large style refactor of the upstream script code.
 select = ["E9", "F63", "F7", "F82"]
-

@@ -3,6 +3,11 @@ MD External Attack Surface Management API helpers and examples.
 
 All these are based on the mdeasm.py helper. It is easiest to import it into the use case scripts and jupyter notebook if it is in the same directory.
 
+Optional (recommended for automation): install the helper as a module + CLI from the repo root:
+```bash
+python3 -m pip install -e . --upgrade
+mdeasm --help
+```
 
 ## Environment file
 

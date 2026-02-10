@@ -7,25 +7,47 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Package the Python helper for ergonomic installs**
-  - Scope: turn `API/mdeasm.py` into an installable module (minimal `pyproject` build config) while keeping existing examples working.
-  - Why: removes the "copy into same directory" requirement and improves DX.
-  - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+### Selected (Cycle 5)
+- [ ] **Make the helper pip-installable (editable) + add a console script**
+  - Scope: configure `pyproject.toml` to install `mdeasm` and `mdeasm_cli` from `API/`; add `mdeasm` console script; keep existing `API/*.py` examples working unchanged.
+  - Why: removes `sys.path`/`cwd` footguns and makes the CLI usable in automation environments.
+  - Score: Impact 4 | Effort 3 | Strategic fit 5 | Differentiation 0 | Risk 2 | Confidence 4
+
+- [ ] **Harden CI around packaging/module entrypoints**
+  - Scope: in CI, `pip install -e .` and verify `python -m mdeasm_cli --help` works; keep existing lint/tests/compile.
+  - Why: packaging regressions are easy to miss locally and break users immediately.
+  - Score: Impact 3 | Effort 1 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **Export output ergonomics: compact JSON + NDJSON**
+  - Scope: add `--pretty/--no-pretty` for JSON and `--format ndjson` for line-oriented ingestion.
+  - Why: improves composability in shell pipelines and downstream ingestion (SIEM/data lake).
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
+
+### Backlog
+- [ ] **Add a "safe logging" mode**
+  - Scope: avoid configuring root logging at import; add explicit opt-in config helpers and CLI verbosity knobs; ensure no secrets ever leak to logs.
+  - Why: improves operational safety in CI/logged environments.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
 - [ ] **Add `python -m mdeasm_cli` entrypoint (module mode)**
-  - Scope: allow `python -m mdeasm.cli ...` (post-packaging) or `python -m API.mdeasm_cli ...` (pre-packaging) so users can run without relying on `cwd`/`sys.path` quirks.
+  - Scope: ensure `python -m mdeasm_cli ...` works after install (and keep `python3 API/mdeasm_cli.py ...` working pre-install).
   - Why: makes automation more robust and reduces "import mdeasm" confusion.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Tighten output ergonomics for exports**
-  - Scope: add `--pretty/--no-pretty` for JSON; optionally add `ndjson` for streaming large outputs.
-  - Why: improves composability in shell pipelines and large export performance.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **CSV export column selection**
+  - Scope: add `--columns` (explicit list) and/or `--columns-from` (file) to reduce output size and stabilize schemas for pipelines.
+  - Why: most asset inventories have many fields; limiting columns reduces noise and cost.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Add a "safe logging" mode**
-  - Scope: centralize logging config, avoid printing workspace lists by default, add `verbose` flags in examples/CLI, and ensure no secrets ever leak.
-  - Why: improves operational safety in CI/logged environments.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **Treat API version drift as a first-class concern**
+  - Scope: periodically validate the default `EASM_API_VERSION`; document recommended versions and when to override; add a tiny integration smoke to detect `api-version` breakage.
+  - Why: Defender EASM uses preview versions; drift can silently break automations.
+  - Score: Impact 3 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Promote upstream TODOs into scoped, testable work**
+  - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; discovery group deletion if endpoint fixed; asset snapshots).
+  - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
+  - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
 ## Implemented
 - [x] **Add progress logging + `--max-assets` cap for CLI exports**

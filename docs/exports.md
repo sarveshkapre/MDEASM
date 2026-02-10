@@ -2,12 +2,18 @@
 
 This repo includes a small opt-in CLI for common automation flows.
 
+After installing the repo in editable mode, you can use either:
+- `mdeasm ...` (console script)
+- `python3 -m mdeasm_cli ...` (module mode)
+
 ## Asset export (JSON)
 ```bash
 source .venv/bin/activate
 
 # Ensure `.env` exists at repo root (see README/API docs), then:
-python3 API/mdeasm_cli.py assets export \
+python3 -m pip install -e . --upgrade
+
+mdeasm assets export \
   --filter 'state = "confirmed" AND kind = "domain"' \
   --format json \
   --out assets.json \
@@ -20,7 +26,7 @@ python3 API/mdeasm_cli.py assets export \
 source .venv/bin/activate
 
 # Machine-readable output goes to stdout; status/progress goes to stderr.
-python3 API/mdeasm_cli.py assets export \
+python3 -m mdeasm_cli assets export \
   --filter 'state = "confirmed" AND kind = "domain"' \
   --format json \
   --out - \
@@ -32,7 +38,7 @@ python3 API/mdeasm_cli.py assets export \
 ```bash
 source .venv/bin/activate
 
-python3 API/mdeasm_cli.py assets export \
+mdeasm assets export \
   --filter 'state = "confirmed" AND kind = "host"' \
   --format csv \
   --out assets.csv \
@@ -44,4 +50,4 @@ python3 API/mdeasm_cli.py assets export \
 - The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
 - For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.
 - For long-running exports, consider `--progress-every-pages 25` (status is printed to stderr).
-- For reliability tuning without code edits, see `python3 API/mdeasm_cli.py assets export --help` for: `--api-version`, `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
+- For reliability tuning without code edits, see `mdeasm assets export --help` for: `--api-version`, `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
