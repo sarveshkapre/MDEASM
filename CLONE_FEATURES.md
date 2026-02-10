@@ -7,11 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Expose CLI flags for HTTP reliability knobs**
-  - Scope: add `--api-version`, `--http-timeout`, `--retry/--no-retry`, `--max-retry`, `--backoff-max-s` to `API/mdeasm_cli.py` and wire them into `Workspaces(...)`.
-  - Why: makes automation less brittle without requiring code edits when API versions or environments vary.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Add an opt-in real integration smoke test (skipped by default)**
   - Scope: `pytest` integration test that runs only when `MDEASM_INTEGRATION=1` and required env vars are set; hit a lightweight endpoint (ex: `get_workspaces`) and assert shape.
   - Why: catches auth/API-version regressions that unit tests cannot.
@@ -38,6 +33,11 @@
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Expose CLI flags for HTTP reliability knobs**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`
+  - Evidence (trusted: local tests): `ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help` (pass); commit `dd9ae80`
+
 - [x] **Remove `eval()` from facet filter construction (and fix multi-facet counting bug)**
   - Date: 2026-02-10
   - Scope: `API/mdeasm.py`, `tests/test_facet_filters.py`

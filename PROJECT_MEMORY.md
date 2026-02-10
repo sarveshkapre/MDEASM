@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Expose CLI flags for HTTP reliability knobs | Reduce brittleness in automation and allow environment-specific tuning without code edits | `ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help` (pass) | dd9ae80 | high | trusted
 - 2026-02-10 | Remove `eval()` from facet filter construction; reuse a `requests.Session` | Security hardening + correctness fix for facet counts; improved HTTP performance for paginated exports | `ruff check .` (pass); `pytest` (11 passed); `python -m compileall API` (pass) | 34c636e | high | trusted
 - 2026-02-10 | Add dependency manifests + runnable quickstart docs | Make repo installable/runnable without guesswork; fix PyJWT naming confusion | `python -m compileall API` (pass) | d50f47a | high | trusted
 - 2026-02-10 | Add minimal lint + unit tests | Prevent regressions in auth/retry and helper behavior without forcing large refactors | `ruff check .` (pass); `pytest` (3 passed) | 54f1289 | high | trusted
@@ -27,7 +28,6 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Expose CLI flags for HTTP reliability knobs (api-version/timeout/retry/backoff) to reduce environment-specific brittleness.
 - Add an opt-in real integration smoke test (skipped by default) to catch auth/api-version drift early.
 - Decide whether to keep default `EASM_API_VERSION=2022-04-01-preview` or bump the default after validating against current Microsoft Learn reference versions.
 
@@ -52,6 +52,7 @@
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` | `All checks passed!`; `11 passed`; compile ok; CLI help ok | pass
 - 2026-02-10 | `source .venv/bin/activate && python -c "import sys; from pathlib import Path; sys.path.insert(0, str(Path('API').resolve())); import mdeasm; print('mdeasm version', mdeasm._VERSION)"` | prints `mdeasm version 1.4` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest` | `All checks passed!`; `11 passed` | pass
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` | `All checks passed!`; `12 passed`; compile ok; CLI help ok | pass
 
 ## Historical Summary
 - Keep compact summaries of older entries here when file compaction runs.
