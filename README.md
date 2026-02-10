@@ -20,3 +20,5 @@ python3 API/retrieve_risk_observations.py
 ```
 
 More details: `API/README.md`
+
+Auth/setup details (env vars, permissions, common 401/403 troubleshooting): `docs/auth.md`

@@ -12,6 +12,7 @@ All these are based on the mdeasm.py helper. It is easiest to import it into the
 Notes:
 - `API/mdeasm.py` uses `python-dotenv` (`load_dotenv()`) which will look for a `.env` in the current directory and parent directories, so a root `.env` works when running scripts from `API/`.
 - Optional env: `EASM_API_VERSION` (default: `2022-04-01-preview`).
+- Auth/setup details (env vars, permissions, common 401/403 troubleshooting): `docs/auth.md`
 
 ## Required Python package imports
 
