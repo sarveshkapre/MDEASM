@@ -7,22 +7,42 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Market parity exports (CSV/JSON) via a tiny CLI wrapper**
-  - Scope: add `API/mdeasm_cli.py` (opt-in) without breaking existing scripts.
-  - Why: most ASM products emphasize operational exports/integrations.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 2 | Confidence 3
+- [ ] **Remove `eval()` usage from facet filter construction**
+  - Scope: replace `eval()` in `Workspaces.__facet_filter_helper__()` with explicit tuple-building helpers; add unit tests on representative payloads.
+  - Why: improves security posture and maintainability; prevents accidental code execution if future refactors make inputs less constrained.
+  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+
+- [ ] **Lightweight performance improvement: reuse a `requests.Session`**
+  - Scope: use a single `requests.Session` per `Workspaces` instance, preserving headers/timeouts; keep API surface stable.
+  - Why: reduces overhead and improves throughput for large paginated exports.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 3
 
 - [ ] **Package the Python helper for ergonomic installs**
   - Scope: turn `API/mdeasm.py` into an installable module (`src/` layout or minimal `pyproject` build config).
   - Why: removes the "copy into same directory" requirement and improves DX.
   - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Configurable HTTP behavior**
-  - Scope: allow overriding `_http_timeout`, retry count, and backoff via `Workspaces(...)` args.
-  - Why: bulk exports and large workspaces benefit from tunable reliability settings.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
 ## Implemented
+- [x] **Fix `date_range_end`-only filtering bug in asset parsing**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `tests/test_asset_parsing.py`
+  - Evidence (trusted: local tests): `pytest` (pass); commit `1e35eb9`
+
+- [x] **Configurable HTTP behavior (instance defaults)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`
+  - Evidence (trusted: local tests): `pytest` (pass); commit `98e4eac`
+
+- [x] **Asset serialization helpers (non-breaking)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`
+  - Evidence (trusted: local tests): `pytest` (pass); commit `98e4eac`
+
+- [x] **Market parity exports (CSV/JSON) via a tiny CLI wrapper**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `README.md`, `API/README.md`
+  - Evidence (trusted: local tests): `pytest` (pass); commit `9a55544`
+
 - [x] **Fix auth/token refresh correctness + reliability hardening (highest impact)**
   - Date: 2026-02-08
   - Scope: `API/mdeasm.py`
@@ -61,11 +81,17 @@
 ## Insights
 - Market scan (untrusted: external web sources; links captured during session):
   - Microsoft Defender EASM exposes both control-plane (ARM) and data-plane endpoints and uses OAuth2 client credentials. This repo’s `Workspaces` helper aligns with that model.
+  - Microsoft’s REST API docs emphasize previewed API versions via the `api-version` query param for data-plane/control-plane operations; making `api-version` configurable reduces breakage as preview versions evolve.
   - Commercial ASM tools generally emphasize: continuous discovery, asset inventory, risk prioritization, exports/integrations, and operational reliability (timeouts/retries).
+  - Mature ASM tools ship CLIs and export capabilities (CSV/JSON), often designed to plug into automation workflows (file/stdin, structured output).
   - Sources reviewed (untrusted):
     - Microsoft Learn: Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - Microsoft Learn: Defender EASM REST API (preview) reference root: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/
+    - Microsoft Learn: example data-plane preview reference (shows `api-version`, `skip`, `maxpagesize`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/reports/get-snapshot?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
     - Microsoft Learn: EASM authentication overview (Microsoft Entra ID): https://learn.microsoft.com/en-us/defender-easm/authentication
     - Censys ASM: exporting assets (CSV): https://support.censys.io/hc/en-us/articles/35338966133524-Exporting-Assets-in-Censys-ASM
+    - Censys docs: inventory export UX (CSV): https://docs.censys.com/docs/asm-inventory-assets
+    - Censys Python: CLI reference (structured output patterns): https://censys-python.readthedocs.io/en/v2.2.10/cli.html
     - Palo Alto Networks: Cortex Xpanse product overview: https://www.paloaltonetworks.com/cortex/cortex-xpanse
 
 ## Notes
