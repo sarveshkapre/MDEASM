@@ -7,29 +7,44 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Add an opt-in real integration smoke test (skipped by default)**
-  - Scope: `pytest` integration test that runs only when `MDEASM_INTEGRATION=1` and required env vars are set; hit a lightweight endpoint (ex: `get_workspaces`) and assert shape.
+- [ ] **(Selected) Clarify `Asset.to_dict()` behavior (return value + optional printing)**
+  - Scope: make `Asset.to_dict()` return a dict while preserving current default "print" behavior; add a `print_` kwarg; update docs/examples; add unit test coverage.
+  - Why: removes a common papercut for programmatic usage without breaking interactive workflows.
+  - Score: Impact 3 | Effort 1 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **(Selected) Add `docs/auth.md` for `.env` + permissions troubleshooting**
+  - Scope: document required env vars, optional env vars, Azure roles/permissions at a high level, and common 401/403 failure modes; link from `README.md` and `API/README.md` while keeping those short.
+  - Why: reduces setup thrash and makes onboarding deterministic.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **(Selected) Add an opt-in real integration smoke test (skipped by default)**
+  - Scope: `pytest` integration test that runs only when `MDEASM_INTEGRATION=1` and required env vars are set; hit a lightweight endpoint (start with `get_workspaces`) and assert response shape.
   - Why: catches auth/API-version regressions that unit tests cannot.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Add progress logging + `--max-assets` cap for CLI exports**
+  - Scope: optional `--max-assets N` to cap results; periodic progress log (every N pages/assets) for long runs.
+  - Why: makes large exports observable and prevents runaway automation.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Package the Python helper for ergonomic installs**
   - Scope: turn `API/mdeasm.py` into an installable module (minimal `pyproject` build config) while keeping existing examples working.
   - Why: removes the "copy into same directory" requirement and improves DX.
   - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Improve `.env` and permissions documentation**
-  - Scope: add `docs/auth.md` that lists required env vars, expected Azure roles/permissions at a high level, and common 401/403 failure modes; keep `README.md` short and link out.
-  - Why: reduces setup thrash and support burden; makes onboarding more deterministic.
+- [ ] **Add `python -m mdeasm_cli` entrypoint (module mode)**
+  - Scope: allow `python -m mdeasm.cli ...` (post-packaging) or `python -m API.mdeasm_cli ...` (pre-packaging) so users can run without relying on `cwd`/`sys.path` quirks.
+  - Why: makes automation more robust and reduces "import mdeasm" confusion.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Clarify Asset serialization API**
-  - Scope: `Asset.to_dict()` currently prints; consider deprecating in favor of `as_dict()` or changing `to_dict()` to return a dict (non-breaking if possible); add tests.
-  - Why: avoids surprising behavior and makes programmatic usage cleaner.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 3
+- [ ] **Tighten output ergonomics for exports**
+  - Scope: allow `--out -` explicitly for stdout; add `--pretty/--no-pretty` for JSON; optionally add `ndjson` for streaming large outputs.
+  - Why: improves composability in shell pipelines and large export performance.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Add minimal performance guardrails for large exports**
-  - Scope: optional `--max-assets` cap and a periodic progress log (every N pages/assets) for CLI exports.
-  - Why: makes long runs observable and reduces accidental runaway exports.
+- [ ] **Add a "safe logging" mode**
+  - Scope: centralize logging config, avoid printing workspace lists by default, add `verbose` flags in examples/CLI, and ensure no secrets ever leak.
+  - Why: improves operational safety in CI/logged environments.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
