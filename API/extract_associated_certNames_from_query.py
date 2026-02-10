@@ -30,5 +30,5 @@ print(f"found {len(easm.assets_with_cert_cn.assets)} assets with subjectCommonNa
 # this is a regex search, so can pass any python regex tokens/quantifiers/classes/etc
 # this will write results to CSV files in the scripts current directory
 # can also choose out_format='json', out_format='print', and/or out_path for different write options/locations
-easm.query_facet_filter(search='\.com|\.net|\.ca|\.co', facet_filter='subjectCommonNames', out_format='csv')
+easm.query_facet_filter(search=r"\.com|\.net|\.ca|\.co", facet_filter='subjectCommonNames', out_format='csv')
 print('')

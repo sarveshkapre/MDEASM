@@ -120,9 +120,13 @@ class Workspaces:
                     verified_asset_id = asset_id
             except ValueError:
                 try:
-                    if base64.b64encode(base64.b64decode(asset_id.encode())).decode() == asset_id:
+                    decoded = base64.b64decode(asset_id.encode(), validate=True)
+                    if base64.b64encode(decoded).decode() == asset_id:
                         logging.debug(f"{asset_id} is valid base64")
                         verified_asset_id = asset_id
+                    else:
+                        logging.error('invalid base64')
+                        raise Exception(asset_id)
                 except binascii.Error:
                     logging.error('invalid base64')
                     raise Exception(asset_id)
