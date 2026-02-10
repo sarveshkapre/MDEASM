@@ -10,8 +10,6 @@ def main() -> int:
     if mdeasm._VERSION < 1.4:
         sys.exit(f"requires mdeasm.py VERSION 1.4; current version: {mdeasm._VERSION}")
 
-    from dateutil import parser
-
     easm = mdeasm.Workspaces()
 
     # the cvss severity queries that populate the dashboard

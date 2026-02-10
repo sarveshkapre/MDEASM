@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Enforce Ruff `F401` (unused imports) | Prevent dead code / unused imports from silently accumulating while keeping the lint bar small and low-churn | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | TBD | high | trusted
 - 2026-02-10 | Add `mdeasm doctor` (env + optional control-plane probe) | Provide a standard, non-destructive "is my configuration wired correctly?" command that stays stdout-safe for automation | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli doctor --help >/dev/null` (pass) | 00ac4d0 | high | trusted
 - 2026-02-10 | Add saved filters CRUD (data-plane) in helper + CLI | Reduce repetition of brittle filter strings by storing/reusing server-side filters; enable automation via `mdeasm saved-filters ...` | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli saved-filters --help >/dev/null` (pass) | db068a2 | high | trusted
 - 2026-02-10 | Fix facet filter single-element tuple specs + regression test | Single-element facet specs without a trailing comma become strings, causing incorrect facet keys/counts for attributes like `cookies`/`ipBlocks` | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 45c272d | high | trusted
@@ -60,6 +61,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `66 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `gh run watch 21876146038 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `99f7a01` | pass
 - 2026-02-10 | `gh run view 21876107678 -R sarveshkapre/MDEASM --json status,conclusion,displayTitle,headSha,updatedAt,url` | conclusion `success` for commit `c1a9707` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API` | `All checks passed!`; `... (tests passed; integration skipped)`; compile ok | pass

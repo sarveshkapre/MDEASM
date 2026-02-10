@@ -44,6 +44,11 @@ Next Up (keep deduped)
   - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Lint: enforce unused import checks (Ruff `F401`)**
+  - Date: 2026-02-10
+  - Scope: `pyproject.toml`, `API/affected_cvss_validation.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass)
+
 - [x] **CLI: `mdeasm doctor` (env + auth sanity checks)**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `docs/auth.md`, `tests/test_cli_doctor.py`
