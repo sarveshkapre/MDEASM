@@ -15,7 +15,7 @@ python3 -m pip install -r requirements.txt --upgrade
 cp API/.env.template .env
 $EDITOR .env
 
-python3 API/retreive_risk_observations.py
+python3 API/retrieve_risk_observations.py
 ```
 
 More details: `API/README.md`

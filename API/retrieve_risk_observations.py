@@ -1,27 +1,42 @@
 #!/usr/bin/python3
 import sys
 
-# Easiest to import mdeasm.py if it is in the same directory as this script.
-# Requires mdeasm.py VERSION 1.4
-import mdeasm
+def main(severity: str = "high") -> int:
+    """Retrieve and print workspace risk observations.
 
-if mdeasm._VERSION < 1.4:
-    sys.exit(f"requires mdeasm.py VERSION 1.4; current version: {mdeasm._VERSION}")
+    Kept as a tiny example entrypoint so other scripts (and tests) can reuse it
+    without triggering network calls at import time.
+    """
 
-easm = mdeasm.Workspaces()
+    # Easiest to import mdeasm.py if it is in the same directory as this script.
+    # Requires mdeasm.py VERSION 1.4
+    import mdeasm
 
-# The get_workspace_risk_observations() function will print the names of all risk
-# observation details retrieved, and where to access the asset and facet filter attributes.
+    if mdeasm._VERSION < 1.4:
+        sys.stderr.write(
+            f"requires mdeasm.py VERSION 1.4; current version: {mdeasm._VERSION}\n"
+        )
+        return 2
 
-# Retrieve asset details for low severity observations:
-# easm.get_workspace_risk_observations("low")
+    easm = mdeasm.Workspaces()
 
-# Retrieve asset details for medium severity observations:
-# easm.get_workspace_risk_observations("medium")
+    # The get_workspace_risk_observations() function will print the names of all risk
+    # observation details retrieved, and where to access the asset and facet filter attributes.
+    #
+    # Retrieve asset details for low severity observations:
+    # easm.get_workspace_risk_observations("low")
+    #
+    # Retrieve asset details for medium severity observations:
+    # easm.get_workspace_risk_observations("medium")
+    #
+    # Retrieve asset details for high severity observations:
+    # easm.get_workspace_risk_observations("high")
+    #
+    # Retrieve asset details for ALL observations:
+    # easm.get_workspace_risk_observations()
 
-# Retrieve asset details for high severity observations:
-easm.get_workspace_risk_observations("high")
+    easm.get_workspace_risk_observations(severity)
+    return 0
 
-# Retrieve asset details for ALL observations:
-# easm.get_workspace_risk_observations()
-
+if __name__ == "__main__":
+    raise SystemExit(main())

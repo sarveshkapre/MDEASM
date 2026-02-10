@@ -1,27 +1,16 @@
 #!/usr/bin/python3
-import sys
+"""
+Legacy wrapper for backwards compatibility.
 
-#easiest to import mdeasm.py if it is in the same directory as this retreive_risk_observations.py script
-#requires mdeasm.py VERSION 1.4
-import mdeasm
+Use `API/retrieve_risk_observations.py` (correct spelling) going forward.
+"""
 
-if mdeasm._VERSION < 1.4:
-    sys.exit(f"requires mdeasm.py VERSION 1.4; current version: {mdeasm._VERSION}")
 
-easm = mdeasm.Workspaces()
+def main() -> int:
+    from retrieve_risk_observations import main as real_main
 
-#the get_workspace_risk_observations() funnction will print the names of all risk observation details retreived
-#as well as where to access the asset and facet filter attributes
+    return real_main()
 
-#retrieve asset details for low severity observations
-#easm.get_workspace_risk_observations('low')
 
-#retrieve asset details for medium severity observations
-#easm.get_workspace_risk_observations('medium')
-
-#retrieve asset details for high severity observations
-easm.get_workspace_risk_observations('high')
-
-#retrieve asset details for ALL observations
-#easm.get_workspace_risk_observations()
-
+if __name__ == "__main__":
+    raise SystemExit(main())
