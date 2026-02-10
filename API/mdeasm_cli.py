@@ -489,6 +489,204 @@ def build_parser() -> argparse.ArgumentParser:
         help="Max backoff sleep seconds between retries (default: helper default)",
     )
 
+    saved_filters = sub.add_parser("saved-filters", help="Saved filter operations (data plane)")
+    sf_sub = saved_filters.add_subparsers(dest="saved_filters_cmd", required=True)
+
+    sf_list = sf_sub.add_parser("list", help="List saved filters")
+    sf_list.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    sf_list.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    sf_list.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    sf_list.add_argument("--out", default="", help="Output path (default: stdout)")
+    sf_list.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    sf_list.add_argument(
+        "--filter",
+        default="",
+        help="Optional server-side filter expression for listing",
+    )
+    sf_list.add_argument("--get-all", action="store_true", help="Fetch all pages")
+    sf_list.add_argument("--page", type=int, default=0, help="Starting page (skip)")
+    sf_list.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
+    sf_list.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    sf_list.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    sf_list.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    sf_list.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    sf_list.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    sf_list.add_argument(
+        "--max-retry",
+        type=int,
+        default=None,
+        help="Max retry attempts when retry is enabled (default: helper default)",
+    )
+    sf_list.add_argument(
+        "--backoff-max-s",
+        type=float,
+        default=None,
+        help="Max backoff sleep seconds between retries (default: helper default)",
+    )
+
+    sf_get = sf_sub.add_parser("get", help="Get a saved filter by name")
+    sf_get.add_argument("name", help="Saved filter name")
+    sf_get.add_argument("--out", default="", help="Output path (default: stdout)")
+    sf_get.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    sf_get.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    sf_get.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    sf_get.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    sf_get.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    sf_get.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    sf_get.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    sf_get.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    sf_get.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    sf_get.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    sf_put = sf_sub.add_parser("put", help="Create or replace a saved filter")
+    sf_put.add_argument("name", help="Saved filter name")
+    sf_put.add_argument(
+        "--filter",
+        required=True,
+        help="MDEASM query filter (string) or @path (or @- for stdin)",
+    )
+    sf_put.add_argument(
+        "--description",
+        required=True,
+        help="Saved filter description",
+    )
+    sf_put.add_argument("--out", default="", help="Output path (default: stdout)")
+    sf_put.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    sf_put.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    sf_put.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    sf_put.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    sf_put.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    sf_put.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    sf_put.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    sf_put.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    sf_put.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    sf_put.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    sf_delete = sf_sub.add_parser("delete", help="Delete a saved filter by name")
+    sf_delete.add_argument("name", help="Saved filter name")
+    sf_delete.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    sf_delete.add_argument("--out", default="", help="Output path (default: stdout)")
+    sf_delete.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    sf_delete.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    sf_delete.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    sf_delete.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    sf_delete.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    sf_delete.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    sf_delete.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    sf_delete.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    sf_delete.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    sf_delete.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
     assets = sub.add_parser("assets", help="Asset inventory operations")
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
 
@@ -825,6 +1023,95 @@ def main(argv: list[str] | None = None) -> int:
             lines = [f"{d['name']}\t{d['dataPlane']}\t{d['controlPlane']}" for d in items]
             _write_lines(out_path, lines)
         return 0
+
+    if args.cmd == "saved-filters":
+        import mdeasm
+
+        level = None
+        if getattr(args, "log_level", ""):
+            level = args.log_level
+        elif getattr(args, "verbose", 0) >= 2:
+            level = "DEBUG"
+        elif getattr(args, "verbose", 0) == 1:
+            level = "INFO"
+        if level and hasattr(mdeasm, "configure_logging"):
+            mdeasm.configure_logging(level)
+
+        ws_kwargs = _build_ws_kwargs(args)
+        ws = mdeasm.Workspaces(**ws_kwargs)
+
+        out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
+
+        if args.saved_filters_cmd == "list":
+            page = max(int(args.page or 0), 0)
+            max_page_size = max(int(args.max_page_size or 25), 1)
+            values: list[dict] = []
+            while True:
+                resp = ws.get_saved_filters(
+                    workspace_name=args.workspace_name,
+                    filter_expr=args.filter,
+                    skip=page,
+                    max_page_size=max_page_size,
+                    noprint=True,
+                )
+                batch = resp.get("value") or []
+                if isinstance(batch, list):
+                    values.extend(batch)
+                if not args.get_all:
+                    break
+                total = resp.get("totalElements")
+                try:
+                    if total is not None and (page + len(batch)) >= int(total):
+                        break
+                except Exception:
+                    pass
+                if not batch or len(batch) < max_page_size:
+                    break
+                page += len(batch)
+
+            if args.format == "json":
+                _write_json(out_path, values, pretty=True)
+            else:
+                lines = []
+                for item in values:
+                    name = item.get("name") or item.get("id") or ""
+                    display = item.get("displayName") or ""
+                    filt = item.get("filter") or ""
+                    lines.append(f"{name}\t{display}\t{filt}")
+                _write_lines(out_path, lines)
+            return 0
+
+        if args.saved_filters_cmd == "get":
+            resp = ws.get_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
+            _write_json(out_path, resp, pretty=True)
+            return 0
+
+        if args.saved_filters_cmd == "put":
+            try:
+                query_filter = _resolve_filter_arg(args.filter)
+            except Exception as e:
+                sys.stderr.write(f"invalid --filter: {e}\n")
+                return 2
+            resp = ws.create_or_replace_saved_filter(
+                args.name,
+                query_filter=query_filter,
+                description=args.description,
+                workspace_name=args.workspace_name,
+                noprint=True,
+            )
+            _write_json(out_path, resp, pretty=True)
+            return 0
+
+        if args.saved_filters_cmd == "delete":
+            ws.delete_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
+            if args.format == "json":
+                _write_json(out_path, {"deleted": args.name}, pretty=True)
+            else:
+                _write_lines(out_path, [f"deleted {args.name}"])
+            return 0
+
+        sys.stderr.write("unknown saved-filters command\n")
+        return 2
 
     if args.cmd == "assets" and args.assets_cmd in ("export", "schema"):
         # Import inside the command so `--help` works without requiring env/config.

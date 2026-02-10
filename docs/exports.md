@@ -42,6 +42,12 @@ mdeasm assets export \
 cat filter.txt | mdeasm assets export --filter @- --format json --out assets.json --get-all --no-facet-filters
 ```
 
+## Tip: Store Filters Server-Side
+
+If you want to reuse filters across scripts/exports, you can store them as saved filters in Defender EASM:
+- Docs: `docs/saved_filters.md`
+- CLI: `mdeasm saved-filters put/list/get/delete`
+
 ## Asset export (stdout)
 ```bash
 source .venv/bin/activate

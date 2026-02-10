@@ -1842,6 +1842,105 @@ class Workspaces:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
 
+    def get_saved_filters(self, workspace_name="", filter_expr="", skip=0, max_page_size=25, **kwargs):
+        """
+        List saved filters in the data plane.
+
+        Returns the raw API response JSON (paged list). Use `noprint=True` for programmatic use.
+        """
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        params = {}
+        if filter_expr:
+            params["filter"] = filter_expr
+        if skip:
+            params["skip"] = skip
+        if max_page_size:
+            params["maxpagesize"] = max_page_size
+
+        r = self.__workspace_query_helper__(
+            "get_saved_filters",
+            method="get",
+            endpoint="savedFilters",
+            params=params,
+            workspace_name=workspace_name,
+        )
+        payload = r.json()
+        if kwargs.get("noprint"):
+            return payload
+        print(json.dumps(payload, indent=2))
+        return payload
+
+    def get_saved_filter(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        r = self.__workspace_query_helper__(
+            "get_saved_filter",
+            method="get",
+            endpoint=f"savedFilters/{name}",
+            workspace_name=workspace_name,
+        )
+        payload = r.json()
+        if kwargs.get("noprint"):
+            return payload
+        print(json.dumps(payload, indent=2))
+        return payload
+
+    def create_or_replace_saved_filter(
+        self, name, query_filter, description, workspace_name="", **kwargs
+    ):
+        """
+        Create or replace a data-plane saved filter.
+        """
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        payload = {"filter": query_filter, "description": description}
+        r = self.__workspace_query_helper__(
+            "create_or_replace_saved_filter",
+            method="put",
+            endpoint=f"savedFilters/{name}",
+            payload=payload,
+            workspace_name=workspace_name,
+        )
+        out = r.json()
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def delete_saved_filter(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        r = self.__workspace_query_helper__(
+            "delete_saved_filter",
+            method="delete",
+            endpoint=f"savedFilters/{name}",
+            workspace_name=workspace_name,
+        )
+        if kwargs.get("noprint"):
+            return None
+        if r.status_code == 204:
+            print(f"deleted saved filter '{name}'")
+        else:
+            print(json.dumps({"status": r.status_code, "name": name}, indent=2))
+        return None
+
     def update_assets(
         self,
         query_filter,
