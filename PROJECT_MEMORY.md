@@ -9,6 +9,8 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Make the helper pip-installable (editable) and add a console script (`mdeasm`) + CI packaging smoke | Reduce `sys.path`/`cwd` footguns and make CLI usage automation-friendly | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help >/dev/null` (pass) | b6a0599 | high | trusted
+- 2026-02-10 | Add compact JSON and NDJSON output modes to the CLI | Improve pipeline ergonomics (smaller JSON, line-oriented ingestion) without changing default behavior | `source .venv/bin/activate && ruff check . && pytest` (pass) | ec831f4 | high | trusted
 - 2026-02-10 | Make CLI asset exports stdout-safe (status to stderr) and add `--max-assets`/`--progress-every-pages` knobs | Prevent corrupted JSON/CSV when piping and make long exports controllable/observable | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` (pass) | dc5b59d | high | trusted
 - 2026-02-10 | Make `Asset.to_dict()` return a dict while preserving default printing | Remove a programmatic usage papercut without breaking existing interactive workflows | `ruff check . && pytest` (pass) | 1f44548 | high | trusted
 - 2026-02-10 | Add `docs/auth.md` (env vars + permissions + common failures) and link from READMEs | Reduce onboarding thrash and make auth/permission troubleshooting skimmable | `ruff check . && pytest` (pass) | 539fc66 | high | trusted
@@ -38,6 +40,9 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -c "import mdeasm, mdeasm_cli; print('import ok')"` | `All checks passed!`; `16 passed, 1 skipped`; compile ok; import ok | pass
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help >/dev/null && mdeasm --help >/dev/null` | `All checks passed!`; `18 passed, 1 skipped`; compile ok; CLI help ok | pass
+- 2026-02-10 | `gh run list -R sarveshkapre/MDEASM -L 2` | CI success for commits `ec831f4` and `b6a0599` (run ids `21869287738`, `21869249414`) | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` | `All checks passed!`; `16 passed, 1 skipped`; compile ok; CLI help ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `13 passed, 1 skipped`; compile ok | pass
 - 2026-02-10 | `gh run list -R sarveshkapre/MDEASM -L 5` | CI success for commits `86b4128`, `539fc66`, `d4984ca` (run ids `21867777681`, `21867755140`, `21867716197`) | pass

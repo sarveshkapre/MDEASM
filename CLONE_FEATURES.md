@@ -7,32 +7,10 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-### Selected (Cycle 5)
-- [ ] **Make the helper pip-installable (editable) + add a console script**
-  - Scope: configure `pyproject.toml` to install `mdeasm` and `mdeasm_cli` from `API/`; add `mdeasm` console script; keep existing `API/*.py` examples working unchanged.
-  - Why: removes `sys.path`/`cwd` footguns and makes the CLI usable in automation environments.
-  - Score: Impact 4 | Effort 3 | Strategic fit 5 | Differentiation 0 | Risk 2 | Confidence 4
-
-- [ ] **Harden CI around packaging/module entrypoints**
-  - Scope: in CI, `pip install -e .` and verify `python -m mdeasm_cli --help` works; keep existing lint/tests/compile.
-  - Why: packaging regressions are easy to miss locally and break users immediately.
-  - Score: Impact 3 | Effort 1 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Export output ergonomics: compact JSON + NDJSON**
-  - Scope: add `--pretty/--no-pretty` for JSON and `--format ndjson` for line-oriented ingestion.
-  - Why: improves composability in shell pipelines and downstream ingestion (SIEM/data lake).
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 4
-
-### Backlog
 - [ ] **Add a "safe logging" mode**
   - Scope: avoid configuring root logging at import; add explicit opt-in config helpers and CLI verbosity knobs; ensure no secrets ever leak to logs.
   - Why: improves operational safety in CI/logged environments.
   - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
-- [ ] **Add `python -m mdeasm_cli` entrypoint (module mode)**
-  - Scope: ensure `python -m mdeasm_cli ...` works after install (and keep `python3 API/mdeasm_cli.py ...` working pre-install).
-  - Why: makes automation more robust and reduces "import mdeasm" confusion.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **CSV export column selection**
   - Scope: add `--columns` (explicit list) and/or `--columns-from` (file) to reduce output size and stabilize schemas for pipelines.
@@ -50,6 +28,16 @@
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
 ## Implemented
+- [x] **Make the helper pip-installable (editable) + add module/console entrypoints**
+  - Date: 2026-02-10
+  - Scope: `pyproject.toml`, `.github/workflows/ci.yml`, `.gitignore`, `README.md`, `API/README.md`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help` (pass); commit `b6a0599`
+
+- [x] **Export output ergonomics: compact JSON + NDJSON**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest` (pass); commit `ec831f4`
+
 - [x] **Add progress logging + `--max-assets` cap for CLI exports**
   - Date: 2026-02-10
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
@@ -158,6 +146,7 @@
   - Market scan refresh (untrusted; 2026-02-10):
     - Export UX commonly supports multiple formats and column selection (CSV/XLSX/JSON).
     - Large data exports are often implemented as async jobs in APIs (kick off export, poll, download chunks).
+    - Microsoft Learn data-plane preview references show a newer `api-version` (`2024-10-01-preview`) than this repo’s historic default; keeping `EASM_API_VERSION` configurable remains important.
     - Sources reviewed (untrusted):
       - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
       - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
