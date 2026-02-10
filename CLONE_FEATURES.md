@@ -7,22 +7,47 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Remove `eval()` usage from facet filter construction**
-  - Scope: replace `eval()` in `Workspaces.__facet_filter_helper__()` with explicit tuple-building helpers; add unit tests on representative payloads.
-  - Why: improves security posture and maintainability; prevents accidental code execution if future refactors make inputs less constrained.
-  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+- [ ] **Expose CLI flags for HTTP reliability knobs**
+  - Scope: add `--api-version`, `--http-timeout`, `--retry/--no-retry`, `--max-retry`, `--backoff-max-s` to `API/mdeasm_cli.py` and wire them into `Workspaces(...)`.
+  - Why: makes automation less brittle without requiring code edits when API versions or environments vary.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Lightweight performance improvement: reuse a `requests.Session`**
-  - Scope: use a single `requests.Session` per `Workspaces` instance, preserving headers/timeouts; keep API surface stable.
-  - Why: reduces overhead and improves throughput for large paginated exports.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 3
+- [ ] **Add an opt-in real integration smoke test (skipped by default)**
+  - Scope: `pytest` integration test that runs only when `MDEASM_INTEGRATION=1` and required env vars are set; hit a lightweight endpoint (ex: `get_workspaces`) and assert shape.
+  - Why: catches auth/API-version regressions that unit tests cannot.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Package the Python helper for ergonomic installs**
-  - Scope: turn `API/mdeasm.py` into an installable module (`src/` layout or minimal `pyproject` build config).
+  - Scope: turn `API/mdeasm.py` into an installable module (minimal `pyproject` build config) while keeping existing examples working.
   - Why: removes the "copy into same directory" requirement and improves DX.
   - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
+- [ ] **Improve `.env` and permissions documentation**
+  - Scope: add `docs/auth.md` that lists required env vars, expected Azure roles/permissions at a high level, and common 401/403 failure modes; keep `README.md` short and link out.
+  - Why: reduces setup thrash and support burden; makes onboarding more deterministic.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Clarify Asset serialization API**
+  - Scope: `Asset.to_dict()` currently prints; consider deprecating in favor of `as_dict()` or changing `to_dict()` to return a dict (non-breaking if possible); add tests.
+  - Why: avoids surprising behavior and makes programmatic usage cleaner.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Add minimal performance guardrails for large exports**
+  - Scope: optional `--max-assets` cap and a periodic progress log (every N pages/assets) for CLI exports.
+  - Why: makes long runs observable and reduces accidental runaway exports.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
 ## Implemented
+- [x] **Remove `eval()` from facet filter construction (and fix multi-facet counting bug)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `tests/test_facet_filters.py`
+  - Evidence (trusted: local tests): `ruff check .` (pass); `pytest` (pass); commit `34c636e`
+
+- [x] **Lightweight performance improvement: reuse a `requests.Session`**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `pytest` (pass); commit `34c636e`
+
 - [x] **Fix `date_range_end`-only filtering bug in asset parsing**
   - Date: 2026-02-10
   - Scope: `API/mdeasm.py`, `tests/test_asset_parsing.py`
@@ -93,6 +118,13 @@
     - Censys docs: inventory export UX (CSV): https://docs.censys.com/docs/asm-inventory-assets
     - Censys Python: CLI reference (structured output patterns): https://censys-python.readthedocs.io/en/v2.2.10/cli.html
     - Palo Alto Networks: Cortex Xpanse product overview: https://www.paloaltonetworks.com/cortex/cortex-xpanse
+  - Market scan refresh (untrusted; 2026-02-10):
+    - Export UX commonly supports multiple formats and column selection (CSV/XLSX/JSON).
+    - Large data exports are often implemented as async jobs in APIs (kick off export, poll, download chunks).
+    - Sources reviewed (untrusted):
+      - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
+      - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
+      - Rapid7 Exposure Command: external assets export (CSV/JSON): https://docs.rapid7.com/exposure-command/manage-external-assets/
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
