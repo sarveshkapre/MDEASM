@@ -131,6 +131,15 @@ def test_cli_assets_export_filter_at_stdin(tmp_path, monkeypatch):
     assert captured["get_kwargs"]["query_filter"] == 'state = "confirmed" AND kind = "domain"'
 
 
+def test_cli_version_flag_exits_cleanly(capsys):
+    ver = mdeasm_cli._cli_version()
+    with pytest.raises(SystemExit) as e:
+        mdeasm_cli.main(["--version"])
+    assert e.value.code == 0
+    out = capsys.readouterr().out
+    assert ver in out
+
+
 def test_cli_assets_export_json_no_pretty_is_compact(tmp_path, monkeypatch):
     out = tmp_path / "assets.json"
 

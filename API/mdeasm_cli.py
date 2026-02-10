@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+from importlib.metadata import PackageNotFoundError, version as pkg_version
 from pathlib import Path
 
 
@@ -42,6 +43,23 @@ def _parse_http_timeout(value: str) -> tuple[float, float]:
     if connect_s <= 0 or read_s <= 0:
         raise ValueError("timeouts must be > 0")
     return (connect_s, read_s)
+
+
+def _cli_version() -> str:
+    # Prefer the installed distribution version (CI installs `-e .`), but fall back to the
+    # upstream helper's `_VERSION` when running directly from a checkout.
+    try:
+        return pkg_version("mdeasm")
+    except PackageNotFoundError:
+        try:
+            import mdeasm  # type: ignore
+
+            v = getattr(mdeasm, "_VERSION", None)
+            if v is not None:
+                return str(v)
+        except Exception:
+            pass
+        return "unknown"
 
 
 def _atomic_write_text(path: Path, data: str, *, encoding: str = "utf-8") -> None:
@@ -254,9 +272,9 @@ def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="mdeasm_cli",
         description="Small CLI for MDEASM helper workflows (exports/automation).",
     )
+    p.add_argument("--version", action="version", version=f"%(prog)s {_cli_version()}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     assets = sub.add_parser("assets", help="Asset inventory operations")

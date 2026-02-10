@@ -35,6 +35,7 @@ jobs:
         run: |
           python -c "import mdeasm, mdeasm_cli; print('import ok')"
           python -m mdeasm_cli --help >/dev/null
+          python -m mdeasm_cli --version >/dev/null
 
       - name: Tests
         run: pytest

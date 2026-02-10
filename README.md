@@ -26,6 +26,7 @@ python3 -m pip install -e . --upgrade
 
 # CLI help (no credentials required):
 mdeasm --help
+mdeasm --version
 ```
 
 More details: `API/README.md`
