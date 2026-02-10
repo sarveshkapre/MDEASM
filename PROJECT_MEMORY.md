@@ -60,6 +60,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `gh run view 21876107678 -R sarveshkapre/MDEASM --json status,conclusion,displayTitle,headSha,updatedAt,url` | conclusion `success` for commit `c1a9707` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API` | `All checks passed!`; `... (tests passed; integration skipped)`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m mdeasm_cli doctor --help >/dev/null && python -m mdeasm_cli saved-filters --help >/dev/null` | CLI help ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `54 passed, 3 skipped`; compile ok | pass
