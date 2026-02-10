@@ -22,17 +22,17 @@
   - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
-- [ ] **HTTP timeout parsing tests + docs**
-  - Scope: add tests for `--http-timeout` parsing edge cases and document recommended defaults for bulk exports.
-  - Why: reliability knobs are only useful if they are hard to misuse and easy to reason about.
-  - Score: Impact 1 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Add an opt-in “real export” integration smoke (skipped by default)**
   - Scope: extend integration smoke to optionally run a tiny `assets export --max-assets 1` call when `MDEASM_INTEGRATION=1` and required env vars are present.
   - Why: catches data-plane export regressions earlier than unit tests without requiring creds in CI.
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
 
 ## Implemented
+- [x] **HTTP timeout parsing tests + docs**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`, `API/mdeasm.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); commit `8216474`
+
 - [x] **Filter input ergonomics (`--filter @file` / `--filter @-`)**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`

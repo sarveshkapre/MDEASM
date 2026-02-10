@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Harden `--http-timeout` parsing (reject NaN/inf) + add edge-case tests | Prevent misconfigured reliability knobs from producing confusing runtime failures; keep CLI inputs deterministic | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 8216474 | high | trusted
 - 2026-02-10 | Write CLI `--out` exports atomically | Avoid partial/corrupt export files on interruption; safer for scheduled jobs and pipelines | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | b0ce4cb | high | trusted
 - 2026-02-10 | Add `--columns` / `--columns-from` for CSV exports | Stabilizes schemas and reduces noise/cost for automation pipelines without changing default export behavior | `source .venv/bin/activate && ruff check . && pytest` (pass) | 6efb19a | high | trusted
 - 2026-02-10 | Make logging configuration opt-in (`configure_logging`) and add CLI verbosity flags | Avoid surprising root-logger side effects at import while keeping a first-class debugging path in the CLI | `source .venv/bin/activate && ruff check . && pytest` (pass) | 6520e6f | high | trusted
@@ -49,6 +50,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `44 passed, 2 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `26 passed, 2 skipped`; compile ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest` | `All checks passed!`; `25 passed, 2 skipped` | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m compileall API` | compiled `API/` | pass
