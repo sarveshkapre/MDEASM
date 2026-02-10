@@ -316,6 +316,65 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"%(prog)s {_cli_version()}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    workspaces = sub.add_parser("workspaces", help="Workspace operations")
+    workspaces_sub = workspaces.add_subparsers(dest="workspaces_cmd", required=True)
+
+    ws_list = workspaces_sub.add_parser(
+        "list", help="List available workspaces (stdout-safe structured output)"
+    )
+    ws_list.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    ws_list.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log verbosity (repeatable; maps to INFO/DEBUG)",
+    )
+    ws_list.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    ws_list.add_argument("--out", default="", help="Output path (default: stdout)")
+    ws_list.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    ws_list.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    ws_list.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    ws_list.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="Disable HTTP retry/backoff (default: enabled)",
+    )
+    ws_list.add_argument(
+        "--max-retry",
+        type=int,
+        default=None,
+        help="Max retry attempts when retry is enabled (default: helper default)",
+    )
+    ws_list.add_argument(
+        "--backoff-max-s",
+        type=float,
+        default=None,
+        help="Max backoff sleep seconds between retries (default: helper default)",
+    )
+
     assets = sub.add_parser("assets", help="Asset inventory operations")
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
 
@@ -521,6 +580,48 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    if args.cmd == "workspaces" and args.workspaces_cmd == "list":
+        import mdeasm
+
+        level = None
+        if args.log_level:
+            level = args.log_level
+        elif args.verbose >= 2:
+            level = "DEBUG"
+        elif args.verbose == 1:
+            level = "INFO"
+        if level and hasattr(mdeasm, "configure_logging"):
+            mdeasm.configure_logging(level)
+
+        ws_kwargs = _build_ws_kwargs(args)
+        # For listing, we want *all* workspaces regardless of WORKSPACE_NAME in the env.
+        ws_kwargs["workspace_name"] = ""
+        # This is a control-plane-only command; don't require data-plane scope.
+        ws_kwargs["init_data_plane_token"] = False
+        # Suppress default-workspace guidance; the command output is the guidance.
+        ws_kwargs["emit_workspace_guidance"] = False
+
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            sys.stderr.write(f"failed to list workspaces: {e}\n")
+            return 1
+
+        items = []
+        for name, endpoints in (getattr(ws, "_workspaces", {}) or {}).items():
+            dp = endpoints[0] if isinstance(endpoints, (list, tuple)) and len(endpoints) > 0 else ""
+            cp = endpoints[1] if isinstance(endpoints, (list, tuple)) and len(endpoints) > 1 else ""
+            items.append({"name": name, "dataPlane": dp, "controlPlane": cp})
+        items.sort(key=lambda d: str(d.get("name", "")).lower())
+
+        out_path = None if (not args.out or args.out == "-") else Path(args.out)
+        if args.format == "json":
+            _write_json(out_path, items, pretty=True)
+        else:
+            lines = [f"{d['name']}\t{d['dataPlane']}\t{d['controlPlane']}" for d in items]
+            _write_lines(out_path, lines)
+        return 0
 
     if args.cmd == "assets" and args.assets_cmd in ("export", "schema"):
         # Import inside the command so `--help` works without requiring env/config.

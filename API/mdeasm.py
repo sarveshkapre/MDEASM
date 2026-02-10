@@ -168,6 +168,8 @@ class Workspaces:
         *args,
         **kwargs,
     ) -> None:
+        emit_workspace_guidance = bool(kwargs.pop("emit_workspace_guidance", True))
+        init_data_plane_token = bool(kwargs.pop("init_data_plane_token", True))
         # Instance defaults (overridable via kwargs for reliability and future-proofing).
         # Note: keep these as kwargs to avoid breaking the historic positional signature.
         self._http_timeout = kwargs.pop("http_timeout", (10, 60))  # (connect, read)
@@ -216,11 +218,13 @@ class Workspaces:
         # Reuse connections across requests (particularly helpful for paginated exports).
         self._session = requests.Session()
         self._cp_token = self.__bearer_token__()
-        self._dp_token = self.__bearer_token__(data_plane=True)
+        # Some workflows are control-plane only (for example listing workspaces). Allow opting out
+        # of data-plane token retrieval so callers don't require unnecessary permissions/scopes.
+        self._dp_token = self.__bearer_token__(data_plane=True) if init_data_plane_token else ""
         self._workspaces = requests.structures.CaseInsensitiveDict()
         self._region = os.getenv("EASM_REGION")
         self._resource_group = os.getenv("RESOURCE_GROUP_NAME")
-        self.get_workspaces(workspace_name=workspace_name)
+        self.get_workspaces(workspace_name=workspace_name, emit_guidance=emit_workspace_guidance)
 
     def __bearer_token__(self, data_plane=False):
         url = f"https://login.microsoftonline.com/{self._tenant_id}/oauth2/v2.0/token"
@@ -699,11 +703,13 @@ class Workspaces:
         if max_retry is None:
             max_retry = getattr(self, "_default_max_retry", 5)
         if data_plane:
-            if self.__token_expiry__(self._dp_token):
+            token = getattr(self, "_dp_token", None)
+            if not token or self.__token_expiry__(token):
                 self._dp_token = self.__bearer_token__(data_plane=True)
             token = self._dp_token
         else:
-            if self.__token_expiry__(self._cp_token):
+            token = getattr(self, "_cp_token", None)
+            if not token or self.__token_expiry__(token):
                 self._cp_token = self.__bearer_token__()
             token = self._cp_token
         if url:
@@ -836,7 +842,7 @@ class Workspaces:
             f"max attempts: {attempts} -- last_status: {last_status} -- last_error: {last_err} -- last_text: {last_text}"
         )
 
-    def get_workspaces(self, workspace_name=""):
+    def get_workspaces(self, workspace_name="", emit_guidance=True):
         url = f"https://management.azure.com/subscriptions/{self._subscription_id}/providers/Microsoft.Easm/"
         r = self.__workspace_query_helper__(
             "get_workspaces",
@@ -863,7 +869,7 @@ class Workspaces:
                     f"management.azure.com{workspace['id']}",
                 )
             logging.info(f"Found workspaces:\n {self._workspaces}")
-        if not self._default_workspace_name:
+        if emit_guidance and not self._default_workspace_name:
             if len(self._workspaces.keys()) == 1:
                 self.__set_default_workspace_name__(next(iter(self._workspaces)))
             else:

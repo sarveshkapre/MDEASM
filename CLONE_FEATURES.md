@@ -7,9 +7,24 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **CLI: `mdeasm workspaces list` (stdout-safe JSON)**
-  - Scope: add a CLI command that lists available workspaces (names + endpoints) and never prints guidance to stdout; include `--format json|lines`.
-  - Why: makes multi-workspace environments less error-prone and improves automation/diagnostics.
+- [ ] **(Selected) CLI: `mdeasm workspaces list` (stdout-safe JSON/lines; control-plane only)**
+  - Scope: add a CLI command that lists available workspaces (names + endpoints) and never prints guidance to stdout; include `--format json|lines` and `--out -|path`.
+  - Why: makes multi-workspace environments less error-prone and improves automation/diagnostics; should not require data-plane permissions.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **(Selected) Performance: stream NDJSON exports (avoid storing all assets in-memory)**
+  - Scope: add a `Workspaces.stream_workspace_assets()` generator and make CLI `--format ndjson` write incrementally to stdout/file; preserve current JSON/CSV behavior.
+  - Why: reduces peak memory and improves time-to-first-byte for large inventories; NDJSON is a natural streaming format.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **(Selected) Performance: stream CSV exports when columns are explicit**
+  - Scope: when `--format csv` and columns are specified via `--columns`/`--columns-from`, stream rows as they arrive; keep the current union-of-keys header logic (in-memory) when columns are not specified.
+  - Why: large CSV exports are common; requiring explicit columns is already recommended for stable schemas and unlocks constant-memory exports.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Reliability: make data-plane token retrieval lazy (opt-in)**
+  - Scope: add a `init_data_plane_token=False` mode (or similar) so control-plane-only operations (like listing workspaces) don't fail due to missing data-plane permissions; keep default behavior unchanged.
+  - Why: reduces unnecessary permission coupling and improves diagnostics when onboarding new service principals.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Performance: streaming asset export path (avoid storing all assets in-memory)**
@@ -26,6 +41,16 @@
   - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; asset snapshots; discovery group deletion if endpoint fixed).
   - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+
+- [ ] **CLI: `mdeasm doctor` (env + auth sanity checks)**
+  - Scope: add a non-destructive command that validates required env vars, prints configured api-versions, and optionally performs a tiny control-plane probe; always keep stdout machine-readable when requested.
+  - Why: reduces setup thrash and creates a standard "are my credentials wired correctly?" answer.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Docs: add guidance for large exports (streaming + column selection)**
+  - Scope: update `docs/exports.md` to explain streaming behavior, why `--columns`/`--columns-from` matters, and when the CLI needs to buffer.
+  - Why: prevents surprise memory use and makes "big export" workflows more reliable.
+  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
 - [x] **Export schema helper (`mdeasm assets schema`)**

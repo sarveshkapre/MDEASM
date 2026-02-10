@@ -736,3 +736,44 @@ def test_write_json_is_atomic_on_replace_error(tmp_path, monkeypatch):
     assert out.read_text(encoding="utf-8") == "OLD\n"
     # Temp file should be cleaned up on failure.
     assert list(tmp_path.glob(f".{out.name}.*.tmp")) == []
+
+
+def test_cli_workspaces_list_json_to_stdout(monkeypatch, capsys):
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            captured["init_kwargs"] = dict(kwargs)
+            self._workspaces = {
+                "wsB": ("https://dp/wsB", "management.azure.com/wsB"),
+                "wsA": ("https://dp/wsA", "management.azure.com/wsA"),
+            }
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["workspaces", "list", "--format", "json", "--out", "-"])
+    assert rc == 0
+    assert captured["init_kwargs"] == {
+        "workspace_name": "",
+        "init_data_plane_token": False,
+        "emit_workspace_guidance": False,
+    }
+
+    payload = json.loads(capsys.readouterr().out)
+    assert [w["name"] for w in payload] == ["wsA", "wsB"]
+    assert payload[0]["dataPlane"].startswith("https://dp/")
+
+
+def test_cli_workspaces_list_lines_to_stdout(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._workspaces = {"ws1": ("https://dp/ws1", "management.azure.com/ws1")}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["workspaces", "list", "--format", "lines", "--out", "-"])
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    assert out.startswith("ws1\t")
