@@ -17,6 +17,31 @@ def _json_default(obj):
             return str(obj)
 
 
+def _parse_http_timeout(value: str) -> tuple[float, float]:
+    """
+    Parse `--http-timeout` as either:
+      - "read" (seconds) -> (10, read)
+      - "connect,read" (seconds) -> (connect, read)
+    """
+    raw = (value or "").strip()
+    if not raw:
+        raise ValueError("empty timeout")
+
+    if "," in raw:
+        parts = [p.strip() for p in raw.split(",", 1)]
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            raise ValueError(f"invalid timeout format: {value!r}")
+        connect_s = float(parts[0])
+        read_s = float(parts[1])
+    else:
+        connect_s = 10.0
+        read_s = float(raw)
+
+    if connect_s <= 0 or read_s <= 0:
+        raise ValueError("timeouts must be > 0")
+    return (connect_s, read_s)
+
+
 def _write_json(path: Path | None, payload) -> None:
     data = json.dumps(payload, indent=2, default=_json_default, sort_keys=True)
     if path is None:
@@ -72,6 +97,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
     )
     export.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    export.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    export.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="Disable HTTP retry/backoff (default: enabled)",
+    )
+    export.add_argument(
+        "--max-retry",
+        type=int,
+        default=None,
+        help="Max retry attempts when retry is enabled (default: helper default)",
+    )
+    export.add_argument(
+        "--backoff-max-s",
+        type=float,
+        default=None,
+        help="Max backoff sleep seconds between retries (default: helper default)",
+    )
+    export.add_argument(
         "--asset-list-name",
         default="assetList",
         help="Attribute name to store results on the Workspaces object",
@@ -96,7 +149,21 @@ def main(argv: list[str] | None = None) -> int:
         # Import inside the command so `--help` works without requiring env/config.
         import mdeasm
 
-        ws = mdeasm.Workspaces(workspace_name=args.workspace_name) if args.workspace_name else mdeasm.Workspaces()
+        ws_kwargs = {}
+        if args.workspace_name:
+            ws_kwargs["workspace_name"] = args.workspace_name
+        if args.api_version:
+            ws_kwargs["api_version"] = args.api_version
+        if args.http_timeout is not None:
+            ws_kwargs["http_timeout"] = args.http_timeout
+        if args.no_retry:
+            ws_kwargs["retry"] = False
+        if args.max_retry is not None:
+            ws_kwargs["max_retry"] = args.max_retry
+        if args.backoff_max_s is not None:
+            ws_kwargs["backoff_max_s"] = args.backoff_max_s
+
+        ws = mdeasm.Workspaces(**ws_kwargs)
         ws.get_workspace_assets(
             query_filter=args.filter,
             asset_list_name=args.asset_list_name,
