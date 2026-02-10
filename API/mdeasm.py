@@ -1248,6 +1248,128 @@ class Workspaces:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
 
+    def stream_workspace_assets(
+        self,
+        query_filter,
+        page=0,
+        max_page_size=25,
+        max_page_count=0,
+        get_all=False,
+        get_recent=True,
+        last_seen_days_back=30,
+        date_range_start="",
+        date_range_end="",
+        workspace_name="",
+        **kwargs,
+    ):
+        """
+        Stream assets matching a query filter.
+
+        This is a generator version of `get_workspace_assets()` intended for large exports:
+        it yields one parsed asset dict at a time instead of storing all assets in-memory.
+
+        Extra kwargs (optional) match `get_workspace_assets()` for status/progress:
+          - max_assets: int. Stop after yielding at most N assets (0/None means unbounded).
+          - status_to_stderr: bool. Print status/progress to stderr instead of stdout.
+          - quiet: bool. Suppress all status/progress printing.
+          - track_every_N_pages: int. Emit progress estimate every N pages (default 100).
+          - no_track_time: bool. Disable periodic progress estimate printing.
+        """
+        quiet = bool(kwargs.get("quiet"))
+        status_fh = sys.stderr if kwargs.get("status_to_stderr") else sys.stdout
+        max_assets = int(kwargs.get("max_assets") or 0)
+
+        def _status(msg: str) -> None:
+            if quiet:
+                return
+            print(msg, file=status_fh)
+
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        if max_page_size > 100:
+            logging.warning("max_page_size cannot be greater than 100, setting max_page_size=100")
+            max_page_size = 100
+        elif max_page_size < 1:
+            logging.warning("max_page_size cannot be less than 1, setting max_page_size=1")
+            max_page_size = 1
+
+        if max_page_count:
+            get_all = True
+        if max_assets:
+            get_all = True
+
+        params = {"filter": query_filter, "skip": page, "maxpagesize": max_page_size}
+        run_query = True
+        page_counter = 0
+        emitted = 0
+        time_counter_start = datetime.datetime.now().replace(microsecond=0)
+        while run_query:
+            r = self.__workspace_query_helper__(
+                "stream_workspace_assets",
+                method="get",
+                endpoint="assets",
+                params=params,
+                workspace_name=workspace_name,
+            )
+            payload = r.json()
+            total_assets = payload.get("totalElements", 0)
+            if page_counter == 0:
+                _status(
+                    f"{time_counter_start.strftime('%d-%b-%y %H:%M:%S')} -- {total_assets} assets identified by query"
+                )
+
+            for asset in payload.get("content") or []:
+                parsed = Asset().__parse_workspace_assets__(
+                    asset,
+                    get_recent=get_recent,
+                    last_seen_days_back=last_seen_days_back,
+                    date_range_start=date_range_start,
+                    date_range_end=date_range_end,
+                )
+                if hasattr(parsed, "as_dict"):
+                    yield parsed.as_dict()
+                else:
+                    yield dict(vars(parsed))
+
+                emitted += 1
+                if max_assets and emitted >= max_assets:
+                    run_query = False
+                    break
+
+            page_counter += 1
+
+            if not run_query:
+                break
+            if not get_all:
+                run_query = False
+            elif max_page_count and page_counter >= max_page_count:
+                run_query = False
+            elif payload.get("last"):
+                run_query = False
+            else:
+                page = payload.get("number", page) + 1
+                params["skip"] = page
+
+                if not (
+                    page_counter % kwargs.get("track_every_N_pages", 100)
+                    or kwargs.get("no_track_time")
+                ):
+                    time_counter_diff = (
+                        datetime.datetime.now().replace(microsecond=0) - time_counter_start
+                    )
+                    assets_so_far = max(emitted, 1)
+                    _status(
+                        f"\nretrieved {assets_so_far} assets in {time_counter_diff}\nestimated time for remaining {max(total_assets - assets_so_far, 0)} assets: {str((time_counter_diff * (total_assets / assets_so_far)) - time_counter_diff).split('.')[0]}"
+                    )
+
+        _status(
+            f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- query complete, {emitted} assets retrieved"
+        )
+
     def get_workspace_asset_by_id(
         self,
         asset_id,

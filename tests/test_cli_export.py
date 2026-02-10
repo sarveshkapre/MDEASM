@@ -329,6 +329,45 @@ def test_cli_assets_export_ndjson_writes_file(tmp_path, monkeypatch):
     ]
 
 
+def test_cli_assets_export_ndjson_streams_when_available(tmp_path, monkeypatch):
+    out = tmp_path / "assets.ndjson"
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.init_kwargs = dict(kwargs)
+
+        def get_workspace_assets(self, **kwargs):
+            raise AssertionError("get_workspace_assets should not be used for streaming ndjson")
+
+        def stream_workspace_assets(self, **kwargs):
+            yield {"id": "domain$$example.com", "kind": "domain"}
+            yield {"id": "host$$www.example.com", "kind": "host"}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind in ("domain","host")',
+            "--format",
+            "ndjson",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert [json.loads(l) for l in lines] == [
+        {"id": "domain$$example.com", "kind": "domain"},
+        {"id": "host$$www.example.com", "kind": "host"},
+    ]
+
+
 def test_cli_assets_export_csv_writes_file(tmp_path, monkeypatch):
     out = tmp_path / "assets.csv"
     captured = {}
@@ -373,6 +412,46 @@ def test_cli_assets_export_csv_writes_file(tmp_path, monkeypatch):
     assert "id,kind,ports" in text.replace("\r\n", "\n").splitlines()[0]
     assert "domain$$example.com" in text
     assert "host$$www.example.com" in text
+
+
+def test_cli_assets_export_csv_columns_streams_when_available(tmp_path, monkeypatch):
+    out = tmp_path / "assets.csv"
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_workspace_assets(self, **kwargs):
+            raise AssertionError("get_workspace_assets should not be used for streaming csv")
+
+        def stream_workspace_assets(self, **kwargs):
+            yield {"id": "domain$$example.com", "kind": "domain", "ports": [80, 443]}
+            yield {"id": "host$$www.example.com", "kind": "host", "ports": [80]}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind in ("domain","host")',
+            "--format",
+            "csv",
+            "--out",
+            str(out),
+            "--columns",
+            "id",
+            "--columns",
+            "kind",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+
+    header = out.read_text(encoding="utf-8").replace("\r\n", "\n").splitlines()[0]
+    assert header == "id,kind"
 
 
 def test_cli_assets_export_csv_columns_limits_header(tmp_path, monkeypatch):

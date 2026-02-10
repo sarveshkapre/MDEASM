@@ -100,6 +100,9 @@ mdeasm assets export \
 - The CLI uses the same `.env` configuration as the example scripts (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `WORKSPACE_NAME`).
 - When using `--out <path>`, exports are written atomically (temp file + replace) to avoid partial files on interruption.
 - For compact JSON in pipelines, consider `--no-pretty`. For line-oriented ingestion, consider `--format ndjson`.
+- For large exports:
+  - `--format ndjson` streams rows as they are fetched (constant memory) when `--no-facet-filters` is set.
+  - `--format csv` can stream rows when columns are explicit (`--columns` / `--columns-from`) and `--no-facet-filters` is set. If columns are not explicit, the CLI buffers rows to infer a union-of-keys header.
 - For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.
 - For long-running exports, consider `--progress-every-pages 25` (status is printed to stderr).
 - For reliability tuning without code edits, see `mdeasm assets export --help` for: `--api-version` (or `--cp-api-version`/`--dp-api-version`), `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.

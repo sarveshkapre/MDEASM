@@ -128,7 +128,7 @@ def _write_json(path: Path | None, payload, *, pretty: bool) -> None:
         _atomic_write_text(path, data + "\n", encoding="utf-8")
 
 
-def _write_ndjson(path: Path | None, rows: list[dict]) -> None:
+def _write_ndjson(path: Path | None, rows) -> None:
     if path is None:
         out_fh = sys.stdout
         for row in rows:
@@ -281,6 +281,46 @@ def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None
             cooked = {}
             for k in fieldnames:
                 v = row.get(k)
+                if isinstance(v, (dict, list)):
+                    cooked[k] = json.dumps(v, default=_json_default, sort_keys=True)
+                else:
+                    cooked[k] = v
+            writer.writerow(cooked)
+
+    if path is None:
+        write_rows(sys.stdout)
+        return
+
+    tmp_fh, tmp_path = _atomic_open_text(path, encoding="utf-8", newline="")
+    try:
+        with tmp_fh:
+            write_rows(tmp_fh)
+            tmp_fh.flush()
+            try:
+                os.fsync(tmp_fh.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
+
+def _write_csv_stream(path: Path | None, rows, *, columns: list[str]) -> None:
+    # Streaming CSV requires explicit columns because the header cannot be inferred without
+    # buffering all rows.
+    fieldnames: list[str] = list(columns)
+
+    def write_rows(out_fh) -> None:
+        writer = csv.DictWriter(out_fh, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            cooked = {}
+            for k in fieldnames:
+                v = row.get(k) if isinstance(row, dict) else None
                 if isinstance(v, (dict, list)):
                     cooked[k] = json.dumps(v, default=_json_default, sort_keys=True)
                 else:
@@ -646,6 +686,47 @@ def main(argv: list[str] | None = None) -> int:
 
         ws = mdeasm.Workspaces(**ws_kwargs)
         if args.assets_cmd == "export":
+            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+
+            columns: list[str] = []
+            if args.format == "csv":
+                columns = _parse_columns_arg(args.columns)
+                if args.columns_from:
+                    columns = _read_columns_file(Path(args.columns_from)) + columns
+                    # Dedup while preserving file order first.
+                    columns = _parse_columns_arg(columns)
+
+            if (
+                args.no_facet_filters
+                and hasattr(ws, "stream_workspace_assets")
+                and args.format in ("ndjson", "csv")
+            ):
+                stream_kwargs = dict(
+                    query_filter=query_filter,
+                    page=args.page,
+                    max_page_size=args.max_page_size,
+                    max_page_count=args.max_page_count,
+                    get_all=args.get_all,
+                    workspace_name=args.workspace_name,
+                    # Keep machine-readable stdout clean; status/progress goes to stderr.
+                    status_to_stderr=True,
+                    max_assets=args.max_assets or 0,
+                )
+                if args.progress_every_pages and args.progress_every_pages > 0:
+                    stream_kwargs["track_every_N_pages"] = args.progress_every_pages
+                else:
+                    # Only emit the initial/final status lines by default.
+                    stream_kwargs["no_track_time"] = True
+
+                if args.format == "ndjson":
+                    _write_ndjson(out_path, ws.stream_workspace_assets(**stream_kwargs))
+                    return 0
+                if args.format == "csv" and columns:
+                    _write_csv_stream(
+                        out_path, ws.stream_workspace_assets(**stream_kwargs), columns=columns
+                    )
+                    return 0
+
             get_kwargs = dict(
                 query_filter=query_filter,
                 asset_list_name=args.asset_list_name,
@@ -669,18 +750,11 @@ def main(argv: list[str] | None = None) -> int:
 
             asset_list = getattr(ws, args.asset_list_name)
             rows = asset_list.as_dicts() if hasattr(asset_list, "as_dicts") else []
-
-            out_path = None if (not args.out or args.out == "-") else Path(args.out)
             if args.format == "json":
                 _write_json(out_path, rows, pretty=bool(args.pretty))
             elif args.format == "ndjson":
                 _write_ndjson(out_path, rows)
             else:
-                columns = _parse_columns_arg(args.columns)
-                if args.columns_from:
-                    columns = _read_columns_file(Path(args.columns_from)) + columns
-                    # Dedup while preserving file order first.
-                    columns = _parse_columns_arg(columns)
                 _write_csv(out_path, rows, columns=(columns or None))
             return 0
 

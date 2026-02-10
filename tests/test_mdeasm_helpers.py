@@ -254,6 +254,76 @@ def test_get_workspace_assets_status_to_stderr_and_max_assets_cap(capsys):
     assert len(ws.assetList.assets) == 4
 
 
+def test_stream_workspace_assets_status_to_stderr_and_max_assets_cap(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    # Two pages of 3 assets each, but we cap to 4 total.
+    responses = [
+        Resp(
+            {
+                "totalElements": 6,
+                "content": [
+                    {"id": "a1", "kind": "domain"},
+                    {"id": "a2", "kind": "domain"},
+                    {"id": "a3", "kind": "domain"},
+                ],
+                "last": False,
+                "number": 0,
+            }
+        ),
+        Resp(
+            {
+                "totalElements": 6,
+                "content": [
+                    {"id": "b1", "kind": "domain"},
+                    {"id": "b2", "kind": "domain"},
+                    {"id": "b3", "kind": "domain"},
+                ],
+                "last": True,
+                "number": 1,
+            }
+        ),
+    ]
+    calls = {"n": 0}
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **_kwargs):
+        idx = calls["n"]
+        calls["n"] += 1
+        return responses[idx]
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    rows = list(
+        ws.stream_workspace_assets(
+            query_filter='kind = "domain"',
+            get_all=True,
+            max_page_size=3,
+            max_assets=4,
+            status_to_stderr=True,
+            no_track_time=True,
+        )
+    )
+
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert "assets identified by query" in out.err
+    assert "query complete" in out.err
+    assert len(rows) == 4
+    assert rows[0]["id"] == "a1"
+
+
 def test_get_workspaces_missing_default_does_not_write_to_stdout(capsys):
     ws = _new_ws()
     ws._subscription_id = "sub0"
