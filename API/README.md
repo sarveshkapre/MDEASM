@@ -20,6 +20,15 @@ Recommended install:
 ```bash
 python3 -m pip install -r requirements.txt --upgrade
 ```
+
+## Example scripts
+- `API/retreive_risk_observations.py` (legacy name)
+- `API/retrieve_risk_observations.py` (correctly spelled alias)
+
+## Troubleshooting
+- `ModuleNotFoundError: No module named 'jwt'`: install `PyJWT` (import name is `jwt`).
+- `missing required configuration: ...`: ensure `.env` has `TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`.
+- `401`/`403` responses: credentials or access are incorrect. Re-check the app registration/service principal and its permissions for Defender EASM + ARM.
 ### Initialize your mdeasm.Workspaces object:
 ```
 import mdeasm
