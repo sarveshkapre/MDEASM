@@ -7,22 +7,42 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] **Filter input ergonomics (`--filter @file`)**
-  - Scope: allow `--filter @path` to read a query filter from disk (strip whitespace/comments), and document recommended patterns for long filters.
-  - Why: real EASM filters get long; files are easier to review/version than shell-escaped strings.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **Server-side export via data-plane `assets:export` task**
+  - Scope: add an opt-in CLI mode that uses the data-plane `POST /assets:export` endpoint (columns + filename) to kick off an export task, then poll until completion and download the artifact; fall back to the existing paginated GET export path.
+  - Why: paginated client-side exports can be slow and memory-heavy; a first-class export job path is a common pattern in mature ASM products.
+  - Score: Impact 3 | Effort 5 | Strategic fit 3 | Differentiation 1 | Risk 3 | Confidence 1
 
-- [ ] **Export schema helper**
-  - Scope: add a CLI mode that prints the observed column set for a query (union-of-keys) without writing the full export.
+- [ ] **Export schema helper (`mdeasm assets schema`)**
+  - Scope: add a CLI command that prints the observed column set for a query (union-of-keys) without writing the full export payload; output should be consumable by `--columns-from`.
   - Why: helps users choose `--columns` deterministically and detect schema drift early.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 2
 
 - [ ] **Promote upstream TODOs into scoped, testable work**
-  - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; discovery group deletion if endpoint fixed; asset snapshots).
+  - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (saved filters CRUD; asset snapshots; discovery group deletion if endpoint fixed).
   - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
+- [ ] **HTTP timeout parsing tests + docs**
+  - Scope: add tests for `--http-timeout` parsing edge cases and document recommended defaults for bulk exports.
+  - Why: reliability knobs are only useful if they are hard to misuse and easy to reason about.
+  - Score: Impact 1 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Add an opt-in “real export” integration smoke (skipped by default)**
+  - Scope: extend integration smoke to optionally run a tiny `assets export --max-assets 1` call when `MDEASM_INTEGRATION=1` and required env vars are present.
+  - Why: catches data-plane export regressions earlier than unit tests without requiring creds in CI.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 0 | Risk 2 | Confidence 2
+
 ## Implemented
+- [x] **Filter input ergonomics (`--filter @file` / `--filter @-`)**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest` (pass); commit `4fac209`
+
+- [x] **CLI polish: correct help `prog` + add `--version`**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `README.md`, `.github/workflows/ci.yml`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m mdeasm_cli --version` (pass); commit `a0c1c5b`
+
 - [x] **Atomic export writes**
   - Date: 2026-02-10
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
@@ -167,8 +187,11 @@
     - Export UX commonly supports multiple formats and column selection (CSV/XLSX/JSON).
     - Large data exports are often implemented as async jobs in APIs (kick off export, poll, download chunks).
     - Microsoft Learn data-plane preview references show a newer `api-version` (`2024-10-01-preview`) than this repo’s historic default; keeping `EASM_API_VERSION` configurable remains important.
+    - Microsoft Learn data-plane preview asset listing endpoints document `skip`/`maxpagesize` parameters; CLI paging knobs should stay aligned with those semantics.
     - Some ASM vendors enforce format-specific export limits (for example XLSX max row counts) and provide an async "export token" workflow for downloads.
     - Sources reviewed (untrusted):
+      - Microsoft Learn: Defender EASM data-plane preview assets list (shows `api-version`, `skip`, `maxpagesize`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/list-asset-resource?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Microsoft Learn: Defender EASM data-plane preview `assets:export` (server-side export task): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
       - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
       - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
       - Tenable Developer: Export assets in XLSX format (token + limits): https://developer.tenable.com/reference/io-asm-exports-assets-xlsx

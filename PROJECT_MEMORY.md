@@ -30,6 +30,8 @@
 - 2026-02-10 | Fix `date_range_end`-only asset parsing filter | Prevent silent data loss when users filter by end-date only | `pytest` (pass) | 1e35eb9 | high | trusted
 - 2026-02-10 | Make HTTP defaults configurable (timeout/retry/backoff/api-version) | Reduce operational brittleness for bulk exports and evolving preview API versions while keeping defaults backward compatible | `pytest` (pass) | 98e4eac | medium | trusted
 - 2026-02-10 | Add opt-in CLI asset export (json/csv) + recipes | Provide a production-friendly automation path for common “inventory export” workflows | `pytest` (pass); `python API/mdeasm_cli.py --help` (pass) | 9a55544 | high | trusted
+- 2026-02-10 | Allow `mdeasm assets export --filter @file` / `--filter @-` | Reduce shell-escaping footguns and enable reviewable/versioned long filters for automation pipelines | `source .venv/bin/activate && ruff check . && pytest` (pass) | 4fac209 | high | trusted
+- 2026-02-10 | Add CLI `--version` and rely on default `argparse` `prog` | Make the CLI self-describing and ensure `mdeasm --help` reflects the invoked command name | `source .venv/bin/activate && ruff check . && pytest && python -m mdeasm_cli --version` (pass) | a0c1c5b | high | trusted
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
@@ -41,8 +43,8 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Consider atomic export writes for `--out <path>` to avoid partial files on interruption.
-- Consider adding `--filter @path` to reduce shell-escaping and make long filters reviewable.
+- Consider `mdeasm assets schema` to make column selection deterministic and detect schema drift.
+- Add timeout parsing tests + docs for bulk export reliability tuning.
 - Decide whether to keep default `EASM_API_VERSION=2022-04-01-preview` or bump defaults after validating against current Microsoft Learn reference versions.
 
 ## Verification Evidence
@@ -81,6 +83,8 @@
 - 2026-02-10 | `source .venv/bin/activate && python -c "import sys; from pathlib import Path; sys.path.insert(0, str(Path('API').resolve())); import mdeasm; print('mdeasm version', mdeasm._VERSION)"` | prints `mdeasm version 1.4` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest` | `All checks passed!`; `11 passed` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` | `All checks passed!`; `12 passed`; compile ok; CLI help ok | pass
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest` | `All checks passed!`; `29 passed, 2 skipped` | pass
+- 2026-02-10 | `source .venv/bin/activate && python -m pip install -e . --upgrade && python -m mdeasm_cli --help >/dev/null && python -m mdeasm_cli --version && mdeasm --version && python -m compileall API` | version prints `1.4.0`; compile ok | pass
 
 ## Historical Summary
 - Keep compact summaries of older entries here when file compaction runs.
