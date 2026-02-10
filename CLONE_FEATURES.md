@@ -124,7 +124,6 @@
     - Sources reviewed (untrusted):
       - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
       - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
-      - Rapid7 Exposure Command: external assets export (CSV/JSON): https://docs.rapid7.com/exposure-command/manage-external-assets/
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
