@@ -53,6 +53,11 @@
   - Scope: `API/retrieve_risk_observations.py`, `API/README.md`
   - Evidence (trusted: local git history): commit `6aec111`
 
+- [x] **Deduplicate risk observation example scripts (import-safe `main()` + legacy wrapper)**
+  - Date: 2026-02-10
+  - Scope: `API/retrieve_risk_observations.py`, `API/retreive_risk_observations.py`, `tests/test_example_scripts.py`, `README.md`
+  - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
+
 ## Insights
 - Market scan (untrusted: external web sources; links captured during session):
   - Microsoft Defender EASM exposes both control-plane (ARM) and data-plane endpoints and uses OAuth2 client credentials. This repo’s `Workspaces` helper aligns with that model.
