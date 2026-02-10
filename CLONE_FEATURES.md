@@ -147,9 +147,11 @@
     - Export UX commonly supports multiple formats and column selection (CSV/XLSX/JSON).
     - Large data exports are often implemented as async jobs in APIs (kick off export, poll, download chunks).
     - Microsoft Learn data-plane preview references show a newer `api-version` (`2024-10-01-preview`) than this repo’s historic default; keeping `EASM_API_VERSION` configurable remains important.
+    - Some ASM vendors enforce format-specific export limits (for example XLSX max row counts) and provide an async "export token" workflow for downloads.
     - Sources reviewed (untrusted):
       - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
       - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
+      - Tenable Developer: Export assets in XLSX format (token + limits): https://developer.tenable.com/reference/io-asm-exports-assets-xlsx
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
