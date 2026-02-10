@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-10 | Keep CLI/machine-readable stdout clean by emitting missing-workspace guidance to stderr | `Workspaces.__init__` calls `get_workspaces()` and previously used `print()`, which could corrupt JSON/CSV pipelines when `WORKSPACE_NAME` was unset and multiple workspaces existed | `source .venv/bin/activate && ruff check . && pytest` (pass) | b937478 | high | trusted
 - 2026-02-10 | Make the helper pip-installable (editable) and add a console script (`mdeasm`) + CI packaging smoke | Reduce `sys.path`/`cwd` footguns and make CLI usage automation-friendly | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help >/dev/null` (pass) | b6a0599 | high | trusted
 - 2026-02-10 | Add compact JSON and NDJSON output modes to the CLI | Improve pipeline ergonomics (smaller JSON, line-oriented ingestion) without changing default behavior | `source .venv/bin/activate && ruff check . && pytest` (pass) | ec831f4 | high | trusted
 - 2026-02-10 | Make CLI asset exports stdout-safe (status to stderr) and add `--max-assets`/`--progress-every-pages` knobs | Prevent corrupted JSON/CSV when piping and make long exports controllable/observable | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python API/mdeasm_cli.py --help >/dev/null` (pass) | dc5b59d | high | trusted
@@ -28,6 +29,7 @@
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
+- 2026-02-10 | CLI `mdeasm assets export` could emit non-JSON/CSV text before the payload | `Workspaces.__init__` calls `get_workspaces()` which used `print()` to stdout when `WORKSPACE_NAME` was unset and multiple workspaces existed | Emit guidance to stderr instead of stdout; add regression test for stdout cleanliness | Keep stdout-clean tests for any codepath reachable before the CLI writes machine-readable output | b937478 | high
 - 2026-02-10 | CLI exports to stdout could produce invalid JSON/CSV | `get_workspace_assets()` printed status/progress to stdout while the CLI also wrote machine-readable output to stdout | Add `status_to_stderr`/`quiet` knobs and make the CLI send status to stderr; add stdout-mode regression tests | Keep stdout-mode tests for CLI and keep status output configurable in helper methods | dc5b59d | high
 - 2026-02-10 | `__validate_asset_id__` could raise `UnboundLocalError` for invalid inputs | Base64 decode path didn't validate input and failed to raise when roundtrip check failed, leaving `verified_asset_id` unset | Use `base64.b64decode(..., validate=True)` and raise on non-canonical/non-base64 values | Keep unit tests for invalid asset ids and run `pytest` in CI | 8cd0881 | high
 - 2026-02-10 | `date_range_end`-only filtering referenced `date_start` | Copy/paste oversight in date-range condition and exception handling masked the bug | Use `date_end` in the end-only path and add a focused regression test | Add unit tests for each date-filter mode (start-only, end-only, start+end) before changing filtering logic | 1e35eb9 | high
@@ -40,6 +42,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && mdeasm --help >/dev/null && python -m mdeasm_cli --help >/dev/null` | `All checks passed!`; `19 passed, 1 skipped`; compile ok; CLI help ok | pass
 - 2026-02-10 | `gh run watch 21869443801 -R sarveshkapre/MDEASM --exit-status` | CI succeeded for commit `cbea835` | pass
 - 2026-02-10 | `source .venv/bin/activate && python -m pip install -e . && ruff check . && pytest && python -m compileall API && python -c "import mdeasm, mdeasm_cli; print('import ok')"` | `All checks passed!`; `16 passed, 1 skipped`; compile ok; import ok | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API && python -m mdeasm_cli --help >/dev/null && mdeasm --help >/dev/null` | `All checks passed!`; `18 passed, 1 skipped`; compile ok; CLI help ok | pass

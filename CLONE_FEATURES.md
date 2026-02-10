@@ -28,6 +28,11 @@
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
 ## Implemented
+- [x] **Keep CLI stdout clean when `WORKSPACE_NAME` is missing**
+  - Date: 2026-02-10
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest` (pass); commit `b937478`
+
 - [x] **Make the helper pip-installable (editable) + add module/console entrypoints**
   - Date: 2026-02-10
   - Scope: `pyproject.toml`, `.github/workflows/ci.yml`, `.gitignore`, `README.md`, `API/README.md`, `docs/exports.md`
