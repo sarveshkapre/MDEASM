@@ -12,44 +12,26 @@ def main() -> int:
 
     easm = mdeasm.Workspaces()
 
-    # the cvss severity queries that populate the dashboard
-    cvss_10 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 10 or cvss3BaseScore = 10)"
-    )
-    cvss_9 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 9 or cvss3BaseScore = 9)"
-    )
-    cvss_8 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 8 or cvss3BaseScore = 8)"
-    )
-    cvss_7 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 7 or cvss3BaseScore = 7)"
-    )
-    cvss_6 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 6 or cvss3BaseScore = 6)"
-    )
-    cvss_5 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 5 or cvss3BaseScore = 5)"
-    )
-    cvss_4 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 4 or cvss3BaseScore = 4)"
-    )
-    cvss_3 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 3 or cvss3BaseScore = 3)"
-    )
-    cvss_2 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 2 or cvss3BaseScore = 2)"
-    )
-    cvss_1 = (
-        "state = confirmed | kind = page | rootUrl = true | (cvssScore = 1 or cvss3BaseScore = 1)"
-    )
+    # CVSS severity queries (kept as a single structure to avoid unused local assignments).
+    cvss_queries = {
+        "10": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 10 or cvss3BaseScore = 10)",
+        "9": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 9 or cvss3BaseScore = 9)",
+        "8": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 8 or cvss3BaseScore = 8)",
+        "7": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 7 or cvss3BaseScore = 7)",
+        "6": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 6 or cvss3BaseScore = 6)",
+        "5": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 5 or cvss3BaseScore = 5)",
+        "4": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 4 or cvss3BaseScore = 4)",
+        "3": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 3 or cvss3BaseScore = 3)",
+        "2": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 2 or cvss3BaseScore = 2)",
+        "1": "state = confirmed | kind = page | rootUrl = true | (cvssScore = 1 or cvss3BaseScore = 1)",
+    }
 
     # this will get all the assets with CVSS Score of 10
     # that will include all the other recent CVEs on the asset, regardless of score
     # this function will also auto-create facet filters for all asset details
     # which will be available through <mdeasm.Workspaces object>.filters.<filter_name>
     easm.get_workspace_assets(
-        query_filter=cvss_10, asset_list_name="cvss_10", max_page_size=100, get_all=True
+        query_filter=cvss_queries["10"], asset_list_name="cvss_10", max_page_size=100, get_all=True
     )
 
     print(f"checking {len(easm.cvss_10.assets)} assets with CVE CVSS Scores")

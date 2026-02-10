@@ -14,17 +14,17 @@ def main() -> int:
 
     easm = mdeasm.Workspaces()
 
-    # the certificate expiration queries that populate the dashboard
-    certs_expired_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expired"
-    certs_expire_30days_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expires30"
-    certs_expire_60days_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expires60"
-    certs_expire_90days_query = "state = confirmed | kind = sslCert | sslCertExpiration = Expires90"
-    certs_expire_after90days_query = (
-        "state = confirmed | kind = sslCert | sslCertExpiration = ExpiresAfter90"
-    )
+    # Certificate expiration queries (kept as a single structure to avoid unused local assignments).
+    cert_queries = {
+        "expired": "state = confirmed | kind = sslCert | sslCertExpiration = Expired",
+        "expires_30": "state = confirmed | kind = sslCert | sslCertExpiration = Expires30",
+        "expires_60": "state = confirmed | kind = sslCert | sslCertExpiration = Expires60",
+        "expires_90": "state = confirmed | kind = sslCert | sslCertExpiration = Expires90",
+        "expires_after_90": "state = confirmed | kind = sslCert | sslCertExpiration = ExpiresAfter90",
+    }
 
     easm.get_workspace_assets(
-        query_filter=certs_expired_query,
+        query_filter=cert_queries["expired"],
         asset_list_name="expired_certs",
         max_page_size=100,
         get_all=True,

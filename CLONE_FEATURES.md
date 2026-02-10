@@ -44,9 +44,9 @@ Next Up (keep deduped)
   - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 ## Implemented
-- [x] **Lint: enforce unused import checks (Ruff `F401`)**
+- [x] **Lint: enforce unused code checks (Ruff `F401`, `F841`)**
   - Date: 2026-02-10
-  - Scope: `pyproject.toml`, `API/affected_cvss_validation.py`
+  - Scope: `pyproject.toml`, `API/affected_cvss_validation.py`, `API/expired_certificates_validation.py`
   - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass)
 
 - [x] **CLI: `mdeasm doctor` (env + auth sanity checks)**
