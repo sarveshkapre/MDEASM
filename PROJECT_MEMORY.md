@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh cycle 10 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep backlog status, market-scan gap map, mutable facts, and verification evidence synchronized with pushed `main` commits | Tracker files updated after feature commit `93069b0`; follow-up tracker push CI run `21906910036` succeeded | d3c1519 | high | trusted
 - 2026-02-11 | Ship cycle 10 parity batch: workspace delete lifecycle (`workspaces delete`) plus streamed JSON array export (`--stream-json-array`) and guardrail tests | Highest-value safe backlog items were closing workspace lifecycle parity and reducing client export memory pressure without breaking existing JSON array contracts | `source .venv/bin/activate && make verify` (pass); focused helper/CLI tests for delete + stream guardrails pass | 93069b0 | high | trusted
 - 2026-02-11 | Keep real control-plane/data-plane integration validation optional in this cycle for new delete/stream paths | Local environment lacks Defender EASM credentials, so deterministic local validation is limited to unit tests, CLI help/smoke, and expected missing-env behavior | `python -m mdeasm_cli workspaces delete cycle10-demo --yes --format json --out -` exits 1 with expected missing-env diagnostics; stream flag verified in help and unit tests | 93069b0 | high | trusted
 - 2026-02-11 | Prioritize cycle 10 around workspace lifecycle parity and low-memory export UX from bounded market scan | Official Defender EASM docs plus peer ASM/search APIs continue to emphasize lifecycle coverage and automation-safe export ergonomics as baseline expectations | Cycle 10 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
@@ -123,6 +124,8 @@
 - 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli assets export --help | rg -- \"--stream-json-array\"` | help output includes `--stream-json-array` | pass
 - 2026-02-11 | `git push origin main` | pushed commit `93069b0` to `origin/main` | pass
 - 2026-02-11 | `gh run watch 21906877826 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `93069b0` | pass
+- 2026-02-11 | `git push origin main` | pushed commit `d3c1519` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21906910036 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `d3c1519` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest run for pushed commit `af3dcc5` completed `success` (`21905893624`) | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_doctor.py` | `All checks passed!` | pass
