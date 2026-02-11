@@ -9,7 +9,7 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 16 session planning after current shipment)
+Priority order (cycle 17 backlog after current shipment)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
@@ -17,47 +17,29 @@ Priority order (cycle 16 session planning after current shipment)
   - Why: closes remaining confidence gap between unit coverage and tenant behavior.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **CLI `--format lines` consistency sweep**
-  - Gap class: weak (DX)
-  - Scope: standardize ID-first order and stable field columns across lines-mode families.
-  - Why: improves shell pipeline portability (`awk`/`cut`/`grep`) and scripting stability.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Discovery-group delete retry hardening**
-  - Gap class: weak (reliability)
-  - Scope: add bounded retry/jitter around transient discovery-group delete failures.
-  - Why: reduces flaky cleanup in batch automations.
-  - Score: Impact 3 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Saved-filters live integration smoke (`list/get/put/delete`)**
-  - Gap class: weak (reliability)
-  - Scope: add opt-in tenant smoke for full saved-filter lifecycle.
-  - Why: validates API preview drift beyond unit coverage.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Resource-tags live integration smoke (`list/get/put/delete`)**
-  - Gap class: weak (reliability)
-  - Scope: add opt-in tenant smoke flow for workspace tag lifecycle.
-  - Why: validates real ARM tag semantics and permission edge-cases.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+- [ ] **Discovery-group lifecycle parity (`delete` helper + bounded retry hardening)**
+  - Gap class: missing + weak (reliability)
+  - Scope: add explicit discovery-group delete support and bounded retry/jitter around transient failures.
+  - Why: closes control-plane lifecycle gaps and reduces flaky cleanup in batch automations.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
   - Scope: ship bash/zsh completion scripts and focused workflow snippets.
   - Why: lowers onboarding friction and command syntax errors.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **Legacy stdout side-effect cleanup (phase 2)**
   - Gap class: weak (quality)
   - Scope: continue converting helper methods to `noprint`-safe structured returns.
   - Why: preserves machine-readable stdout semantics for automation.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Preview API version canary smoke helper**
   - Gap class: weak (reliability)
   - Scope: add lightweight probe script against configurable preview API versions.
   - Why: early warning for preview endpoint drift.
-  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
 - [ ] **Checkpoint/profile file schema docs + fixtures**
   - Gap class: weak (DX)
@@ -89,7 +71,34 @@ Priority order (cycle 16 session planning after current shipment)
   - Why: improves diagnosability of tenant/API drift and throttling.
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
+- [ ] **CLI docs command matrix for JSON/lines/text contracts**
+  - Gap class: weak (DX)
+  - Scope: add compact contract tables in docs for each command family.
+  - Why: prevents downstream parser regressions during CLI evolution.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Repository smoke profile script (`scripts/smoke_cycle.sh`)**
+  - Gap class: weak (maintainability)
+  - Scope: codify repeatable local smoke commands used in tracker evidence.
+  - Why: speeds cycle execution and reduces operator variance.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
+
 ## Implemented
+- [x] **CLI line-mode contract hardening (`--format lines` consistency + structured delete output)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_tasks.py`, `tests/test_cli_saved_filters.py`, `tests/test_cli_data_connections.py`, `docs/saved_filters.md`, `docs/data_connections.md`
+  - Evidence (trusted: local tests + smoke + CI): `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_tasks.py tests/test_cli_saved_filters.py tests/test_cli_data_connections.py docs/saved_filters.md docs/data_connections.md` (pass); `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py tests/test_cli_saved_filters.py tests/test_cli_data_connections.py -k \"lines or delete\"` (pass); `source .venv/bin/activate && make verify` (pass); `source .venv/bin/activate && python -m mdeasm_cli saved-filters delete cycle17-smoke --format lines --out - >/tmp/mdeasm_saved_filters_delete_cycle17.out 2>/tmp/mdeasm_saved_filters_delete_cycle17.err; rc=$?; test \"$rc\" -eq 1 && python -m mdeasm_cli data-connections delete cycle17-dc --format lines --out - >/tmp/mdeasm_data_connections_delete_cycle17.out 2>/tmp/mdeasm_data_connections_delete_cycle17.err; rc2=$?; test \"$rc2\" -eq 1` (pass; expected missing env credentials locally); `gh run watch 21914225777 -R sarveshkapre/MDEASM --exit-status` (pass)
+
+- [x] **Saved-filters live lifecycle integration smoke (opt-in)**
+  - Date: 2026-02-11
+  - Scope: `tests/test_integration_smoke.py`, `docs/saved_filters.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py -k saved_filters_lifecycle` (pass; skipped by default without env/credentials)
+
+- [x] **Resource-tags live lifecycle integration smoke (opt-in)**
+  - Date: 2026-02-11
+  - Scope: `tests/test_integration_smoke.py`, `docs/resource_tags.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py -k resource_tags_lifecycle` (pass; skipped by default without env/credentials)
+
 - [x] **Workspace resource-tags parity (`mdeasm resource-tags list/get/put/delete`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_resource_tags.py`, `docs/resource_tags.md`, `README.md`, `API/README.md`, `Makefile`
@@ -471,6 +480,25 @@ Priority order (cycle 16 session planning after current shipment)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 17 session):
+  - Microsoft Defender EASM preview docs still center task lifecycle APIs and saved-filter lifecycle APIs as baseline automation surfaces, while ARM tag APIs remain the control-plane standard for workspace metadata management.
+  - Peer ASM/search UX continues to prioritize reusable saved queries/tags and predictable machine-readable outputs for scripting, which reinforces tabular line-mode contract quality and integration smoke coverage as immediate product-quality work.
+  - Gap map (cycle 17 session):
+    - Weak -> closed this cycle: CLI line-mode parsing stability (`--format lines`) with control-whitespace normalization and structured delete output for command families that previously returned free text only.
+    - Weak -> closed this cycle: opt-in live integration lifecycle coverage for saved-filters and resource-tags (`put/get/list/delete`) with cleanup-aware smoke paths.
+    - Missing -> remaining: discovery-group delete helper parity and retry hardening against transient control-plane failures.
+    - Weak -> remaining: live protected-artifact URL auth-fallback smoke against a credentialed tenant.
+  - Top 5 high-impact opportunities now:
+    - 1) protected artifact fallback live smoke, 2) discovery-group delete parity + retries, 3) CLI completions + recipes, 4) preview API canary helper, 5) tracker trust-label validation automation.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn Defender EASM tasks operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM saved-filters operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/saved-filters?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM discovery-groups remove operation: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/discovery-groups/remove?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - Azure ARM tags create/update at scope: https://learn.microsoft.com/en-us/rest/api/resources/tags/create-or-update-at-scope?view=rest-resources-2021-04-01
+    - runZero saved searches guide: https://help.runzero.com/docs/saved-searches/
+    - Censys query tags API: https://docs.censys.com/reference/postsearchv2query-tags
+    - Shodan search query fundamentals: https://help.shodan.io/the-basics/search-query-fundamentals
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 16 session):
   - Microsoft Defender EASM control-plane APIs and Azure ARM tag APIs keep workspace-level metadata tagging as baseline governance capability, so adding first-class tag CRUD in helper/CLI was the highest-impact missing parity gap.
   - Peer ASM/API UX (runZero, Censys, Shodan) continues to emphasize discoverability and scriptable filtering/tagging, reinforcing stable JSON/lines contracts and concise command surfaces.
