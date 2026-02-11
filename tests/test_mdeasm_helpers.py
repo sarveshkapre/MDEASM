@@ -687,3 +687,116 @@ def test_create_facet_filter_accepts_asset_id_only():
 
     ws.create_facet_filter(asset_id=asset_id)
     assert captured["asset_id"] == asset_id
+
+
+def test_get_discovery_templates_supports_noprint_and_returns_rows(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+
+    class Resp:
+        def json(self):
+            return {
+                "content": [
+                    {"name": "Contoso.", "id": "tmpl-1"},
+                    {"name": "Fabrikam", "id": "tmpl-2"},
+                ]
+            }
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = lambda *_args, **_kwargs: Resp()  # type: ignore[attr-defined]
+
+    rows = ws.get_discovery_templates("contoso", noprint=True)
+    assert rows == ["Contoso---tmpl-1", "Fabrikam---tmpl-2"]
+    assert capsys.readouterr().out == ""
+
+
+def test_get_workspace_risk_observations_handles_empty_findings_with_noprint(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append(kwargs["endpoint"])
+        if kwargs["endpoint"] == "reports/assets:summarize":
+            return Resp({"assetSummaries": [{"displayName": "High", "count": 0, "children": []}]})
+        raise AssertionError(f"unexpected endpoint: {kwargs['endpoint']}")
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.get_workspace_risk_observations("high", noprint=True)
+    assert payload["metrics"] == {}
+    assert payload["snapshot_assets"] == {}
+    assert calls == ["reports/assets:summarize"]
+    assert capsys.readouterr().out == ""
+
+
+def test_update_assets_and_poll_task_support_noprint(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    task_payload = {
+        "totalElements": 1,
+        "content": [
+            {
+                "id": "task-123",
+                "state": "running",
+                "startedAt": "2026-01-01T00:00:00Z",
+                "metadata": {
+                    "filter": 'kind = "domain"',
+                    "assetUpdateRequest": {"state": "confirmed"},
+                    "estimated": 1,
+                    "progress": 50,
+                },
+            }
+        ],
+    }
+
+    def fake_query_helper(*_args, **kwargs):
+        if kwargs["endpoint"] == "reports/assets:summarize":
+            return Resp({"assetSummaries": [{"count": 1}]})
+        if kwargs["endpoint"] == "assets":
+            return Resp({"id": "task-123"})
+        if kwargs["endpoint"] == "tasks":
+            return Resp(task_payload)
+        raise AssertionError(f"unexpected endpoint: {kwargs['endpoint']}")
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    task_id = ws.update_assets(
+        query_filter='kind = "domain"',
+        new_state="Approved",
+        noprint=True,
+    )
+    assert task_id == "task-123"
+    assert ws.task_ids == ["task-123"]
+
+    polled = ws.poll_asset_state_change(task_id="task-123", noprint=True)
+    assert [task["id"] for task in polled] == ["task-123"]
+    assert capsys.readouterr().out == ""
+
+
+def test_asset_lists_and_facet_filters_support_noprint(capsys):
+    ws = _new_ws()
+    ws.some_assets = mdeasm.AssetList()
+    ws.filters = mdeasm.FacetFilter()
+    ws.filters.headers = {}
+
+    assert ws.asset_lists(noprint=True) == ["some_assets"]
+    assert ws.facet_filters(noprint=True) == ["headers"]
+    assert capsys.readouterr().out == ""

@@ -7,12 +7,7 @@ _VERSION = 1.4
 # CHANGELOG
 # https://github.com/fer39e4f/MDEASM/blob/main/API/changelog.md
 #
-# TODO
-#   create/update azure resource tags
-#   delete azure resource
-#   delete disco group (endpoint bugged)
-#   asset snapshots
-#   cancel tasks
+# Historical TODOs are tracked in CLONE_FEATURES.md to keep backlog and shipped behavior aligned.
 
 
 import base64
@@ -1000,7 +995,7 @@ class Workspaces:
             self.__set_default_workspace_name__(r.json()["name"])
             return {workspace_name: self._workspaces[workspace_name]}
 
-    def get_discovery_templates(self, org_name, workspace_name=""):
+    def get_discovery_templates(self, org_name, workspace_name="", **kwargs):
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if self.__verify_workspace__(workspace_name):
@@ -1012,17 +1007,20 @@ class Workspaces:
                 params=params,
                 workspace_name=workspace_name,
             )
-            for org in r.json()["content"]:
+            templates = []
+            for org in _response_items(r.json()):
                 logging.info(org)
-                if org["name"][-1] != ".":
-                    print(f"{org['name']}---{org['id']}")
-                else:
-                    print(f"{org['name'][:-1]}---{org['id']}")
+                template_name = org["name"][:-1] if org["name"].endswith(".") else org["name"]
+                templates.append(f"{template_name}---{org['id']}")
+            if not kwargs.get("noprint"):
+                for template in templates:
+                    print(template)
+            return templates
         else:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
 
-    def get_discovery_template_by_id(self, template_id, workspace_name=""):
+    def get_discovery_template_by_id(self, template_id, workspace_name="", **kwargs):
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if self.__verify_workspace__(workspace_name):
@@ -1032,8 +1030,10 @@ class Workspaces:
                 endpoint=f"discoTemplates/{template_id}",
                 workspace_name=workspace_name,
             )
-            print(json.dumps(r.json(), indent=2))
-            return r.json()
+            payload = r.json()
+            if not kwargs.get("noprint"):
+                print(json.dumps(payload, indent=2))
+            return payload
         else:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
@@ -1609,6 +1609,7 @@ class Workspaces:
         date_range_start="",
         date_range_end="",
         workspace_name="",
+        **kwargs,
     ):
         """if supplied, optional argument severity must be one of (case-insensitive) 'high','medium', or 'low'. if not supplied, retreives risk observations for all severities
 
@@ -1620,6 +1621,12 @@ class Workspaces:
 
         if both date_range_start and date_range_end are submitted, any asset details that are seen, they will be evaluated together -- whether date_range_start is LATER THAN 'firstSeen' and date_range_end is EARLIER THAN 'lastSeen' -- and prevent any standalone date_range_start or date_range_end evaluation
         """
+        noprint = bool(kwargs.get("noprint"))
+
+        def _status(msg):
+            if not noprint:
+                print(msg)
+
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if self.__verify_workspace__(workspace_name):
@@ -1655,6 +1662,7 @@ class Workspaces:
             )
 
             metrics = {}
+            snapshot_assets = {}
             for summary in r_summarize.json()["assetSummaries"]:
                 sev_type = summary["displayName"]
                 if summary["count"]:
@@ -1665,9 +1673,8 @@ class Workspaces:
                             metrics[finding] = observation["metric"]
 
             if not metrics:
-                print(f"No Risk Observations found for severity='{severity}'")
+                _status(f"No Risk Observations found for severity='{severity}'")
             else:
-                snapshot_assets = {}
                 for key, val in metrics.items():
                     snapshot_payload = {"metric": val, "labelName": None, "page": 0, "size": 100}
                     asset_uuids = []
@@ -1703,19 +1710,26 @@ class Workspaces:
                         last_seen_days_back=last_seen_days_back,
                         date_range_start=date_range_start,
                         date_range_end=date_range_end,
+                        quiet=noprint,
                     )
                 self.create_facet_filter(asset_list_name=key)
-                print(
+                _status(
                     f"{key} risk observations retrieved for {len(val)} assets and available at <mdeasm.Workspaces object>.{key}.assets\n"
                 )
-            print(
-                f"facet filters created and available at <mdeasm.Workspaces object>.filters.<facet_filter>"
-            )
+            if snapshot_assets:
+                _status(
+                    f"facet filters created and available at <mdeasm.Workspaces object>.filters.<facet_filter>"
+                )
+            return {
+                "severity": severity,
+                "metrics": metrics,
+                "snapshot_assets": snapshot_assets,
+            }
         else:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
 
-    def create_facet_filter(self, asset_list_name="", asset_id="", attribute_name=""):
+    def create_facet_filter(self, asset_list_name="", asset_id="", attribute_name="", **kwargs):
         """Expects an asset_list_name created by get_workspace_assets() or an asset_id created by get_workspace_asset_by_id().
 
         If no attribute_name value is passed to the function, this will create facet filters for every attribute found in every asset(s). Optionally pass in a single attribute_name (e.g.: 'cnames', 'headers', 'location') to create a facet filter for just that attribute.
@@ -1749,7 +1763,7 @@ class Workspaces:
             self.__facet_filter_helper__(asset_id=asset_id, attribute_name=attribute_name)
 
         # print(f"facet filter created, available at <mdeasm.Workspaces object>.filters.<attribute_name>")
-        if attribute_name:
+        if attribute_name and not kwargs.get("noprint"):
             print(
                 f"facet filter created successfully and available at <mdeasm.Workspaces object>.filters.{attribute_name}"
             )
@@ -2296,6 +2310,7 @@ class Workspaces:
         apply_labels=True,
         remove_labels=False,
         workspace_name="",
+        **kwargs,
     ):
         """this function will update asset states and/or labels, depending on the submitted arguments. at least one of 'new_state' and/or 'labels' must be submitted.
 
@@ -2340,7 +2355,7 @@ class Workspaces:
                     logging.warning(
                         f"label '{label}' not available within {workspace_name}; creating it with defaults"
                     )
-                    self.create_or_update_label(name=label)
+                    self.create_or_update_label(name=label, noprint=bool(kwargs.get("noprint")))
                 asset_update_payload["labels"][label] = label_action
         logging.debug(asset_update_payload)
         if self.__verify_workspace__(workspace_name):
@@ -2378,15 +2393,17 @@ class Workspaces:
                 params=params,
                 payload=asset_update_payload,
             )
-
-            print(f"task id for asset update action: {r.json()['id']}")
-            self.task_ids.append(r.json()["id"])
-            # return(self.task_ids)
+            task_id = r.json()["id"]
+            if not kwargs.get("noprint"):
+                print(f"task id for asset update action: {task_id}")
+            self.task_ids.append(task_id)
+            return task_id
         else:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
 
-    def poll_asset_state_change(self, task_id="", workspace_name=""):
+    def poll_asset_state_change(self, task_id="", workspace_name="", **kwargs):
+        noprint = bool(kwargs.get("noprint"))
         if not task_id and not hasattr(self, "task_ids"):
             setattr(self, "task_ids", [])
         # if not task_id and (hasattr(self, 'task_ids') and len(self.task_ids) == 0):
@@ -2408,63 +2425,83 @@ class Workspaces:
                 logging.error("no tasks found for workspace: {workspace_name}")
                 raise Exception
             else:
+                polled = []
                 for task in r.json()["content"]:
                     if task_id and task_id == task["id"]:
-                        print(f"\ntask id:\n\t{task['id']}")
-                        print(f"task query:\n\t{task['metadata']['filter']}")
-                        print(f"task actions:\n\t{task['metadata']['assetUpdateRequest']}")
-                        print(f"task status:\n\t{task['state']}")
-                        print(f"task started:\n\t{task['startedAt']}")
-                        print(
-                            f"total estimated assets to be updated:\n\t{task['metadata']['estimated']}"
-                        )
-                        print(
-                            f"current task completion percentage:\n\t{task['metadata']['progress']}%"
-                        )
-                    elif task["state"] != "complete":
-                        print(f"\ntask id:\n\t{task['id']}")
-                        print(f"task query:\n\t{task['metadata']['filter']}")
-                        print(f"task actions:\n\t{task['metadata']['assetUpdateRequest']}")
-                        print(f"task started:\n\t{task['startedAt']}")
-                        print(
-                            f"total estimated assets to be updated:\n\t{task['metadata']['estimated']}"
-                        )
-                        print(
-                            f"current task completion percentage:\n\t{task['metadata']['progress']}%"
-                        )
-                    elif task["state"] == "complete":
-                        print(f"\ntask id:\n\t{task['id']}")
-                        print(f"task query:\n\t{task['metadata']['filter']}")
-                        print(f"task actions:\n\t{task['metadata']['assetUpdateRequest']}")
-                        print((f"task started:\n\t{task['startedAt']}"))
-                        print(f"task completed:\n\t{task['completedAt']}")
-                        print(f"total assets updated:\n\t{task['metadata']['estimated']}")
+                        polled.append(task)
+                        if not noprint:
+                            print(f"\ntask id:\n\t{task['id']}")
+                            print(f"task query:\n\t{task['metadata']['filter']}")
+                            print(f"task actions:\n\t{task['metadata']['assetUpdateRequest']}")
+                            print(f"task status:\n\t{task['state']}")
+                            print(f"task started:\n\t{task['startedAt']}")
+                            print(
+                                f"total estimated assets to be updated:\n\t{task['metadata']['estimated']}"
+                            )
+                            print(
+                                f"current task completion percentage:\n\t{task['metadata']['progress']}%"
+                            )
+                    elif not task_id and task["state"] != "complete":
+                        polled.append(task)
+                        if not noprint:
+                            print(f"\ntask id:\n\t{task['id']}")
+                            print(f"task query:\n\t{task['metadata']['filter']}")
+                            print(f"task actions:\n\t{task['metadata']['assetUpdateRequest']}")
+                            print(f"task started:\n\t{task['startedAt']}")
+                            print(
+                                f"total estimated assets to be updated:\n\t{task['metadata']['estimated']}"
+                            )
+                            print(
+                                f"current task completion percentage:\n\t{task['metadata']['progress']}%"
+                            )
+                    elif not task_id and task["state"] == "complete":
+                        polled.append(task)
+                        if not noprint:
+                            print(f"\ntask id:\n\t{task['id']}")
+                            print(f"task query:\n\t{task['metadata']['filter']}")
+                            print(f"task actions:\n\t{task['metadata']['assetUpdateRequest']}")
+                            print((f"task started:\n\t{task['startedAt']}"))
+                            print(f"task completed:\n\t{task['completedAt']}")
+                            print(f"total assets updated:\n\t{task['metadata']['estimated']}")
+                return polled
 
-    def asset_lists(self):
+    def asset_lists(self, **kwargs):
         """retrieves and prints the current AssetList objects available within the Workspaces object"""
         asset_lists_out = []
         for k, v in vars(self).items():
             if isinstance(v, AssetList):
                 asset_lists_out.append(k)
+        if kwargs.get("noprint"):
+            return asset_lists_out
         if not asset_lists_out:
             print("no AssetList attributes found")
         else:
             print(f"\n".join(asset_lists_out))
+        return asset_lists_out
 
-    def facet_filters(self):
+    def facet_filters(self, **kwargs):
         """retreives and prints the current FacetFilter objects available within the Workspaces object"""
         facet_filters_out = []
         for v in vars(self).values():
             if isinstance(v, FacetFilter):
                 for k in vars(v).keys():
                     facet_filters_out.append(k)
+        if kwargs.get("noprint"):
+            return facet_filters_out
         if not facet_filters_out:
             print("no FacetFilter attributes found")
         else:
             print(f"\n".join(facet_filters_out))
+        return facet_filters_out
 
     def get_workspace_asset_summaries(
-        self, query_filters=[], metric_categories=[], metrics=[], group_by="", workspace_name=""
+        self,
+        query_filters=[],
+        metric_categories=[],
+        metrics=[],
+        group_by="",
+        workspace_name="",
+        **kwargs,
     ):
         """submit one of:
 
@@ -2554,7 +2591,9 @@ class Workspaces:
                         f"{submitted[idx]} NOT EQUAL to any of {summary['metricCategory']}, {summary['metric']}, {summary['filter']}"
                     )
 
-            print(json.dumps(self.asset_summaries, indent=2))
+            if not kwargs.get("noprint"):
+                print(json.dumps(self.asset_summaries, indent=2))
+            return self.asset_summaries
 
 
 class Asset:
