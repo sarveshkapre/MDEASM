@@ -56,6 +56,26 @@ def test_cli_saved_filters_list_lines(monkeypatch, capsys):
     assert out_lines == ["sfA\tA\tx"]
 
 
+def test_cli_saved_filters_list_lines_normalizes_control_whitespace(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_saved_filters(self, **kwargs):
+            return {
+                "totalElements": 1,
+                "value": [{"name": "sf\tA", "displayName": "A\nB", "filter": "x\r\ny"}],
+            }
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["saved-filters", "list", "--format", "lines"])
+    assert rc == 0
+    out_lines = capsys.readouterr().out.splitlines()
+    assert out_lines == ["sf A\tA B\tx y"]
+
+
 def test_cli_saved_filters_get(monkeypatch, capsys):
     class DummyWS:
         def __init__(self, *args, **kwargs):
@@ -154,6 +174,23 @@ def test_cli_saved_filters_delete_json(monkeypatch, capsys):
     assert rc == 0
     out = json.loads(capsys.readouterr().out)
     assert out == {"deleted": "sfA"}
+
+
+def test_cli_saved_filters_delete_lines(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def delete_saved_filter(self, name, **kwargs):
+            assert name == "sfA"
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["saved-filters", "delete", "sfA", "--format", "lines", "--out", "-"])
+    assert rc == 0
+    assert capsys.readouterr().out.splitlines() == ["sfA\tTrue"]
 
 
 @pytest.mark.parametrize("cmd", [["saved-filters"], ["saved-filters", "put", "x", "--description", "d"]])

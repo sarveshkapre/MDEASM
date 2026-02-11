@@ -14,6 +14,13 @@ import mdeasm  # noqa: E402
 import mdeasm_cli  # noqa: E402
 
 
+def _extract_last_status(exc: Exception) -> int | None:
+    status_match = re.search(r"last_status:\s*([0-9]{3})", str(exc), flags=re.IGNORECASE)
+    if not status_match:
+        return None
+    return int(status_match.group(1))
+
+
 def test_integration_smoke_get_workspaces():
     """
     Opt-in integration smoke test.
@@ -260,6 +267,136 @@ def test_integration_smoke_data_connections_validate():
         pytest.fail(f"unexpected validate_data_connection failure: {exc}")
     else:
         assert isinstance(payload, dict)
+
+
+def test_integration_smoke_saved_filters_lifecycle():
+    """
+    Optional saved-filters lifecycle smoke.
+
+    This validates put/get/list/delete behavior against the live tenant and always attempts
+    cleanup of temporary filters created by the test.
+    """
+    if os.getenv("MDEASM_INTEGRATION_SAVED_FILTERS") != "1":
+        pytest.skip("set MDEASM_INTEGRATION_SAVED_FILTERS=1 to enable saved-filters smoke")
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip("set WORKSPACE_NAME (or ensure only one workspace exists) to run saved-filters smoke")
+
+    filter_name = f"mdeasm-smoke-sf-{int(time.time())}"
+    deleted = False
+    try:
+        created = ws.create_or_replace_saved_filter(
+            filter_name,
+            query_filter='kind = "domain"',
+            description="MDEASM integration smoke temporary saved filter",
+            noprint=True,
+        )
+        created_name = str((created or {}).get("name") or (created or {}).get("id") or "").strip()
+        assert created_name == filter_name
+
+        fetched = ws.get_saved_filter(filter_name, noprint=True)
+        fetched_name = str((fetched or {}).get("name") or (fetched or {}).get("id") or "").strip()
+        assert fetched_name == filter_name
+
+        listed = ws.get_saved_filters(max_page_size=100, noprint=True)
+        rows = listed.get("value") if isinstance(listed, dict) else None
+        if rows is None and isinstance(listed, dict):
+            rows = listed.get("content")
+        rows = rows if isinstance(rows, list) else []
+        names = {str((row or {}).get("name") or (row or {}).get("id") or "").strip() for row in rows}
+        assert filter_name in names
+
+        ws.delete_saved_filter(filter_name, noprint=True)
+        deleted = True
+
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                ws.get_saved_filter(filter_name, noprint=True)
+            except Exception as exc:
+                if _extract_last_status(exc) == 404:
+                    break
+                raise
+            time.sleep(2)
+        else:
+            pytest.fail(f"saved filter was not deleted within timeout: {filter_name}")
+    finally:
+        if not deleted:
+            try:
+                ws.delete_saved_filter(filter_name, noprint=True)
+            except Exception:
+                pass
+
+
+def test_integration_smoke_resource_tags_lifecycle():
+    """
+    Optional workspace resource-tags lifecycle smoke.
+
+    This validates list/get/put/delete behavior against the ARM tag endpoint at workspace scope.
+    """
+    if os.getenv("MDEASM_INTEGRATION_RESOURCE_TAGS") != "1":
+        pytest.skip("set MDEASM_INTEGRATION_RESOURCE_TAGS=1 to enable resource-tags smoke")
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(
+        http_timeout=(5, 30),
+        retry=True,
+        max_retry=2,
+        backoff_max_s=5,
+        init_data_plane_token=False,
+    )
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip("set WORKSPACE_NAME (or ensure only one workspace exists) to run resource-tags smoke")
+
+    tag_name = f"mdeasm-smoke-tag-{int(time.time())}"
+    tag_value = f"cycle17-{int(time.time())}"
+    deleted = False
+    try:
+        before = ws.list_resource_tags(noprint=True)
+        assert isinstance(before, dict)
+
+        put_payload = ws.put_resource_tag(tag_name, tag_value, noprint=True)
+        assert str((put_payload or {}).get("name") or "").strip() == tag_name
+        assert str((put_payload or {}).get("value") or "").strip() == tag_value
+
+        get_payload = ws.get_resource_tag(tag_name, noprint=True)
+        assert str((get_payload or {}).get("name") or "").strip() == tag_name
+        assert str((get_payload or {}).get("value") or "").strip() == tag_value
+
+        listed = ws.list_resource_tags(noprint=True)
+        tags = (listed.get("tags") or {}) if isinstance(listed, dict) else {}
+        assert str(tags.get(tag_name) or "").strip() == tag_value
+
+        ws.delete_resource_tag(tag_name, noprint=True)
+        deleted = True
+
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                ws.get_resource_tag(tag_name, noprint=True)
+            except Exception as exc:
+                if _extract_last_status(exc) == 404:
+                    break
+                raise
+            time.sleep(2)
+        else:
+            pytest.fail(f"resource tag was not deleted within timeout: {tag_name}")
+    finally:
+        if not deleted:
+            try:
+                ws.delete_resource_tag(tag_name, noprint=True)
+            except Exception:
+                pass
 
 
 def test_integration_smoke_server_export_task():

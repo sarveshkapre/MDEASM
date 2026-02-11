@@ -40,8 +40,18 @@ mdeasm saved-filters get owned_domains
 ## Delete
 ```bash
 mdeasm saved-filters delete owned_domains
+
+# Structured line output (name<TAB>deleted)
+mdeasm saved-filters delete owned_domains --format lines
 ```
 
 Notes:
 - `saved-filters put` validates payload shape locally before API submit (`name`, `filter`, `description` must be non-empty after trimming).
 - Saved filter names are treated as path segments and cannot include `/`.
+- `saved-filters list --format lines` emits stable tab-delimited columns: `name`, `displayName`, `filter` (control whitespace is normalized for shell-safe parsing).
+
+## Optional Integration Smoke (Maintainers)
+```bash
+source .venv/bin/activate
+MDEASM_INTEGRATION_SAVED_FILTERS=1 pytest -q tests/test_integration_smoke.py -k saved_filters_lifecycle
+```

@@ -23,6 +23,14 @@ def test_resolve_out_path_treats_dash_as_stdout():
     assert mdeasm_cli._resolve_out_path("result.json") == Path("result.json")
 
 
+def test_rows_to_tab_lines_normalizes_control_whitespace():
+    lines = mdeasm_cli._rows_to_tab_lines(
+        [{"id": "a\tb", "state": "line1\nline2", "detail": " c\r\nd "}],
+        ["id", "state", "detail"],
+    )
+    assert lines == ["a b\tline1 line2\tc d"]
+
+
 def test_parse_retry_after_seconds_supports_delay_and_http_date():
     now = datetime(2026, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
 

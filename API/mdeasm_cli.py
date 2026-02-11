@@ -911,8 +911,16 @@ def _resolve_out_path(value: str) -> Path | None:
     return Path(raw)
 
 
+def _normalize_line_cell(value) -> str:
+    text = "" if value is None else str(value)
+    if not text:
+        return ""
+    # Keep tab-delimited output parseable even when fields contain control whitespace.
+    return re.sub(r"[\t\r\n]+", " ", text).strip()
+
+
 def _rows_to_tab_lines(rows: list[dict], fields: list[str]) -> list[str]:
-    return ["\t".join(str(row.get(field, "")) for field in fields) for row in rows]
+    return ["\t".join(_normalize_line_cell(row.get(field, "")) for field in fields) for row in rows]
 
 
 def _build_data_connection_properties(args) -> dict:
@@ -1588,7 +1596,7 @@ def build_parser() -> argparse.ArgumentParser:
     sf_delete.add_argument("name", help="Saved filter name")
     sf_delete.add_argument(
         "--format",
-        choices=["json", "text"],
+        choices=["json", "lines", "text"],
         default="json",
         help="Output format (default: json)",
     )
@@ -1867,7 +1875,7 @@ def build_parser() -> argparse.ArgumentParser:
     dc_delete.add_argument("name", help="Data connection name")
     dc_delete.add_argument(
         "--format",
-        choices=["json", "text"],
+        choices=["json", "lines", "text"],
         default="json",
         help="Output format (default: json)",
     )
@@ -3091,12 +3099,13 @@ def main(argv: list[str] | None = None) -> int:
                 if args.format == "json":
                     _write_json(out_path, values, pretty=True)
                 else:
-                    lines = []
+                    rows = []
                     for item in values:
                         name = item.get("name") or item.get("id") or ""
                         display = item.get("displayName") or ""
                         filt = item.get("filter") or ""
-                        lines.append(f"{name}\t{display}\t{filt}")
+                        rows.append({"name": name, "displayName": display, "filter": filt})
+                    lines = _rows_to_tab_lines(rows, ["name", "displayName", "filter"])
                     _write_lines(out_path, lines)
                 return 0
             except Exception as e:
@@ -3134,6 +3143,14 @@ def main(argv: list[str] | None = None) -> int:
                 ws.delete_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
                 if args.format == "json":
                     _write_json(out_path, {"deleted": args.name}, pretty=True)
+                elif args.format == "lines":
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            [{"name": args.name, "deleted": True}],
+                            ["name", "deleted"],
+                        ),
+                    )
                 else:
                     _write_lines(out_path, [f"deleted {args.name}"])
                 return 0
@@ -3250,6 +3267,11 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 if args.format == "json":
                     _write_json(out_path, payload, pretty=True)
+                elif args.format == "lines":
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines([payload], ["deleted", "status"]),
+                    )
                 else:
                     _write_lines(out_path, [f"deleted {args.name}"])
                 return 0
@@ -3330,21 +3352,29 @@ def main(argv: list[str] | None = None) -> int:
             if args.format == "json":
                 _write_json(out_path, payload, pretty=True)
             else:
-                terminal_error_code = str((payload or {}).get("terminalErrorCode", ""))
-                terminal_error_message = " ".join(
-                    str((payload or {}).get("terminalErrorMessage", "")).split()
+                _write_lines(
+                    out_path,
+                    _rows_to_tab_lines(
+                        [
+                            {
+                                "id": payload.get("id", ""),
+                                "state": payload.get("state", ""),
+                                "startedAt": payload.get("startedAt", ""),
+                                "completedAt": payload.get("completedAt", ""),
+                                "terminalErrorCode": payload.get("terminalErrorCode", ""),
+                                "terminalErrorMessage": payload.get("terminalErrorMessage", ""),
+                            }
+                        ],
+                        [
+                            "id",
+                            "state",
+                            "startedAt",
+                            "completedAt",
+                            "terminalErrorCode",
+                            "terminalErrorMessage",
+                        ],
+                    ),
                 )
-                line = "\t".join(
-                    [
-                        str(payload.get("id", "")),
-                        str(payload.get("state", "")),
-                        str(payload.get("startedAt", "")),
-                        str(payload.get("completedAt", "")),
-                        terminal_error_code,
-                        terminal_error_message,
-                    ]
-                )
-                _write_lines(out_path, [line])
             return 0
 
         if args.tasks_cmd == "cancel":

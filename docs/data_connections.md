@@ -54,6 +54,9 @@ mdeasm data-connections validate <name> \
 ## Delete
 ```bash
 mdeasm data-connections delete <name> --format json
+
+# Structured line output (deleted<TAB>status)
+mdeasm data-connections delete <name> --format lines
 ```
 
 Notes:

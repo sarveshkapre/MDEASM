@@ -205,3 +205,22 @@ def test_cli_data_connections_validate_and_delete(monkeypatch, capsys):
     )
     assert rc_delete == 0
     assert capsys.readouterr().out.splitlines() == ["deleted dc-adx"]
+
+
+def test_cli_data_connections_delete_lines(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def delete_data_connection(self, name, **kwargs):
+            assert name == "dc-adx"
+            return {"deleted": name, "status": 204}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        ["data-connections", "delete", "dc-adx", "--format", "lines", "--out", "-"]
+    )
+    assert rc == 0
+    assert capsys.readouterr().out.splitlines() == ["dc-adx\t204"]
