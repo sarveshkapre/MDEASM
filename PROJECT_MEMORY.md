@@ -9,6 +9,8 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Complete residual label helper stdout gating by making `create_or_update_label`/`get_labels` return structured payloads in both print and `noprint` modes | This was the highest-impact remaining low-risk cleanup from the backlog and removes another automation footgun without changing default interactive output | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_label_helpers_support_noprint_and_consistent_returns tests/test_mdeasm_helpers.py::test_label_helpers_print_mode_still_returns_payload` (pass) | a953e43 | high | trusted
+- 2026-02-11 | Prioritize label helper cleanup for this targeted refactor pass | Bounded backlog scan kept data-connections and typed exceptions as larger follow-ups; label helper output consistency was the smallest high-value production-safe improvement | `CLONE_FEATURES.md` candidate/implemented updates for this pass | a953e43 | high | trusted
 - 2026-02-11 | Refresh autonomous trackers for cycle 5 (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature shipment | Keep backlog scoring, evidence logs, market-scan gap map, and mutable repo facts aligned with shipped code and CI state | Tracker files updated with cycle 5 selected/delivered work, remaining priorities, and verification records | 096eb53 | high | trusted
 - 2026-02-11 | Add opt-in full artifact lifecycle integration smoke (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`) covering `assets:export -> tasks get/poll -> tasks download -> tasks fetch` | Export/download payloads are previewed and can drift by tenant; a dedicated lifecycle smoke path reduces regression blind spots | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_server_export_task_artifact_fetch -q` (pass; skipped by default without env/credentials) | 5fed728 | high | trusted
 - 2026-02-11 | Harden `query_facet_filter` with `noprint` support and consistent structured return payload across print/csv/json modes | Remaining stdout-heavy helper paths were still risky for automation; this closes a high-friction library UX gap while keeping default interactive behavior | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_query_facet_filter_supports_noprint_and_structured_return tests/test_mdeasm_helpers.py::test_query_facet_filter_csv_json_outputs_and_return_payload tests/test_mdeasm_helpers.py::test_query_facet_filter_requires_precomputed_filters` (pass) | 5fed728 | high | trusted
@@ -84,7 +86,6 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Complete residual `noprint` gating in remaining noisy helpers (notably label CRUD/read helpers) while preserving default interactive behavior.
 - Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`); blocked locally because EASM credentials are not configured.
 - Add `mdeasm data-connections ...` management commands for Log Analytics/ADX parity workflows.
 - Start typed helper exception migration for validation/workspace-not-found/auth paths to reduce broad `Exception` handling.
@@ -92,6 +93,11 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_label_helpers_support_noprint_and_consistent_returns tests/test_mdeasm_helpers.py::test_label_helpers_print_mode_still_returns_payload` | `..` | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `98 passed, 5 skipped`; compile + smoke commands passed | pass
+- 2026-02-11 | `git push origin main` | pushed commit `a953e43` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21902563313 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `a953e43` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest CI runs on `main` were successful before cycle 5 push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py tests/test_integration_smoke.py` | `All checks passed!` | pass

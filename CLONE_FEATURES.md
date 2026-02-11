@@ -21,12 +21,6 @@ Priority order (remaining backlog after cycle 5 shipments)
   - Why: safer automation handling and clearer failure semantics.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Finish remaining stdout gating in helper methods**
-  - Gap class: weak (library UX)
-  - Scope: extend `noprint` and structured-return behavior to remaining noisy label helper paths.
-  - Why: prevents accidental stdout pollution in machine-readable automation contexts.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
 - [ ] **Stream-first JSON array export mode**
   - Gap class: weak (performance/parity)
   - Scope: optional streaming JSON array writer to avoid full in-memory buffering for `--format json`.
@@ -106,6 +100,11 @@ Priority order (remaining backlog after cycle 5 shipments)
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Finish label helper stdout gating with consistent return payloads**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_label_helpers_support_noprint_and_consistent_returns tests/test_mdeasm_helpers.py::test_label_helpers_print_mode_still_returns_payload` (pass)
+
 - [x] **Opt-in integration smoke: full export task artifact lifecycle (`assets:export -> tasks get/download -> tasks fetch`)**
   - Date: 2026-02-11
   - Scope: `tests/test_integration_smoke.py`
@@ -372,7 +371,7 @@ Priority order (remaining backlog after cycle 5 shipments)
   - Peer ASM/search APIs continue to emphasize async export workflows and cursor/search-after pagination ergonomics for large datasets.
   - Gap map (cycle 5):
     - Weak -> closed this cycle: full opt-in export-task artifact lifecycle smoke (`assets:export -> task poll/download -> tasks fetch`) and `query_facet_filter` stdout-safe automation mode with structured returns.
-    - Remaining weak: label helper stdout gating and broad exception typing migration.
+    - Remaining weak: broad exception typing migration.
     - Missing: data-connections management commands and scoped TODO debt retirement.
     - Differentiator opportunities: local command presets and artifact integrity verification.
   - Sources reviewed (untrusted):
