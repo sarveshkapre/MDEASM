@@ -1,10 +1,12 @@
 #!/usr/bin/python3
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
 import random
+import re
 import sys
 import tempfile
 import time
@@ -27,6 +29,7 @@ _DOWNLOAD_URL_PRIORITY_KEYS = (
     "link",
 )
 _DEFAULT_RETRY_ON_STATUSES = (408, 425, 429, 500, 502, 503, 504)
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _json_default(obj):
@@ -83,6 +86,17 @@ def _parse_retry_on_statuses(value: str) -> set[int]:
     if not out:
         raise ValueError("empty retry-on status list")
     return out
+
+
+def _normalize_sha256_hex(value: str) -> str:
+    raw = (value or "").strip().lower()
+    if not raw:
+        return ""
+    if raw.startswith("sha256:"):
+        raw = raw.split(":", 1)[1].strip()
+    if not _SHA256_HEX_RE.fullmatch(raw):
+        raise ValueError("sha256 must be a 64-character hex string")
+    return raw
 
 
 def _find_dotenv_path(start: Path | None = None) -> Path | None:
@@ -223,6 +237,7 @@ def _download_url_to_file(
     overwrite: bool,
     session=None,
     auth_token: str = "",
+    expected_sha256: str = "",
 ) -> dict:
     if out_path.exists() and not overwrite:
         raise FileExistsError(f"output file already exists: {out_path}")
@@ -259,6 +274,7 @@ def _download_url_to_file(
                 if last_status == 200:
                     tmp_fh, tmp_path = _atomic_open_binary(out_path)
                     bytes_written = 0
+                    sha256_digest = hashlib.sha256() if expected_sha256 else None
                     try:
                         with tmp_fh:
                             for chunk in resp.iter_content(chunk_size=chunk_size):
@@ -266,11 +282,21 @@ def _download_url_to_file(
                                     continue
                                 tmp_fh.write(chunk)
                                 bytes_written += len(chunk)
+                                if sha256_digest is not None:
+                                    sha256_digest.update(chunk)
                             tmp_fh.flush()
                             try:
                                 os.fsync(tmp_fh.fileno())
                             except OSError:
                                 pass
+                        digest_hex = (
+                            sha256_digest.hexdigest() if sha256_digest is not None else ""
+                        )
+                        if expected_sha256 and digest_hex != expected_sha256:
+                            raise RuntimeError(
+                                "artifact sha256 mismatch "
+                                f"(expected={expected_sha256}, actual={digest_hex})"
+                            )
                         os.replace(tmp_path, out_path)
                     except Exception:
                         try:
@@ -283,6 +309,8 @@ def _download_url_to_file(
                         "status_code": 200,
                         "bytes_written": bytes_written,
                         "used_bearer_auth": bool(use_auth),
+                        "sha256": digest_hex,
+                        "sha256_verified": bool(expected_sha256),
                     }
 
                 body_snippet = ""
@@ -1653,6 +1681,14 @@ def build_parser() -> argparse.ArgumentParser:
             "(default: 408,425,429,500,502,503,504)"
         ),
     )
+    tasks_fetch.add_argument(
+        "--sha256",
+        default="",
+        help=(
+            "Optional expected SHA-256 checksum (64 hex chars, optionally prefixed with 'sha256:'); "
+            "download fails if artifact digest does not match"
+        ),
+    )
 
     assets = sub.add_parser("assets", help="Asset inventory operations")
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
@@ -2387,6 +2423,11 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as e:
                 sys.stderr.write(f"invalid --retry-on-statuses: {e}\n")
                 return 2
+            try:
+                expected_sha256 = _normalize_sha256_hex(args.sha256)
+            except Exception as e:
+                sys.stderr.write(f"invalid --sha256: {e}\n")
+                return 2
             session = getattr(ws, "_session", None)
             auth_token = str(getattr(ws, "_dp_token", "") or "")
 
@@ -2403,6 +2444,7 @@ def main(argv: list[str] | None = None) -> int:
                     overwrite=bool(args.overwrite),
                     session=session,
                     auth_token=auth_token,
+                    expected_sha256=expected_sha256,
                 )
             except Exception as e:
                 redactor = getattr(mdeasm, "redact_sensitive_text", None)
@@ -2427,6 +2469,9 @@ def main(argv: list[str] | None = None) -> int:
                 "download_host": parsed.netloc,
                 "download_url": redacted_url,
             }
+            if expected_sha256:
+                summary["sha256"] = str(result.get("sha256", ""))
+                summary["sha256_verified"] = bool(result.get("sha256_verified", False))
             _write_json(summary_out, summary, pretty=True)
             return 0
 

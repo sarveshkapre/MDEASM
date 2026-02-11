@@ -53,6 +53,11 @@ mdeasm tasks fetch <task_id> \
   --artifact-out ./export.csv \
   --reference-out ./download-reference.json \
   --overwrite
+
+# Verify artifact integrity against an expected digest.
+mdeasm tasks fetch <task_id> \
+  --artifact-out ./export.csv \
+  --sha256 5c9f0f4f3f6a4b8d0fe8d0a1f472f4e5d9510a40a4ed0ce7f3f0f2df1d9cd8de
 ```
 
 Notes:
@@ -60,4 +65,5 @@ Notes:
 - Reliability and API version flags are available on all task commands (`--http-timeout`, `--no-retry`, `--max-retry`, `--backoff-max-s`, `--api-version`, `--dp-api-version`, `--cp-api-version`).
 - `tasks wait` exits with a non-zero status on timeout and prints the timeout reason to stderr.
 - `tasks fetch` supports `--retry-on-statuses` (default `408,425,429,500,502,503,504`) to tune which HTTP responses are treated as transient during artifact download.
+- `tasks fetch` supports `--sha256` to verify artifact integrity before moving the download into place.
 - `tasks fetch` follows the URL returned by `tasks/{id}:download` and writes bytes atomically to avoid partial files.

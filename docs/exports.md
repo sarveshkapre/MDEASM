@@ -145,7 +145,7 @@ Notes:
 - `--mode server` uses Defender EASM `POST /assets:export` and returns task metadata.
 - `--wait` polls `tasks/{id}` until a terminal state; use `--poll-interval-s` / `--wait-timeout-s` to tune behavior.
 - `--download-on-complete` calls `tasks/{id}:download` after completion and includes that response in output.
-- To download artifact bytes to disk, run `mdeasm tasks fetch <task_id> --artifact-out <path>` (or use `--reference-out` to persist the raw download reference JSON). Use `--retry-on-statuses` to tune transient retry behavior.
+- To download artifact bytes to disk, run `mdeasm tasks fetch <task_id> --artifact-out <path>` (or use `--reference-out` to persist the raw download reference JSON). Use `--retry-on-statuses` to tune transient retry behavior and `--sha256` for integrity verification.
 - For direct task operations, see `docs/tasks.md`.
 
 ## Export schema (columns file)

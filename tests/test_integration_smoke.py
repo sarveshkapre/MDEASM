@@ -118,6 +118,34 @@ def test_integration_smoke_cli_assets_export():
     assert rc == 0
 
 
+def test_integration_smoke_data_connections_list():
+    """
+    Optional data-connections API drift smoke.
+
+    Preview data-connection endpoints can drift by api-version/tenant; this probes a tiny
+    list call so maintainers can validate compatibility without changing data connections.
+    """
+    if os.getenv("MDEASM_INTEGRATION_DATA_CONNECTIONS") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_DATA_CONNECTIONS=1 to enable data-connections integration smoke"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip(
+            "set WORKSPACE_NAME (or ensure only one workspace exists) to run data-connections smoke"
+        )
+
+    payload = ws.list_data_connections(max_page_size=1, get_all=False, noprint=True)
+    assert isinstance(payload, dict)
+    assert "value" in payload or "content" in payload
+
+
 def test_integration_smoke_server_export_task():
     """
     Optional task-based server export smoke.

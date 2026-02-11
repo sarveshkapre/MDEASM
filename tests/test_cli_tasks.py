@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sys
 import types
 from pathlib import Path
@@ -183,6 +184,140 @@ def test_cli_tasks_fetch_downloads_artifact(monkeypatch, capsys, tmp_path):
     assert payload["task_id"] == "abc"
     assert payload["bytes_written"] == len(b"col1,col2\na,b\n")
     assert payload["download_url"].endswith("sig=[REDACTED]")
+
+
+def test_cli_tasks_fetch_verifies_sha256(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+    expected_sha = hashlib.sha256(b"col1,col2\na,b\n").hexdigest()
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 2
+            self._backoff_max_s = 0.01
+            self._dp_token = ""
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/export.csv"}
+
+    class FakeResp:
+        status_code = 200
+        text = ""
+
+        def iter_content(self, chunk_size=65536):
+            yield b"col1,col2\n"
+            yield b"a,b\n"
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        return FakeResp()
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "fetch",
+            "abc",
+            "--artifact-out",
+            str(artifact),
+            "--sha256",
+            expected_sha,
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["sha256"] == expected_sha
+    assert payload["sha256_verified"] is True
+
+
+def test_cli_tasks_fetch_fails_when_sha256_mismatch(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 2
+            self._backoff_max_s = 0.01
+            self._dp_token = ""
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/export.csv"}
+
+    class FakeResp:
+        status_code = 200
+        text = ""
+
+        def iter_content(self, chunk_size=65536):
+            yield b"col1,col2\n"
+            yield b"a,b\n"
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        return FakeResp()
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "fetch",
+            "abc",
+            "--artifact-out",
+            str(artifact),
+            "--sha256",
+            "0" * 64,
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 1
+    assert "sha256 mismatch" in capsys.readouterr().err
+    assert not artifact.exists()
+
+
+def test_cli_tasks_fetch_rejects_invalid_sha256_argument(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 2
+            self._backoff_max_s = 0.01
+            self._dp_token = ""
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/export.csv"}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "fetch",
+            "abc",
+            "--artifact-out",
+            str(artifact),
+            "--sha256",
+            "invalid",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 2
+    assert "invalid --sha256" in capsys.readouterr().err
+    assert not artifact.exists()
 
 
 def test_cli_tasks_fetch_fails_when_download_url_missing(monkeypatch, capsys, tmp_path):
