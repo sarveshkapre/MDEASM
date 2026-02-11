@@ -47,6 +47,14 @@ _SENSITIVE_KV_FIELD_RE = re.compile(
     r"(?i)\b(access_token|refresh_token|client_secret|id_token)\b(\s*=\s*)([^\s&,\"']+)"
 )
 _AUTH_BEARER_RE = re.compile(r"(?i)\b(authorization\s*[:=]\s*bearer\s+|bearer\s+)([A-Za-z0-9._\-+/=]+)")
+_SENSITIVE_OBJECT_KEYS = {
+    "accesstoken",
+    "apikey",
+    "clientsecret",
+    "connectionstring",
+    "idtoken",
+    "refreshtoken",
+}
 
 
 def configure_logging(level: str | int | None = None, *, force: bool = False) -> None:
@@ -110,6 +118,111 @@ def redact_sensitive_text(value) -> str:
 
     text = re.sub(r"([A-Za-z_][A-Za-z0-9_]{1,64})=([^&\s]+)", _mask_query, text)
     return text
+
+
+def redact_sensitive_object(value):
+    """
+    Recursively redact known secret-bearing object keys.
+    """
+
+    if isinstance(value, dict):
+        redacted = {}
+        for k, v in value.items():
+            if str(k).strip().lower() in _SENSITIVE_OBJECT_KEYS:
+                redacted[k] = "[REDACTED]"
+            else:
+                redacted[k] = redact_sensitive_object(v)
+        return redacted
+    if isinstance(value, list):
+        return [redact_sensitive_object(v) for v in value]
+    return value
+
+
+def _normalize_data_connection_kind(kind: str) -> str:
+    raw = str(kind or "").strip().lower().replace("_", "-")
+    aliases = {
+        "loganalytics": "logAnalytics",
+        "log-analytics": "logAnalytics",
+        "log analytics": "logAnalytics",
+        "azuredataexplorer": "azureDataExplorer",
+        "azure-data-explorer": "azureDataExplorer",
+        "azure data explorer": "azureDataExplorer",
+        "adx": "azureDataExplorer",
+    }
+    raw_no_space = raw.replace(" ", "")
+    if raw in aliases:
+        return aliases[raw]
+    if raw_no_space in aliases:
+        return aliases[raw_no_space]
+    raise Exception(
+        "unsupported data connection kind; use one of: logAnalytics, azureDataExplorer"
+    )
+
+
+def _normalize_data_connection_content(content: str) -> str:
+    raw = str(content or "").strip().lower().replace("_", "")
+    aliases = {
+        "assets": "assets",
+        "attacksurfaceinsights": "attackSurfaceInsights",
+    }
+    if raw in aliases:
+        return aliases[raw]
+    raise Exception("unsupported data connection content; use one of: assets, attackSurfaceInsights")
+
+
+def _normalize_data_connection_frequency(frequency: str) -> str:
+    raw = str(frequency or "").strip().lower()
+    aliases = {
+        "daily": "daily",
+        "weekly": "weekly",
+        "monthly": "monthly",
+    }
+    if raw in aliases:
+        return aliases[raw]
+    raise Exception("unsupported data connection frequency; use one of: daily, weekly, monthly")
+
+
+def _validate_data_connection_properties(kind: str, properties: dict) -> dict:
+    if not isinstance(properties, dict):
+        raise Exception("properties must be a dict")
+
+    if kind == "logAnalytics":
+        workspace_id = str(
+            properties.get("workspaceId")
+            or properties.get("workspace_id")
+            or properties.get("workspace")
+            or ""
+        ).strip()
+        api_key = str(
+            properties.get("apiKey") or properties.get("api_key") or properties.get("key") or ""
+        ).strip()
+        if not workspace_id:
+            raise Exception("logAnalytics properties require workspaceId")
+        if not api_key:
+            raise Exception("logAnalytics properties require apiKey")
+        return {"workspaceId": workspace_id, "apiKey": api_key}
+
+    if kind == "azureDataExplorer":
+        cluster_name = str(
+            properties.get("clusterName") or properties.get("cluster_name") or ""
+        ).strip()
+        database_name = str(
+            properties.get("databaseName") or properties.get("database_name") or ""
+        ).strip()
+        region = str(properties.get("region") or "").strip()
+        if not cluster_name:
+            raise Exception("azureDataExplorer properties require clusterName")
+        if not database_name:
+            raise Exception("azureDataExplorer properties require databaseName")
+        if not region:
+            raise Exception("azureDataExplorer properties require region")
+        return {
+            "clusterName": cluster_name,
+            "databaseName": database_name,
+            "region": region,
+        }
+
+    raise Exception(f"unsupported data connection kind: {kind}")
 
 
 class Workspaces:
@@ -2101,6 +2214,235 @@ class Workspaces:
         else:
             print(json.dumps({"status": r.status_code, "name": name}, indent=2))
         return None
+
+    def list_data_connections(
+        self,
+        workspace_name="",
+        skip=0,
+        max_page_size=25,
+        get_all=False,
+        **kwargs,
+    ):
+        """
+        List workspace data connections.
+
+        Returns a payload with a `value` list for programmatic use.
+        """
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        page = max(int(skip or 0), 0)
+        page_size = max(int(max_page_size or 25), 1)
+        values = []
+        total_elements = None
+        while True:
+            params = {"skip": page, "maxpagesize": page_size}
+            r = self.__workspace_query_helper__(
+                "list_data_connections",
+                method="get",
+                endpoint="dataConnections",
+                params=params,
+                workspace_name=workspace_name,
+            )
+            payload = r.json()
+            batch = payload.get("value")
+            if batch is None:
+                batch = payload.get("content") or []
+            if not isinstance(batch, list):
+                batch = []
+
+            if not get_all:
+                out = redact_sensitive_object(payload)
+                if kwargs.get("noprint"):
+                    return out
+                print(json.dumps(out, indent=2))
+                return out
+
+            values.extend(batch)
+            if total_elements is None:
+                total_elements = payload.get("totalElements")
+
+            try:
+                if total_elements is not None and (page + len(batch)) >= int(total_elements):
+                    break
+            except Exception:
+                pass
+            if not batch or len(batch) < page_size:
+                break
+            page += len(batch)
+
+        out = {"value": values}
+        if total_elements is not None:
+            out["totalElements"] = total_elements
+        else:
+            out["totalElements"] = len(values)
+        out = redact_sensitive_object(out)
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def get_data_connection(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        connection_name = str(name or "").strip()
+        if not connection_name:
+            raise Exception("data connection name is required")
+
+        r = self.__workspace_query_helper__(
+            "get_data_connection",
+            method="get",
+            endpoint=f"dataConnections/{connection_name}",
+            workspace_name=workspace_name,
+        )
+        out = redact_sensitive_object(r.json())
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def create_or_replace_data_connection(
+        self,
+        name,
+        *,
+        kind,
+        properties,
+        content="assets",
+        frequency="weekly",
+        frequency_offset=1,
+        workspace_name="",
+        **kwargs,
+    ):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        connection_name = str(name or "").strip()
+        if not connection_name:
+            raise Exception("data connection name is required")
+
+        normalized_kind = _normalize_data_connection_kind(kind)
+        normalized_content = _normalize_data_connection_content(content)
+        normalized_frequency = _normalize_data_connection_frequency(frequency)
+        try:
+            frequency_offset = int(frequency_offset)
+        except Exception as e:
+            raise Exception(f"frequency_offset must be an integer: {e}") from e
+        if frequency_offset < 0:
+            raise Exception("frequency_offset must be >= 0")
+        normalized_properties = _validate_data_connection_properties(normalized_kind, properties)
+
+        payload = {
+            "name": connection_name,
+            "kind": normalized_kind,
+            "properties": normalized_properties,
+            "content": normalized_content,
+            "frequency": normalized_frequency,
+            "frequencyOffset": frequency_offset,
+        }
+        r = self.__workspace_query_helper__(
+            "create_or_replace_data_connection",
+            method="put",
+            endpoint=f"dataConnections/{connection_name}",
+            payload=payload,
+            workspace_name=workspace_name,
+        )
+        out = redact_sensitive_object(r.json())
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def validate_data_connection(
+        self,
+        *,
+        kind,
+        properties,
+        name="",
+        content="assets",
+        frequency="weekly",
+        frequency_offset=1,
+        workspace_name="",
+        **kwargs,
+    ):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        normalized_kind = _normalize_data_connection_kind(kind)
+        normalized_content = _normalize_data_connection_content(content)
+        normalized_frequency = _normalize_data_connection_frequency(frequency)
+        try:
+            frequency_offset = int(frequency_offset)
+        except Exception as e:
+            raise Exception(f"frequency_offset must be an integer: {e}") from e
+        if frequency_offset < 0:
+            raise Exception("frequency_offset must be >= 0")
+        normalized_properties = _validate_data_connection_properties(normalized_kind, properties)
+
+        payload = {
+            "kind": normalized_kind,
+            "properties": normalized_properties,
+            "content": normalized_content,
+            "frequency": normalized_frequency,
+            "frequencyOffset": frequency_offset,
+        }
+        connection_name = str(name or "").strip()
+        if connection_name:
+            payload["name"] = connection_name
+
+        r = self.__workspace_query_helper__(
+            "validate_data_connection",
+            method="post",
+            endpoint="dataConnections:validate",
+            payload=payload,
+            workspace_name=workspace_name,
+        )
+        out = {}
+        try:
+            out = r.json()
+        except Exception:
+            out = {"status": r.status_code}
+        out = redact_sensitive_object(out)
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def delete_data_connection(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        connection_name = str(name or "").strip()
+        if not connection_name:
+            raise Exception("data connection name is required")
+
+        r = self.__workspace_query_helper__(
+            "delete_data_connection",
+            method="delete",
+            endpoint=f"dataConnections/{connection_name}",
+            workspace_name=workspace_name,
+        )
+        out = {"deleted": connection_name, "status": int(getattr(r, "status_code", 0) or 0)}
+        out = redact_sensitive_object(out)
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
 
     def list_tasks(
         self,

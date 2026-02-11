@@ -569,6 +569,36 @@ def _build_ws_kwargs(args) -> dict:
     return ws_kwargs
 
 
+def _build_data_connection_properties(args) -> dict:
+    kind = str(getattr(args, "kind", "") or "")
+    if kind == "logAnalytics":
+        workspace_id = str(getattr(args, "workspace_id", "") or "").strip()
+        api_key = str(getattr(args, "api_key", "") or "").strip()
+        if not workspace_id:
+            raise ValueError("logAnalytics requires --workspace-id")
+        if not api_key:
+            raise ValueError("logAnalytics requires --api-key")
+        return {"workspaceId": workspace_id, "apiKey": api_key}
+
+    if kind == "azureDataExplorer":
+        cluster_name = str(getattr(args, "cluster_name", "") or "").strip()
+        database_name = str(getattr(args, "database_name", "") or "").strip()
+        region = str(getattr(args, "region", "") or "").strip()
+        if not cluster_name:
+            raise ValueError("azureDataExplorer requires --cluster-name")
+        if not database_name:
+            raise ValueError("azureDataExplorer requires --database-name")
+        if not region:
+            raise ValueError("azureDataExplorer requires --region")
+        return {
+            "clusterName": cluster_name,
+            "databaseName": database_name,
+            "region": region,
+        }
+
+    raise ValueError("unsupported --kind (expected logAnalytics or azureDataExplorer)")
+
+
 def _wait_for_task_state(
     ws,
     *,
@@ -993,6 +1023,287 @@ def build_parser() -> argparse.ArgumentParser:
     sf_delete.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
     sf_delete.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
 
+    data_connections = sub.add_parser(
+        "data-connections", help="Data connection operations (Log Analytics / Azure Data Explorer)"
+    )
+    dc_sub = data_connections.add_subparsers(dest="data_connections_cmd", required=True)
+
+    dc_list = dc_sub.add_parser("list", help="List data connections")
+    dc_list.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    dc_list.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    dc_list.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dc_list.add_argument("--out", default="", help="Output path (default: stdout)")
+    dc_list.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dc_list.add_argument("--get-all", action="store_true", help="Fetch all pages")
+    dc_list.add_argument("--page", type=int, default=0, help="Starting page (skip)")
+    dc_list.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
+    dc_list.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dc_list.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dc_list.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dc_list.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dc_list.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dc_list.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dc_list.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dc_get = dc_sub.add_parser("get", help="Get a data connection by name")
+    dc_get.add_argument("name", help="Data connection name")
+    dc_get.add_argument("--out", default="", help="Output path (default: stdout)")
+    dc_get.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    dc_get.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dc_get.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dc_get.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dc_get.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dc_get.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dc_get.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dc_get.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dc_get.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dc_get.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dc_put = dc_sub.add_parser("put", help="Create or replace a data connection")
+    dc_put.add_argument("name", help="Data connection name")
+    dc_put.add_argument(
+        "--kind",
+        required=True,
+        choices=["logAnalytics", "azureDataExplorer"],
+        help="Data connection kind",
+    )
+    dc_put.add_argument(
+        "--content",
+        default="assets",
+        choices=["assets", "attackSurfaceInsights"],
+        help="Export content scope (default: assets)",
+    )
+    dc_put.add_argument(
+        "--frequency",
+        default="weekly",
+        choices=["daily", "weekly", "monthly"],
+        help="Export frequency (default: weekly)",
+    )
+    dc_put.add_argument(
+        "--frequency-offset",
+        type=int,
+        default=1,
+        help="Offset used by schedule cadence (default: 1)",
+    )
+    dc_put.add_argument("--workspace-id", default="", help="Log Analytics workspace id")
+    dc_put.add_argument("--api-key", default="", help="Log Analytics API key")
+    dc_put.add_argument("--cluster-name", default="", help="Azure Data Explorer cluster name")
+    dc_put.add_argument("--database-name", default="", help="Azure Data Explorer database name")
+    dc_put.add_argument("--region", default="", help="Azure Data Explorer region")
+    dc_put.add_argument("--out", default="", help="Output path (default: stdout)")
+    dc_put.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    dc_put.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dc_put.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dc_put.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dc_put.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dc_put.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dc_put.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dc_put.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dc_put.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dc_put.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dc_validate = dc_sub.add_parser("validate", help="Validate a data connection payload")
+    dc_validate.add_argument(
+        "name",
+        nargs="?",
+        default="",
+        help="Optional data connection name included in validation payload",
+    )
+    dc_validate.add_argument(
+        "--kind",
+        required=True,
+        choices=["logAnalytics", "azureDataExplorer"],
+        help="Data connection kind",
+    )
+    dc_validate.add_argument(
+        "--content",
+        default="assets",
+        choices=["assets", "attackSurfaceInsights"],
+        help="Export content scope (default: assets)",
+    )
+    dc_validate.add_argument(
+        "--frequency",
+        default="weekly",
+        choices=["daily", "weekly", "monthly"],
+        help="Export frequency (default: weekly)",
+    )
+    dc_validate.add_argument(
+        "--frequency-offset",
+        type=int,
+        default=1,
+        help="Offset used by schedule cadence (default: 1)",
+    )
+    dc_validate.add_argument("--workspace-id", default="", help="Log Analytics workspace id")
+    dc_validate.add_argument("--api-key", default="", help="Log Analytics API key")
+    dc_validate.add_argument("--cluster-name", default="", help="Azure Data Explorer cluster name")
+    dc_validate.add_argument("--database-name", default="", help="Azure Data Explorer database name")
+    dc_validate.add_argument("--region", default="", help="Azure Data Explorer region")
+    dc_validate.add_argument("--out", default="", help="Output path (default: stdout)")
+    dc_validate.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Increase verbosity"
+    )
+    dc_validate.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dc_validate.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dc_validate.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dc_validate.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dc_validate.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dc_validate.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dc_validate.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dc_validate.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dc_validate.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dc_delete = dc_sub.add_parser("delete", help="Delete a data connection by name")
+    dc_delete.add_argument("name", help="Data connection name")
+    dc_delete.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    dc_delete.add_argument("--out", default="", help="Output path (default: stdout)")
+    dc_delete.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Increase verbosity"
+    )
+    dc_delete.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dc_delete.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dc_delete.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dc_delete.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dc_delete.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dc_delete.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dc_delete.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dc_delete.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dc_delete.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
     tasks = sub.add_parser("tasks", help="Data-plane task operations")
     tasks_sub = tasks.add_subparsers(dest="tasks_cmd", required=True)
 
@@ -1083,6 +1394,63 @@ def build_parser() -> argparse.ArgumentParser:
     tasks_get.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
     tasks_get.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
     tasks_get.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    tasks_wait = tasks_sub.add_parser("wait", help="Wait for a task to reach a terminal state")
+    tasks_wait.add_argument("task_id", help="Task id")
+    tasks_wait.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    tasks_wait.add_argument("--out", default="", help="Output path (default: stdout)")
+    tasks_wait.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_wait.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_wait.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_wait.add_argument(
+        "--poll-interval-s",
+        type=float,
+        default=5.0,
+        help="Polling interval seconds (default: 5)",
+    )
+    tasks_wait.add_argument(
+        "--timeout-s",
+        type=float,
+        default=900.0,
+        help="Maximum wait seconds (default: 900)",
+    )
+    tasks_wait.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_wait.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_wait.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_wait.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_wait.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    tasks_wait.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_wait.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
 
     tasks_cancel = tasks_sub.add_parser("cancel", help="Cancel a task")
     tasks_cancel.add_argument("task_id", help="Task id")
@@ -1781,6 +2149,115 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("unknown saved-filters command\n")
         return 2
 
+    if args.cmd == "data-connections":
+        import mdeasm
+
+        level = None
+        if getattr(args, "log_level", ""):
+            level = args.log_level
+        elif getattr(args, "verbose", 0) >= 2:
+            level = "DEBUG"
+        elif getattr(args, "verbose", 0) == 1:
+            level = "INFO"
+        if level and hasattr(mdeasm, "configure_logging"):
+            mdeasm.configure_logging(level)
+
+        ws_kwargs = _build_ws_kwargs(args)
+        ws = mdeasm.Workspaces(**ws_kwargs)
+        out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
+
+        if args.data_connections_cmd == "list":
+            payload = ws.list_data_connections(
+                workspace_name=args.workspace_name,
+                skip=args.page,
+                max_page_size=args.max_page_size,
+                get_all=args.get_all,
+                noprint=True,
+            )
+            values = payload.get("value") if isinstance(payload, dict) else None
+            if values is None:
+                values = payload.get("content") if isinstance(payload, dict) else []
+            if not isinstance(values, list):
+                values = []
+
+            if args.format == "json":
+                _write_json(out_path, values, pretty=True)
+            else:
+                lines = []
+                for item in values:
+                    lines.append(
+                        "\t".join(
+                            [
+                                str(item.get("name", "")),
+                                str(item.get("kind", "")),
+                                str(item.get("content", "")),
+                                str(item.get("frequency", "")),
+                                str(item.get("frequencyOffset", "")),
+                                str(item.get("provisioningState", "")),
+                            ]
+                        )
+                    )
+                _write_lines(out_path, lines)
+            return 0
+
+        if args.data_connections_cmd == "get":
+            payload = ws.get_data_connection(args.name, workspace_name=args.workspace_name, noprint=True)
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.data_connections_cmd == "put":
+            try:
+                properties = _build_data_connection_properties(args)
+            except ValueError as e:
+                sys.stderr.write(f"invalid data connection arguments: {e}\n")
+                return 2
+            payload = ws.create_or_replace_data_connection(
+                args.name,
+                kind=args.kind,
+                properties=properties,
+                content=args.content,
+                frequency=args.frequency,
+                frequency_offset=args.frequency_offset,
+                workspace_name=args.workspace_name,
+                noprint=True,
+            )
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.data_connections_cmd == "validate":
+            try:
+                properties = _build_data_connection_properties(args)
+            except ValueError as e:
+                sys.stderr.write(f"invalid data connection arguments: {e}\n")
+                return 2
+            payload = ws.validate_data_connection(
+                kind=args.kind,
+                properties=properties,
+                name=args.name,
+                content=args.content,
+                frequency=args.frequency,
+                frequency_offset=args.frequency_offset,
+                workspace_name=args.workspace_name,
+                noprint=True,
+            )
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.data_connections_cmd == "delete":
+            payload = ws.delete_data_connection(
+                args.name,
+                workspace_name=args.workspace_name,
+                noprint=True,
+            )
+            if args.format == "json":
+                _write_json(out_path, payload, pretty=True)
+            else:
+                _write_lines(out_path, [f"deleted {args.name}"])
+            return 0
+
+        sys.stderr.write("unknown data-connections command\n")
+        return 2
+
     if args.cmd == "tasks":
         import mdeasm
 
@@ -1835,6 +2312,32 @@ def main(argv: list[str] | None = None) -> int:
         if args.tasks_cmd == "get":
             payload = ws.get_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
             _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.tasks_cmd == "wait":
+            try:
+                payload = _wait_for_task_state(
+                    ws,
+                    task_id=args.task_id,
+                    workspace_name=args.workspace_name,
+                    poll_interval_s=args.poll_interval_s,
+                    timeout_s=args.timeout_s,
+                )
+            except TimeoutError as e:
+                sys.stderr.write(f"{e}\n")
+                return 1
+            if args.format == "json":
+                _write_json(out_path, payload, pretty=True)
+            else:
+                line = "\t".join(
+                    [
+                        str(payload.get("id", "")),
+                        str(payload.get("state", "")),
+                        str(payload.get("startedAt", "")),
+                        str(payload.get("completedAt", "")),
+                    ]
+                )
+                _write_lines(out_path, [line])
             return 0
 
         if args.tasks_cmd == "cancel":

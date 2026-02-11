@@ -38,6 +38,7 @@ More details: `API/README.md`
 Auth/setup details (env vars, permissions, common 401/403 troubleshooting): `docs/auth.md`
 Export recipes (client + server task mode): `docs/exports.md`
 Task operations (`mdeasm tasks ...`): `docs/tasks.md`
+Data connections (`mdeasm data-connections ...`): `docs/data_connections.md`
 
 ## Maintainer Loop
 ```bash

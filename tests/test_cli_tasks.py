@@ -64,6 +64,67 @@ def test_cli_tasks_get_cancel_run_download(monkeypatch, capsys):
     assert "downloadUrl" in json.loads(capsys.readouterr().out)
 
 
+def test_cli_tasks_wait_returns_terminal_payload(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._calls = 0
+
+        def get_task(self, task_id, **kwargs):
+            self._calls += 1
+            if self._calls == 1:
+                return {"id": task_id, "state": "running"}
+            return {"id": task_id, "state": "complete", "completedAt": "2026-01-01T00:00:00Z"}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "wait",
+            "abc",
+            "--poll-interval-s",
+            "0.01",
+            "--timeout-s",
+            "1",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["id"] == "abc"
+    assert out["state"] == "complete"
+
+
+def test_cli_tasks_wait_times_out(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_task(self, task_id, **kwargs):
+            return {"id": task_id, "state": "running"}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "wait",
+            "abc",
+            "--poll-interval-s",
+            "0.01",
+            "--timeout-s",
+            "0.01",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 1
+    assert "timed out waiting for task abc" in capsys.readouterr().err
+
+
 def test_cli_tasks_fetch_downloads_artifact(monkeypatch, capsys, tmp_path):
     artifact = tmp_path / "artifact.csv"
 
