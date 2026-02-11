@@ -1,0 +1,53 @@
+name: Scheduled Smoke Doctor Probe
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  doctor-probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TENANT_ID: ${{ secrets.MDEASM_TENANT_ID }}
+      SUBSCRIPTION_ID: ${{ secrets.MDEASM_SUBSCRIPTION_ID }}
+      CLIENT_ID: ${{ secrets.MDEASM_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.MDEASM_CLIENT_SECRET }}
+      WORKSPACE_NAME: ${{ secrets.MDEASM_WORKSPACE_NAME }}
+      EASM_CP_API_VERSION: ${{ secrets.MDEASM_CP_API_VERSION }}
+      EASM_DP_API_VERSION: ${{ secrets.MDEASM_DP_API_VERSION }}
+      EASM_API_VERSION: ${{ secrets.MDEASM_API_VERSION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Doctor probe (skip if secrets are missing)
+        shell: bash
+        run: |
+          missing=()
+          for key in TENANT_ID SUBSCRIPTION_ID CLIENT_ID CLIENT_SECRET; do
+            if [ -z "${!key}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Skipping doctor probe; missing required secrets: ${missing[*]}"
+            exit 0
+          fi
+
+          python -m mdeasm_cli doctor --probe --format json --out -
