@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Ship cycle 8 reliability batch: typed helper exceptions (incremental) plus protected task-artifact auth-fallback coverage | Highest-impact safe gap was reducing broad exception semantics in high-traffic helper paths and locking in fallback behavior for protected artifact URLs | `source .venv/bin/activate && make verify` (pass); focused typed-exception + auth-fallback tests pass | d8e7792 | high | trusted
+- 2026-02-11 | Keep real-tenant protected-URL validation as opt-in follow-up while adding deterministic unit coverage now | Local environment has no Defender EASM credentials or guaranteed protected artifact URL scenario, so mandatory live validation is non-reproducible in this session | `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_with_bearer_for_protected_url` (pass); `python -m mdeasm_cli doctor --format json --out -` exits 1 with expected missing-env diagnostics | d8e7792 | high | trusted
+- 2026-02-11 | Prioritize cycle 8 around typed error semantics and fetch fallback robustness from bounded market scan | Microsoft Defender EASM preview docs + peer ASM API workflows continue to treat task/data-connection automation reliability as baseline | Cycle 8 gap map + source links recorded in `CLONE_FEATURES.md` (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
 - 2026-02-11 | Refresh cycle 7 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep mutable facts, selected/completed task state, and verification evidence synchronized with the latest `main` SHA | Tracker files updated after feature commit `7a3343e`; follow-up tracker push CI run succeeded | 90bf993 | high | trusted
 - 2026-02-11 | Ship cycle 7 reliability batch: `tasks fetch --sha256` and opt-in `data-connections list` integration smoke | Highest-impact safe backlog items were artifact integrity gating and live drift coverage for preview data-connections endpoints | `source .venv/bin/activate && make verify` (pass); focused checksum + integration-smoke tests pass/skip as expected | 7a3343e | high | trusted
 - 2026-02-11 | Keep live external integration checks opt-in with explicit env flags in test suite | Local environment lacks Defender EASM credentials, so mandatory live calls would be non-reproducible; skip-by-default still provides runnable smoke paths for configured tenants | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` -> skipped by default without env | 7a3343e | high | trusted
@@ -95,14 +98,22 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`); still blocked locally because EASM credentials are not configured.
-- Start typed helper exception migration for validation/workspace-not-found/auth paths to reduce broad `Exception` handling.
-- Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview` for data-connections and task endpoints.
+- Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`), gated behind explicit env flags once credentials are available.
+- Continue typed exception migration across remaining broad `Exception` paths (saved filters, discovery/workspace lifecycle, and asset helper validation).
 - Implement stream-first JSON array export mode to avoid in-memory buffering for large `--format json` exports.
 - Add optional command presets/profile files for repeated export/task automation invocations.
+- Add doctor probe matrix checks for assets/tasks/data-connections endpoint compatibility under preview API-version drift.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest pre-cycle-8 runs on `main` were successful before this push | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_data_connections_helpers.py tests/test_cli_tasks.py API/README.md CLONE_FEATURES.md PROJECT_MEMORY.md AGENTS.md` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_data_connections_helpers.py::test_data_connection_helpers_raise_typed_validation_errors tests/test_data_connections_helpers.py::test_data_connection_methods_raise_typed_workspace_and_validation_errors tests/test_data_connections_helpers.py::test_workspaces_init_missing_config_raises_configuration_error tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_with_bearer_for_protected_url` | `....` | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `116 passed, 6 skipped`; compile + CLI smoke commands passed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli doctor --format json --out - >/tmp/mdeasm_doctor_cycle8.json 2>/tmp/mdeasm_doctor_cycle8.err; rc=$?; echo doctor_rc=$rc; test \"$rc\" -eq 1` | `doctor_rc=1` with expected missing required env vars | pass
+- 2026-02-11 | `git push origin main` | pushed commit `d8e7792` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21905006679 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `d8e7792` | pass
 - 2026-02-11 | `git push origin main` | pushed commit `90bf993` to `origin/main` | pass
 - 2026-02-11 | `gh run watch 21904220110 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `90bf993` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
