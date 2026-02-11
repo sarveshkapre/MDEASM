@@ -9,13 +9,55 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 10 planning; remaining backlog after selected shipments)
+Priority order (cycle 11 planning; selected cycle 11 task moved to Implemented below)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
   - Scope: add optional live smoke path confirming protected URL bearer fallback in `tasks fetch`.
-  - Why: closes a remaining real-tenant confidence gap beyond unit tests.
+  - Why: closes the remaining real-tenant confidence gap beyond deterministic unit tests.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **List/get parity for API error payload surfacing in CLI**
+  - Gap class: weak (operability)
+  - Scope: standardize CLI error output to include status + redacted API code/message across command families.
+  - Why: improves incident triage and automation alert quality.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Data-connections live smoke expansion**
+  - Gap class: weak (quality)
+  - Scope: add opt-in integration smoke for `get` and `validate` in addition to `list`.
+  - Why: catches tenant/API drift across more endpoint shapes.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Workflow-level docs smoke checks**
+  - Gap class: weak (DX)
+  - Scope: add CI job that executes high-value `--help`/smoke commands referenced in README and docs.
+  - Why: prevents docs drift and stale command examples.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Legacy helper typed-exception migration (phase 2)**
+  - Gap class: weak (reliability)
+  - Scope: replace remaining broad `Exception` raises in high-use helper paths with typed exceptions.
+  - Why: improves catch behavior in automation and reduces ambiguous failures.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Resource tags CRUD parity**
+  - Gap class: missing (feature parity)
+  - Scope: add helper + CLI list/get/put/delete operations for resource tags.
+  - Why: unlocks governance metadata automation workflows.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+
+- [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
+  - Gap class: weak (reliability)
+  - Scope: add a `3.13` CI lane once dependency compatibility is validated.
+  - Why: keeps runtime compatibility current and reduces upgrade risk.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **CLI completions + concise recipes**
+  - Gap class: weak (DX)
+  - Scope: ship bash/zsh completion scripts and short, copy-paste workflow recipes.
+  - Why: lowers onboarding friction and command syntax mistakes.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **End-to-end command presets (`--profile @file`)**
   - Gap class: differentiator
@@ -23,35 +65,17 @@ Priority order (cycle 10 planning; remaining backlog after selected shipments)
   - Why: reduces repeated long commands and operator error in scheduled jobs.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 2 | Risk 2 | Confidence 2
 
-- [ ] **Resource tags CRUD parity**
-  - Gap class: missing (feature parity)
-  - Scope: add helper + CLI list/get/put/delete operations for resource tags.
-  - Why: enables governance metadata automation.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
-
-- [ ] **CLI completions + concise recipes**
-  - Gap class: weak (DX)
-  - Scope: ship shell completions and short copy/paste recipes for top workflows.
-  - Why: lowers onboarding friction and syntax mistakes.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
-  - Gap class: weak (reliability)
-  - Scope: add `3.13` lane after dependency validation and tune fail-fast strategy.
-  - Why: keeps runtime compatibility current.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **List/get parity for API error payload surfacing in CLI**
-  - Gap class: weak (operability)
-  - Scope: standardize CLI error output to include status + redacted error code/message for all commands.
-  - Why: improves incident triage while protecting sensitive values.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Tracker trust-label validation automation**
   - Gap class: differentiator
   - Scope: add a lightweight check for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
   - Why: keeps autonomous memory auditable and consistent.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
+
+- [ ] **Legacy stdout side-effect cleanup (phase 2)**
+  - Gap class: weak (quality)
+  - Scope: continue migrating helper methods to `noprint`-safe structured returns.
+  - Why: preserves machine-readable CLI/library behavior.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Discovery-group delete retry hardening**
   - Gap class: weak (reliability)
@@ -65,36 +89,6 @@ Priority order (cycle 10 planning; remaining backlog after selected shipments)
   - Why: improves diagnosability of tenant/API drift and throttling patterns.
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
-- [ ] **Legacy helper typed-exception migration (phase 2)**
-  - Gap class: weak (reliability)
-  - Scope: replace remaining broad `Exception` raises in high-use helper paths with typed exceptions.
-  - Why: improves error handling in automation and avoids catch-all ambiguity.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Legacy stdout side-effect cleanup (phase 2)**
-  - Gap class: weak (quality)
-  - Scope: continue migrating helper methods to `noprint`-safe structured returns.
-  - Why: preserves machine-readable CLI/library behavior.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Retry-After date parsing support**
-  - Gap class: weak (reliability)
-  - Scope: handle HTTP-date `Retry-After` headers in addition to integer seconds.
-  - Why: improves backoff correctness with standards-compliant gateways.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Data-connections live smoke expansion**
-  - Gap class: weak (quality)
-  - Scope: add opt-in integration smoke for `get` and `validate` in addition to `list`.
-  - Why: catches tenant/API drift across more endpoint shapes.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Workflow-level docs smoke checks**
-  - Gap class: weak (DX)
-  - Scope: add CI step that executes `--help` paths referenced in top-level docs.
-  - Why: prevents docs drift and broken command examples.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Export throughput benchmarking harness (local)**
   - Gap class: differentiator
   - Scope: add repeatable local benchmark script for streamed ndjson/csv/json paths.
@@ -103,11 +97,46 @@ Priority order (cycle 10 planning; remaining backlog after selected shipments)
 
 - [ ] **CLI UX consistency sweep for `--format lines` outputs**
   - Gap class: weak (DX)
-  - Scope: standardize tabular field order and include stable identifiers first across commands.
+  - Scope: standardize line output field ordering and put stable IDs first across command families.
   - Why: improves grep/awk compatibility and script portability.
   - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
 
+- [ ] **Doctor probe output budget + latency summary**
+  - Gap class: weak (operability)
+  - Scope: include per-target elapsed timing and aggregate status summary in `doctor --probe` output.
+  - Why: improves fast diagnosis of endpoint drift and throttling.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
+
+- [ ] **Task wait failure detail parity**
+  - Gap class: weak (UX)
+  - Scope: include terminal error metadata (`errorCode`, `message`) when task state is failed/canceled.
+  - Why: shortens manual follow-up triage loops.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Saved-filter payload schema validation**
+  - Gap class: weak (quality)
+  - Scope: validate user-supplied saved-filter JSON against expected shape before API submit.
+  - Why: catches malformed payloads locally with clearer diagnostics.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Checkpoint/profile file JSON schema docs**
+  - Gap class: weak (DX)
+  - Scope: document and validate checkpoint/profile file formats with example fixtures.
+  - Why: reduces operator confusion and parsing errors in automation.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
+
+- [ ] **Preview API version canary smoke helper**
+  - Gap class: weak (reliability)
+  - Scope: add a local script/test path that runs low-cost list probes against configurable preview versions.
+  - Why: gives early warning when preview API versions drift.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+
 ## Implemented
+- [x] **Retry-After standards support in helper + CLI artifact retries**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_tasks.py`, `docs/tasks.md`, `docs/exports.md`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_parse_retry_after_seconds_supports_delay_and_http_date tests/test_mdeasm_helpers.py::test_parse_retry_after_seconds_handles_invalid_and_past_values tests/test_cli_tasks.py::test_parse_retry_after_seconds_supports_delay_and_http_date tests/test_cli_tasks.py::test_parse_retry_after_seconds_handles_invalid_and_past_values tests/test_cli_tasks.py::test_cli_tasks_fetch_respects_retry_after_header tests/test_mdeasm_helpers.py::test_workspace_query_helper_retries_and_refreshes_token_on_401 tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_on_transient_status` (pass)
+
 - [x] **Workspace lifecycle parity: `mdeasm workspaces delete` helper + CLI**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/workspaces.md`, `README.md`, `API/README.md`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_export.py`
@@ -429,6 +458,20 @@ Priority order (cycle 10 planning; remaining backlog after selected shipments)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 11):
+  - Microsoft Defender EASM task endpoints continue to center asynchronous exports and task polling/download operations, so resilient retry behavior for artifact fetch remains a baseline reliability requirement.
+  - Peer API guidance (runZero) explicitly documents `429` handling with delayed retries, reinforcing the need to honor server-provided retry timing instead of fixed-only exponential backoff.
+  - HTTP semantics define `Retry-After` as either delay-seconds or HTTP-date, so supporting both formats improves standards compatibility and cross-gateway behavior.
+  - Gap map (cycle 11):
+    - Weak -> closed this cycle: `Retry-After` HTTP-date + delay-seconds support in helper and CLI artifact download retry paths.
+    - Weak -> closed this cycle: regression coverage for retry-after parsing and retry delay behavior in task artifact fetch.
+    - Remaining high-priority weak gaps: live protected-artifact fallback smoke and CLI error payload parity across list/get families.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn Defender EASM tasks operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM `assets:export`: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API guidance (`429 Too Many Requests` + delay handling): https://help.runzero.com/docs/leverage-the-api/
+    - RFC 9110 `Retry-After` semantics: https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 10):
   - Microsoft Defender EASM REST references expose workspace lifecycle operation groups (list/get/create/delete) and continue to position task-oriented export + paging as baseline operational capability.
   - Peer ASM/search APIs continue to optimize for automation-friendly export and cursor-style retrieval, reinforcing low-memory streaming output and safe destructive-operation UX as core operator expectations.
