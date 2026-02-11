@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh cycle 7 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep mutable facts, selected/completed task state, and verification evidence synchronized with the latest `main` SHA | Tracker files updated after feature commit `7a3343e`; follow-up tracker push CI run succeeded | 90bf993 | high | trusted
 - 2026-02-11 | Ship cycle 7 reliability batch: `tasks fetch --sha256` and opt-in `data-connections list` integration smoke | Highest-impact safe backlog items were artifact integrity gating and live drift coverage for preview data-connections endpoints | `source .venv/bin/activate && make verify` (pass); focused checksum + integration-smoke tests pass/skip as expected | 7a3343e | high | trusted
 - 2026-02-11 | Keep live external integration checks opt-in with explicit env flags in test suite | Local environment lacks Defender EASM credentials, so mandatory live calls would be non-reproducible; skip-by-default still provides runnable smoke paths for configured tenants | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` -> skipped by default without env | 7a3343e | high | trusted
 - 2026-02-11 | Prioritize cycle 7 around Defender EASM export/data-connections reliability expectations from bounded market scan | Microsoft Learn docs + peer ASM APIs continue to treat task export and integration endpoints as baseline automation surfaces | Cycle 7 scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
@@ -102,6 +103,8 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `git push origin main` | pushed commit `90bf993` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21904220110 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `90bf993` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | recent CI runs on `main` were successful before cycle 7 push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_tasks.py tests/test_integration_smoke.py` | `All checks passed!` | pass
