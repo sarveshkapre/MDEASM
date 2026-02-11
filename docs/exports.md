@@ -145,7 +145,7 @@ Notes:
 - `--mode server` uses Defender EASM `POST /assets:export` and returns task metadata.
 - `--wait` polls `tasks/{id}` until a terminal state; use `--poll-interval-s` / `--wait-timeout-s` to tune behavior.
 - `--download-on-complete` calls `tasks/{id}:download` after completion and includes that response in output.
-- To download artifact bytes to disk, run `mdeasm tasks fetch <task_id> --artifact-out <path>` (or use `--reference-out` to persist the raw download reference JSON).
+- To download artifact bytes to disk, run `mdeasm tasks fetch <task_id> --artifact-out <path>` (or use `--reference-out` to persist the raw download reference JSON). Use `--retry-on-statuses` to tune transient retry behavior.
 - For direct task operations, see `docs/tasks.md`.
 
 ## Export schema (columns file)
@@ -163,6 +163,24 @@ mdeasm assets export \
   --format csv \
   --out assets.csv \
   --columns-from columns.txt
+```
+
+## Schema drift check against a baseline
+```bash
+source .venv/bin/activate
+
+# Compare current observed columns to a baseline file.
+mdeasm assets schema diff \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --baseline columns.txt \
+  --format json \
+  --out schema-diff.json
+
+# CI-friendly mode: return exit code 3 when drift is detected.
+mdeasm assets schema diff \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --baseline columns.txt \
+  --fail-on-drift
 ```
 
 ## Notes

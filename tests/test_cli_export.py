@@ -250,6 +250,105 @@ def test_cli_assets_schema_json_to_stdout(monkeypatch, capsys):
     assert payload == ["id", "kind"]
 
 
+def test_cli_assets_schema_diff_json_no_drift(monkeypatch, capsys, tmp_path):
+    baseline = tmp_path / "baseline.txt"
+    baseline.write_text("id\nkind\n", encoding="utf-8")
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "x", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "schema",
+            "diff",
+            "--filter",
+            'kind = "domain"',
+            "--baseline",
+            str(baseline),
+            "--format",
+            "json",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["has_drift"] is False
+    assert payload["added"] == []
+    assert payload["removed"] == []
+
+
+def test_cli_assets_schema_diff_lines_fail_on_drift(monkeypatch, capsys, tmp_path):
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(["id", "kind", "domain"]), encoding="utf-8")
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "x", "kind": "domain", "displayName": "example.com"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "schema",
+            "diff",
+            "--filter",
+            'kind = "domain"',
+            "--baseline",
+            str(baseline),
+            "--fail-on-drift",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 3
+    out = capsys.readouterr().out.splitlines()
+    assert "drift=true" in out
+    assert "+ displayName" in out
+    assert "- domain" in out
+
+
+def test_cli_assets_schema_diff_requires_baseline(monkeypatch, capsys):
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "x", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["assets", "schema", "diff", "--filter", 'kind = "domain"', "--out", "-"])
+    assert rc == 2
+    assert "requires --baseline" in capsys.readouterr().err
+
+
 def test_cli_version_flag_exits_cleanly(capsys):
     ver = mdeasm_cli._cli_version()
     with pytest.raises(SystemExit) as e:

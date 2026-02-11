@@ -152,6 +152,96 @@ def test_cli_tasks_fetch_fails_when_download_url_missing(monkeypatch, capsys, tm
     assert "did not contain a usable artifact URL" in capsys.readouterr().err
 
 
+def test_cli_tasks_fetch_retries_on_transient_status(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+    calls = {"count": 0}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 3
+            self._backoff_max_s = 0.0
+            self._dp_token = ""
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/export.csv"}
+
+    class RetryResp:
+        status_code = 503
+        text = "busy"
+
+        def iter_content(self, chunk_size=65536):
+            return iter([])
+
+        def close(self):
+            return None
+
+    class OkResp:
+        status_code = 200
+        text = ""
+
+        def iter_content(self, chunk_size=65536):
+            yield b"ok\n"
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return RetryResp()
+        return OkResp()
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    rc = mdeasm_cli.main(["tasks", "fetch", "abc", "--artifact-out", str(artifact), "--out", "-"])
+    assert rc == 0
+    assert calls["count"] == 2
+    assert artifact.read_bytes() == b"ok\n"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status_code"] == 200
+
+
+def test_cli_tasks_fetch_does_not_retry_non_retryable_status(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+    calls = {"count": 0}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 5
+            self._backoff_max_s = 0.0
+            self._dp_token = ""
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/export.csv"}
+
+    class NotFoundResp:
+        status_code = 404
+        text = "missing"
+
+        def iter_content(self, chunk_size=65536):
+            return iter([])
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls["count"] += 1
+        return NotFoundResp()
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    rc = mdeasm_cli.main(["tasks", "fetch", "abc", "--artifact-out", str(artifact), "--out", "-"])
+    assert rc == 1
+    assert calls["count"] == 1
+    assert "artifact fetch failed" in capsys.readouterr().err
+
+
 def test_cli_assets_export_server_mode_wait_download(monkeypatch, capsys):
     class DummyWS:
         def __init__(self, *args, **kwargs):

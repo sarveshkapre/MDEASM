@@ -26,6 +26,7 @@ _DOWNLOAD_URL_PRIORITY_KEYS = (
     "href",
     "link",
 )
+_DEFAULT_RETRY_ON_STATUSES = (408, 425, 429, 500, 502, 503, 504)
 
 
 def _json_default(obj):
@@ -64,6 +65,24 @@ def _parse_http_timeout(value: str) -> tuple[float, float]:
     if connect_s <= 0 or read_s <= 0:
         raise ValueError("timeouts must be > 0")
     return (connect_s, read_s)
+
+
+def _parse_retry_on_statuses(value: str) -> set[int]:
+    raw = (value or "").strip()
+    if not raw:
+        return set(_DEFAULT_RETRY_ON_STATUSES)
+    out: set[int] = set()
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        code = int(token)
+        if code < 100 or code > 599:
+            raise ValueError(f"invalid HTTP status code: {code}")
+        out.add(code)
+    if not out:
+        raise ValueError("empty retry-on status list")
+    return out
 
 
 def _find_dotenv_path(start: Path | None = None) -> Path | None:
@@ -199,6 +218,7 @@ def _download_url_to_file(
     retry: bool,
     max_retry: int,
     backoff_max_s: float,
+    retry_on_statuses: set[int] | None,
     chunk_size: int,
     overwrite: bool,
     session=None,
@@ -214,10 +234,12 @@ def _download_url_to_file(
 
     attempts = max(int(max_retry or 1), 1) if retry else 1
     chunk_size = max(int(chunk_size or 65536), 1024)
+    retry_on_statuses = set(retry_on_statuses or _DEFAULT_RETRY_ON_STATUSES)
     last_error = ""
     last_status = None
 
     for attempt in range(1, attempts + 1):
+        should_retry_attempt = False
         # Most task downloads return signed URLs that don't need auth headers, but some
         # environments can return protected URLs. Try unsigned first, then bearer-auth fallback.
         auth_modes = [False, True] if auth_token else [False]
@@ -269,11 +291,13 @@ def _download_url_to_file(
                 except Exception:
                     body_snippet = ""
                 last_error = f"http {last_status}: {body_snippet}"
+                should_retry_attempt = bool(last_status in retry_on_statuses)
                 if last_status not in (401, 403) or use_auth:
                     break
 
             except Exception as e:
                 last_error = str(e)
+                should_retry_attempt = True
                 # If network/IO failed there is no value in retrying auth mode inside same attempt.
                 break
             finally:
@@ -283,10 +307,13 @@ def _download_url_to_file(
                     except Exception:
                         pass
 
-        if attempt < attempts:
+        if attempt < attempts and should_retry_attempt:
             sleep_s = min(2 ** (attempt - 1), float(backoff_max_s or 30))
             sleep_s += random.uniform(0, min(0.25, sleep_s / 4 if sleep_s else 0.0))
             time.sleep(sleep_s)
+            continue
+        if not should_retry_attempt:
+            break
 
     raise RuntimeError(
         f"artifact download failed after {attempts} attempts; last_status={last_status}; error={last_error}"
@@ -354,6 +381,50 @@ def _read_columns_file(path: Path) -> list[str]:
             continue
         cols.append(line)
     return cols
+
+
+def _read_schema_baseline(path: Path) -> list[str]:
+    """
+    Read baseline columns from either:
+      - newline-delimited text (`id`, `kind`, ...)
+      - JSON list (`["id","kind",...]`)
+    """
+    raw = path.read_text(encoding="utf-8").strip()
+    if not raw:
+        return []
+
+    as_list: list[str] = []
+    is_json_candidate = path.suffix.lower() == ".json" or raw.startswith("[")
+    if is_json_candidate:
+        try:
+            payload = json.loads(raw)
+            if isinstance(payload, list):
+                as_list = [str(item).strip() for item in payload if str(item).strip()]
+            else:
+                raise ValueError("baseline json must be a list of column names")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"invalid baseline json: {e}") from e
+    else:
+        as_list = _read_columns_file(path)
+
+    # Dedup while preserving input order.
+    return _parse_columns_arg(as_list)
+
+
+def _schema_diff(observed: list[str], baseline: list[str]) -> dict:
+    observed_set = set(observed)
+    baseline_set = set(baseline)
+    added = sorted(observed_set - baseline_set)
+    removed = sorted(baseline_set - observed_set)
+    unchanged = sorted(observed_set & baseline_set)
+    return {
+        "has_drift": bool(added or removed),
+        "added": added,
+        "removed": removed,
+        "unchanged": unchanged,
+        "observed_count": len(observed_set),
+        "baseline_count": len(baseline_set),
+    }
 
 
 def _read_filter_text(text: str) -> str:
@@ -1206,6 +1277,14 @@ def build_parser() -> argparse.ArgumentParser:
     tasks_fetch.add_argument(
         "--backoff-max-s", type=float, default=None, help="Max backoff seconds"
     )
+    tasks_fetch.add_argument(
+        "--retry-on-statuses",
+        default="408,425,429,500,502,503,504",
+        help=(
+            "Comma-separated HTTP statuses treated as retryable for artifact download "
+            "(default: 408,425,429,500,502,503,504)"
+        ),
+    )
 
     assets = sub.add_parser("assets", help="Asset inventory operations")
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
@@ -1381,6 +1460,12 @@ def build_parser() -> argparse.ArgumentParser:
         "schema", help="Print observed columns for a query (union-of-keys)"
     )
     schema.add_argument(
+        "schema_action",
+        nargs="?",
+        choices=["diff"],
+        help="Optional action: `diff` compares observed columns against a baseline file",
+    )
+    schema.add_argument(
         "--filter",
         required=True,
         help="MDEASM query filter (string) or @path (or @- for stdin)",
@@ -1400,6 +1485,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
     )
     schema.add_argument("--out", default="", help="Output path (default: stdout)")
+    schema.add_argument(
+        "--baseline",
+        default="",
+        help="Schema diff mode: baseline file path (newline columns or JSON list)",
+    )
+    schema.add_argument(
+        "--fail-on-drift",
+        action="store_true",
+        help="Schema diff mode: exit with status 3 when drift is detected",
+    )
     schema.add_argument(
         "--max-assets",
         type=int,
@@ -1784,6 +1879,11 @@ def main(argv: list[str] | None = None) -> int:
                 if args.backoff_max_s is not None
                 else float(getattr(ws, "_backoff_max_s", 30))
             )
+            try:
+                retry_on_statuses = _parse_retry_on_statuses(args.retry_on_statuses)
+            except Exception as e:
+                sys.stderr.write(f"invalid --retry-on-statuses: {e}\n")
+                return 2
             session = getattr(ws, "_session", None)
             auth_token = str(getattr(ws, "_dp_token", "") or "")
 
@@ -1795,6 +1895,7 @@ def main(argv: list[str] | None = None) -> int:
                     retry=retry,
                     max_retry=max_retry,
                     backoff_max_s=backoff_max_s,
+                    retry_on_statuses=retry_on_statuses,
                     chunk_size=args.chunk_size,
                     overwrite=bool(args.overwrite),
                     session=session,
@@ -2039,6 +2140,34 @@ def main(argv: list[str] | None = None) -> int:
 
             cols = sorted({k for r in rows for k in r.keys()})
             out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            if args.schema_action == "diff":
+                if not args.baseline:
+                    sys.stderr.write("schema diff mode requires --baseline <path>\n")
+                    return 2
+                try:
+                    baseline_cols = _read_schema_baseline(Path(args.baseline).expanduser())
+                except Exception as e:
+                    sys.stderr.write(f"invalid --baseline: {e}\n")
+                    return 2
+
+                payload = _schema_diff(cols, baseline_cols)
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    lines: list[str] = []
+                    lines.append(f"drift={str(payload['has_drift']).lower()}")
+                    lines.append(f"observed_count={payload['observed_count']}")
+                    lines.append(f"baseline_count={payload['baseline_count']}")
+                    for col in payload["added"]:
+                        lines.append(f"+ {col}")
+                    for col in payload["removed"]:
+                        lines.append(f"- {col}")
+                    _write_lines(out_path, lines)
+
+                if args.fail_on_drift and payload["has_drift"]:
+                    return 3
+                return 0
+
             if args.format == "json":
                 _write_json(out_path, cols, pretty=True)
             else:
