@@ -9,66 +9,123 @@
 ## Candidate Features To Do
 Next Up (keep deduped)
 - [ ] **Security hardening: centralized secret redaction in exceptions/logging**
+  - Gap class: weak (quality)
   - Scope: scrub bearer tokens/client secrets from raised exception text and CLI stderr output; add focused tests.
   - Why: protects logs and terminals in automation.
   - Score: Impact 4 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Export reliability: resumable paging checkpoints**
-  - Scope: add `--resume-from` and checkpoint writing for paginated export mode.
-  - Why: prevents restart-from-zero on interrupted long exports.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 2 | Confidence 3
-
 - [ ] **Data connections management (`mdeasm data-connections ...`)**
+  - Gap class: missing (feature parity)
   - Scope: list/create/delete data connections (ADX/Log Analytics) with validation.
   - Why: makes downstream SIEM export setup reproducible.
   - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 2
 
-- [ ] **Export ordering control (`orderby`) for deterministic pages**
-  - Scope: add CLI flag for stable ordering in client-side export mode.
-  - Why: improves reproducibility and incremental sync behavior.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+- [ ] **Task artifact retrieval helper (`tasks fetch`)**
+  - Gap class: weak (parity)
+  - Scope: follow task download references and fetch artifact bytes to a local file path with retries/timeouts.
+  - Why: current `tasks download` only returns references; operators still need manual fetch logic.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 3
 
-- [ ] **CLI completions and command examples**
-  - Scope: generate bash/zsh completions and add copy-paste recipes.
-  - Why: improves operator UX and onboarding speed.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
+- [ ] **Schema utilities: compare current columns vs baseline file**
+  - Gap class: weak (DX)
+  - Scope: add `mdeasm assets schema diff --baseline <file>`.
+  - Why: detects downstream-breaking schema drift early.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
 
 - [ ] **Refactor: typed exceptions for helper API failures**
+  - Gap class: weak (maintainability)
   - Scope: replace broad `Exception` raises with narrower error classes.
   - Why: safer automation and cleaner failure handling in callers.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
 - [ ] **Refactor: remove or gate legacy `print()` paths for library usage**
+  - Gap class: weak (library UX)
   - Scope: add `noprint`/structured return options for noisy helper methods.
   - Why: avoids stdout side effects in script and pipeline usage.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
 - [ ] **Performance: backoff jitter + retry policy by status code**
+  - Gap class: weak (resilience)
   - Scope: add jitter and configurable retry-on status map.
   - Why: improves behavior under throttling and transient failures.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Schema utilities: compare current columns vs baseline file**
-  - Scope: add `mdeasm assets schema diff --baseline <file>`.
-  - Why: detects downstream-breaking schema drift early.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
+- [ ] **CLI completions and command examples**
+  - Gap class: weak (DX)
+  - Scope: generate bash/zsh completions and add copy-paste recipes.
+  - Why: improves operator UX and onboarding speed.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **Developer DX: add `make`/task runner aliases for common checks**
+  - Gap class: weak (DX)
   - Scope: standardized commands for lint/test/compile/smoke.
   - Why: reduces command drift and local friction.
   - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **Promote remaining upstream TODOs into scoped features**
+  - Gap class: missing (debt retirement)
   - Scope: resource tags CRUD, workspace deletion, discovery-group deletion retry path.
   - Why: converts legacy TODO debt into tracked deliverables.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
+- [ ] **CI hardening: add scheduled smoke lane with optional integration credentials**
+  - Gap class: weak (reliability)
+  - Scope: schedule a non-blocking smoke workflow, run `mdeasm doctor --probe` with secrets when available.
+  - Why: catches auth/version drift earlier than ad-hoc manual checks.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Integration test: task export artifact lifecycle**
+  - Gap class: weak (quality)
+  - Scope: add opt-in integration test covering `assets:export -> tasks get -> tasks download`.
+  - Why: closes a production risk around task payload shape drift.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
 - [ ] **Packaging/docs cleanup for historical script aliases**
+  - Gap class: weak (DX)
   - Scope: document deprecation timeline for `retreive_*` typo alias and keep backward compatibility.
   - Why: reduce user confusion while avoiding abrupt breakage.
   - Score: Impact 2 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 4
 
+- [ ] **CLI: filter/orderby presets via named local profiles**
+  - Gap class: differentiator
+  - Scope: local profile file for reusable export/task command presets.
+  - Why: reduces repeated long command lines in scheduled jobs.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Performance: stream-first JSON output mode for large client exports**
+  - Gap class: weak (parity)
+  - Scope: optional JSON array streaming writer to avoid holding all rows in memory.
+  - Why: improves memory profile for large inventory snapshots.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Docs split: keep README within 1-2 screens and move deep recipes under `docs/`**
+  - Gap class: weak (DX)
+  - Scope: tighten README and link richer operational playbooks.
+  - Why: improves first-run comprehension while keeping docs maintainable.
+  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 5
+
+- [ ] **Trust tagging automation for tracker updates**
+  - Gap class: differentiator
+  - Scope: lightweight script/check to validate trust labels and evidence formatting in `PROJECT_MEMORY.md`.
+  - Why: keeps autonomous maintenance logs consistent and auditable.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
+
 ## Implemented
+- [x] **Client export resume checkpoints (`--resume-from`, `--checkpoint-out`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API` (pass); `source .venv/bin/activate && python -m mdeasm_cli --version` (pass)
+
+- [x] **Deterministic client-side export ordering (`--orderby`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q` (pass)
+
+- [x] **Asset API compatibility + reliability bugfix sweep**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q` (pass)
+
 - [x] **Server-side asset export mode (`mdeasm assets export --mode server`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_tasks.py`
@@ -307,6 +364,20 @@ Next Up (keep deduped)
       - Tenable ASM API changelog (export/integration lifecycle): https://developer.tenable.com/changelog/asm-export-updates
       - Censys changelog (ASM API/task-related enhancements): https://docs.censys.com/changelog/new-data-in-asm-seeds-api
       - Censys changelog (ASM Cloud Connectors API): https://docs.censys.com/changelog/announcing-the-cloud-connectors-api
+  - Market scan refresh (untrusted; 2026-02-11 cycle 2):
+    - Microsoft Defender EASM asset list and task list references document `filter`, `orderby`, `skip`, `maxpagesize`, and mark-style continuation tokens, so deterministic ordering and resumable paging are baseline parity expectations.
+    - Censys and Shodan API guidance both expose cursor-based continuation patterns for high-volume search/export workflows; checkpoint/resume UX is expected in production ASM automation.
+    - Gap map (current repo vs market expectations):
+      - Missing: centralized secret redaction in raised exception text, task artifact fetch helper (`tasks fetch`).
+      - Weak: resumable client export checkpoints (now delivered), deterministic ordering for resumable exports (now delivered), payload-shape compatibility for list responses (`content` vs `value`) (now delivered).
+      - Parity: task lifecycle CLI (`list/get/cancel/run/download`), server-side export task kickoff/wait/download metadata.
+      - Differentiator opportunities: local export profile presets and tracker trust-label validation automation.
+    - Sources reviewed (untrusted):
+      - Microsoft Learn: assets list (`filter`, `orderby`, `skip`, `maxpagesize`, `mark`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/list-asset-resource?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Microsoft Learn: tasks list (`filter`, `orderby`, `skip`, `maxpagesize`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks/list-task?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Microsoft Learn: assets export task kickoff (`POST /assets:export`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Censys Search API v2 pagination (`cursor`): https://docs.censys.com/reference/v2-globaldata-search-query
+      - Shodan API paging guidance (`search_cursor`): https://help.shodan.io/the-basics/search-query-fundamentals
 
 ## Notes
 - This file is maintained by the autonomous clone loop.

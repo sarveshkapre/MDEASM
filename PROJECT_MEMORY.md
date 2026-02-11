@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Add client export resume checkpoints (`--resume-from`, `--checkpoint-out`) and deterministic ordering (`--orderby`) | Long-running ASM exports need reliable continuation semantics and stable ordering to be automation-safe | `source .venv/bin/activate && ruff check .` (pass); `source .venv/bin/activate && pytest -q` (pass); `source .venv/bin/activate && python -m compileall API` (pass) | 97be9c2 | high | trusted
+- 2026-02-11 | Harden asset list compatibility for preview payload drift (`content` vs `value`) and fix `create_workspace` + `create_facet_filter(asset_id=...)` reliability bugs | Preview APIs can drift and helper reliability bugs can block core workflows despite valid configuration | Added regression tests in `tests/test_mdeasm_helpers.py`; full lint/test/compile pass | 97be9c2 | high | trusted
+- 2026-02-11 | Prioritize resume/orderby parity from bounded market scan | Microsoft Defender EASM plus peer ASM APIs document cursor/mark + ordering semantics, making resumable deterministic exports baseline expectation | Microsoft Learn assets/tasks references and Censys/Shodan pagination docs captured in `CLONE_FEATURES.md` | n/a | medium | untrusted
 - 2026-02-11 | Refresh autonomous trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after delivery | Keep backlog, decisions, and mutable repo facts aligned with shipped behavior and verification evidence | Tracker files updated with delivered items, remaining backlog, CI evidence, and mutable fact timestamp | 4f6db34 | high | trusted
 - 2026-02-11 | Add server-side export task mode (`mdeasm assets export --mode server`) with optional wait/download flow | Large inventories are better handled by async server-side exports; this reduces client memory pressure and aligns with modern ASM export UX | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli assets export --help >/dev/null` (pass) | e6fabeb | high | trusted
 - 2026-02-11 | Add task lifecycle operations in helper + CLI (`mdeasm tasks list/get/cancel/run/download`) | Long-running operations need first-class observability/control for production automation reliability | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli tasks --help >/dev/null` (pass) | e6fabeb | high | trusted
@@ -51,6 +54,8 @@
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
+- 2026-02-11 | `create_workspace()` could raise `no region` even when `EASM_REGION` was set to a valid value | Region validation mixed fallback and validation in a single `if/else`, causing the valid fallback path to still raise | Split fallback (`if not region`) from validation (`if region not in _easm_regions`) and add regression coverage | Keep env fallback + validation checks separated in control flow and cover both with tests | 97be9c2 | high
+- 2026-02-11 | `create_facet_filter(asset_id=...)` could raise before reaching the `asset_id` path | Function always validated `asset_list_name` first, even when only `asset_id` was supplied | Branch validation by mode (`asset_list_name` vs `asset_id`) and add regression coverage | Add tests for every mutually-exclusive argument path before refactoring validation blocks | 97be9c2 | high
 - 2026-02-10 | Facet filters for certain list attributes could collapse into `(None, None, ...)` keys | Single-element facet specs in `_facet_filters` were written as `(\"cookieName\")` which is a string in Python, not a tuple, so code iterated characters instead of facet paths | Add trailing commas for single-element tuples and add a focused unit test that asserts the expected tuple keys | Add regression tests for any special-case parsing table (facet specs, schema maps) and ensure single-element tuples use trailing commas | 45c272d | high
 - 2026-02-10 | CLI `mdeasm assets export` could emit non-JSON/CSV text before the payload | `Workspaces.__init__` calls `get_workspaces()` which used `print()` to stdout when `WORKSPACE_NAME` was unset and multiple workspaces existed | Emit guidance to stderr instead of stdout; add regression test for stdout cleanliness | Keep stdout-clean tests for any codepath reachable before the CLI writes machine-readable output | b937478 | high
 - 2026-02-10 | CLI exports to stdout could produce invalid JSON/CSV | `get_workspace_assets()` printed status/progress to stdout while the CLI also wrote machine-readable output to stdout | Add `status_to_stderr`/`quiet` knobs and make the CLI send status to stderr; add stdout-mode regression tests | Keep stdout-mode tests for CLI and keep status output configurable in helper methods | dc5b59d | high
@@ -61,12 +66,20 @@
 
 ## Next Prioritized Tasks
 - Add centralized secret redaction for exception/log payloads to prevent credential leakage in shared logs.
-- Add resumable paging checkpoints (`--resume-from`) for client-side exports.
-- Add task artifact downloader behavior validation with a real tenant (SAS/blob fetch shape can vary by API version/tenant).
+- Add task artifact downloader behavior validation with a real tenant (SAS/blob fetch shape can vary by API version/tenant); blocked locally because no EASM credentials are configured.
+- Add first-class task artifact fetch command (`mdeasm tasks fetch`) that follows the download reference and writes bytes to disk.
 - Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview`.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh run watch 21899599038 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `97be9c2` | pass
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 30 --json number,title,author,state,url` | repository has issues disabled | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 10 --json databaseId,headSha,status,conclusion,name,workflowName,createdAt,updatedAt,url` | recent CI runs all `success` on `main` | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q` | `80 passed, 4 skipped` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m compileall API` | compiled `API/mdeasm.py` and `API/mdeasm_cli.py` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli --version` | `python -m mdeasm_cli 1.4.0` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli doctor --format json --out -` | returned expected missing-env diagnostics (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`) with exit code 1 | pass
 - 2026-02-11 | `gh run watch 21898556772 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `4f6db34` | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
 - 2026-02-11 | `source .venv/bin/activate && pytest` | `73 passed, 4 skipped in 0.33s` | pass
