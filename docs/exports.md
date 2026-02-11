@@ -85,6 +85,46 @@ mdeasm assets export \
   --columns id,kind,displayName,domain,firstSeen,lastSeen
 ```
 
+## Deterministic ordering for resumable exports (client mode)
+```bash
+source .venv/bin/activate
+
+mdeasm assets export \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --format ndjson \
+  --out hosts.ndjson \
+  --get-all \
+  --orderby 'id asc' \
+  --no-facet-filters
+```
+
+## Resume interrupted client exports
+```bash
+source .venv/bin/activate
+
+# During a long run, write a checkpoint after each fetched page.
+mdeasm assets export \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --format ndjson \
+  --out hosts.ndjson \
+  --get-all \
+  --orderby 'id asc' \
+  --checkpoint-out .mdeasm-export-checkpoint.json \
+  --no-facet-filters
+
+# Resume from a saved checkpoint file:
+mdeasm assets export \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --format ndjson \
+  --out hosts.ndjson \
+  --get-all \
+  --orderby 'id asc' \
+  --resume-from @.mdeasm-export-checkpoint.json \
+  --no-facet-filters
+```
+
+`--resume-from` also accepts a direct integer page (`--resume-from 25`) or a mark token (`--resume-from mark:<token>`).
+
 ## Server-side asset export task (recommended for large inventories)
 ```bash
 source .venv/bin/activate
@@ -132,6 +172,7 @@ mdeasm assets export \
   - `--format ndjson` streams rows as they are fetched (constant memory) when `--no-facet-filters` is set.
   - `--format csv` can stream rows when columns are explicit (`--columns` / `--columns-from`) and `--no-facet-filters` is set. If columns are not explicit, the CLI buffers rows to infer a union-of-keys header.
 - For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.
+- For stable, resumable client-side exports, use `--orderby` plus `--checkpoint-out`/`--resume-from`.
 - For long-running exports, consider `--progress-every-pages 25` (status is printed to stderr).
 - For reliability tuning without code edits, see `mdeasm assets export --help` for: `--api-version` (or `--cp-api-version`/`--dp-api-version`), `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
 - `--http-timeout` examples: `--http-timeout 120` (connect=10, read=120) or `--http-timeout 5,120`.

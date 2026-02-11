@@ -474,3 +474,161 @@ def test_task_endpoints_use_expected_routes():
         ("post", "tasks/task-123:run"),
         ("post", "tasks/task-123:download"),
     ]
+
+
+def test_get_workspace_assets_supports_value_payload_orderby_mark_and_progress():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+    progress = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append(kwargs)
+        return Resp(
+            {
+                "totalElements": 1,
+                "value": [{"id": "domain$$example.com", "kind": "domain"}],
+                "last": True,
+                "number": 0,
+            }
+        )
+
+    def fake_parse_asset(self, asset, **_kwargs):
+        parsed = mdeasm.Asset()
+        parsed.id = asset.get("id")
+        parsed.kind = asset.get("kind")
+        return parsed
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    with mock.patch.object(mdeasm.Asset, "__parse_workspace_assets__", fake_parse_asset):
+        ws.get_workspace_assets(
+            query_filter='kind = "domain"',
+            asset_list_name="assetList",
+            get_all=True,
+            auto_create_facet_filters=False,
+            no_track_time=True,
+            status_to_stderr=True,
+            orderby="id asc",
+            mark="*",
+            progress_callback=lambda state: progress.append(state),
+        )
+
+    assert len(ws.assetList.assets) == 1
+    assert calls[0]["params"]["orderby"] == "id asc"
+    assert calls[0]["params"]["mark"] == "*"
+    assert "skip" not in calls[0]["params"]
+    assert progress[-1]["last"] is True
+    assert progress[-1]["assets_emitted"] == 1
+
+
+def test_create_workspace_uses_default_region_when_argument_missing():
+    ws = _new_ws()
+    ws._subscription_id = "sub0"
+    ws._resource_group = "rg0"
+    ws._region = "eastus"
+    ws._default_workspace_name = "ws0"
+    ws._workspaces = mdeasm.requests.structures.CaseInsensitiveDict()
+    captured = {}
+
+    class Resp:
+        def json(self):
+            return {
+                "name": "ws0",
+                "properties": {"dataPlaneEndpoint": "https://dp.example/"},
+                "id": "/subscriptions/sub0/resourceGroups/rg0/providers/Microsoft.Easm/workspaces/ws0",
+            }
+
+    def fake_verify_workspace(_workspace_name):
+        return False
+
+    def fake_query_helper(*_args, **kwargs):
+        captured.update(kwargs)
+        return Resp()
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    out = ws.create_workspace(resource_group_name="rg0", region=None, workspace_name="ws0")
+    assert "ws0" in out
+    assert captured["payload"]["location"] == "eastus"
+
+
+def test_stream_workspace_assets_supports_value_payload_orderby_mark():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append(kwargs)
+        return Resp(
+            {
+                "totalElements": 1,
+                "value": [{"id": "domain$$example.com", "kind": "domain"}],
+                "last": True,
+                "number": 0,
+            }
+        )
+
+    def fake_parse_asset(self, asset, **_kwargs):
+        parsed = mdeasm.Asset()
+        parsed.id = asset.get("id")
+        parsed.kind = asset.get("kind")
+        return parsed
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    with mock.patch.object(mdeasm.Asset, "__parse_workspace_assets__", fake_parse_asset):
+        rows = list(
+            ws.stream_workspace_assets(
+                query_filter='kind = "domain"',
+                get_all=True,
+                no_track_time=True,
+                status_to_stderr=True,
+                orderby="id asc",
+                mark="*",
+            )
+        )
+
+    assert rows[0]["id"] == "domain$$example.com"
+    assert calls[0]["params"]["orderby"] == "id asc"
+    assert calls[0]["params"]["mark"] == "*"
+    assert "skip" not in calls[0]["params"]
+
+
+def test_create_facet_filter_accepts_asset_id_only():
+    ws = _new_ws()
+    asset_id = "domain$$example.com"
+    setattr(ws, asset_id, mdeasm.Asset())
+    captured = {}
+
+    def fake_facet_helper(*_args, **kwargs):
+        captured.update(kwargs)
+        return None
+
+    ws.__facet_filter_helper__ = fake_facet_helper  # type: ignore[attr-defined]
+
+    ws.create_facet_filter(asset_id=asset_id)
+    assert captured["asset_id"] == asset_id

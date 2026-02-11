@@ -46,6 +46,17 @@ def test_parse_http_timeout_invalid(value):
         mdeasm_cli._parse_http_timeout(value)
 
 
+def test_parse_resume_from_variants(tmp_path):
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text(
+        json.dumps({"next_page": 12, "next_mark": "m123"}, sort_keys=True), encoding="utf-8"
+    )
+    assert mdeasm_cli._parse_resume_from("12") == {"page": 12}
+    assert mdeasm_cli._parse_resume_from("mark:m123") == {"mark": "m123"}
+    assert mdeasm_cli._parse_resume_from("opaque-token") == {"mark": "opaque-token"}
+    assert mdeasm_cli._parse_resume_from(f"@{checkpoint}") == {"page": 12, "mark": "m123"}
+
+
 def test_cli_assets_export_json_writes_file(tmp_path, monkeypatch):
     out = tmp_path / "assets.json"
     captured = {}
@@ -756,6 +767,107 @@ def test_cli_assets_export_stdout_dash_and_status_to_stderr(monkeypatch, capsys)
 
     payload = json.loads(capsys.readouterr().out)
     assert payload == [{"id": "domain$$example.com", "kind": "domain"}]
+
+
+def test_cli_assets_export_resume_checkpoint_and_orderby(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    checkpoint = tmp_path / "checkpoint.json"
+    captured = {}
+
+    class DummyAssetList:
+        def as_dicts(self):
+            return [{"id": "domain$$example.com", "kind": "domain"}]
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            captured["get_kwargs"] = dict(kwargs)
+            cb = kwargs.get("progress_callback")
+            if callable(cb):
+                cb(
+                    {
+                        "next_page": 11,
+                        "next_mark": "mark-11",
+                        "pages_completed": 4,
+                        "assets_emitted": 100,
+                        "total_elements": 1000,
+                        "last": False,
+                    }
+                )
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+            "--resume-from",
+            "7",
+            "--checkpoint-out",
+            str(checkpoint),
+            "--orderby",
+            "id asc",
+        ]
+    )
+    assert rc == 0
+    assert captured["get_kwargs"]["page"] == 7
+    assert captured["get_kwargs"]["orderby"] == "id asc"
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert payload["next_page"] == 11
+    assert payload["next_mark"] == "mark-11"
+
+
+def test_cli_assets_export_stream_resume_from_checkpoint_file(tmp_path, monkeypatch):
+    out = tmp_path / "assets.ndjson"
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text(
+        json.dumps({"next_page": 13, "next_mark": "token-13"}, sort_keys=True), encoding="utf-8"
+    )
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def stream_workspace_assets(self, **kwargs):
+            captured["stream_kwargs"] = dict(kwargs)
+            yield {"id": "domain$$example.com", "kind": "domain"}
+
+        def get_workspace_assets(self, **kwargs):
+            raise AssertionError("get_workspace_assets should not be used for streaming ndjson")
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "ndjson",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+            "--resume-from",
+            f"@{checkpoint}",
+        ]
+    )
+    assert rc == 0
+    assert captured["stream_kwargs"]["page"] == 13
+    assert captured["stream_kwargs"]["mark"] == "token-13"
 
 
 def test_cli_assets_export_wires_max_assets_and_progress(monkeypatch):

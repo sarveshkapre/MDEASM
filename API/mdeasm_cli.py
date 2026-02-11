@@ -267,6 +267,57 @@ def _parse_columns_arg(values: list[str] | None) -> list[str]:
     return deduped
 
 
+def _parse_resume_from(value: str) -> dict:
+    """
+    Parse `--resume-from` for client export mode.
+
+    Accepted forms:
+    - integer page number (for `skip` paging): `25`
+    - mark/cursor token: `mark:<token>` or `<token>`
+    - checkpoint file: `@/path/to/checkpoint.json`
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return {}
+
+    if raw.startswith("@"):
+        src = raw[1:].strip()
+        if not src:
+            raise ValueError("empty checkpoint source")
+        text = Path(src).expanduser().read_text(encoding="utf-8").strip()
+        if not text:
+            raise ValueError(f"empty checkpoint file: {src}")
+        raw = text
+
+    if raw.startswith("{"):
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"invalid checkpoint json: {e}") from e
+        if not isinstance(payload, dict):
+            raise ValueError("checkpoint json must be an object")
+        out = {}
+        if payload.get("next_page") is not None and str(payload.get("next_page")).strip() != "":
+            out["page"] = max(int(payload["next_page"]), 0)
+        if payload.get("next_mark") is not None and str(payload.get("next_mark")).strip() != "":
+            out["mark"] = str(payload["next_mark"]).strip()
+        if not out:
+            raise ValueError("checkpoint did not contain next_page or next_mark")
+        return out
+
+    if raw.lower().startswith("mark:"):
+        mark = raw.split(":", 1)[1].strip()
+        if not mark:
+            raise ValueError("empty mark token")
+        return {"mark": mark}
+
+    try:
+        return {"page": max(int(raw), 0)}
+    except ValueError:
+        # Treat non-integer values as opaque mark/cursor tokens.
+        return {"mark": raw}
+
+
 def _build_ws_kwargs(args) -> dict:
     ws_kwargs = {}
     if getattr(args, "workspace_name", ""):
@@ -988,6 +1039,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Server export mode: optional orderby expression",
     )
     export.add_argument(
+        "--orderby",
+        default="",
+        help="Client export mode: optional orderby expression",
+    )
+    export.add_argument(
+        "--resume-from",
+        default="",
+        help="Client export mode: resume value (`<page>`, `mark:<token>`, or `@checkpoint.json`)",
+    )
+    export.add_argument(
+        "--checkpoint-out",
+        default="",
+        help="Client export mode: write checkpoint JSON after each fetched page",
+    )
+    export.add_argument(
         "--wait",
         action="store_true",
         help="Server export mode: poll task status until terminal state",
@@ -1546,6 +1612,37 @@ def main(argv: list[str] | None = None) -> int:
                 _write_json(out_path, output_payload, pretty=bool(args.pretty))
                 return 0
 
+            try:
+                resume_state = _parse_resume_from(args.resume_from)
+            except Exception as e:
+                sys.stderr.write(f"invalid --resume-from: {e}\n")
+                return 2
+            resume_page = args.page
+            if "page" in resume_state:
+                resume_page = int(resume_state["page"])
+            resume_mark = str(resume_state.get("mark") or "").strip()
+
+            progress_callback = None
+            if args.checkpoint_out:
+                checkpoint_path = Path(args.checkpoint_out)
+
+                def _checkpoint_cb(state):
+                    payload = {
+                        "next_page": state.get("next_page"),
+                        "next_mark": state.get("next_mark"),
+                        "pages_completed": state.get("pages_completed"),
+                        "assets_emitted": state.get("assets_emitted"),
+                        "total_elements": state.get("total_elements"),
+                        "last": bool(state.get("last")),
+                    }
+                    _atomic_write_text(
+                        checkpoint_path,
+                        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+
+                progress_callback = _checkpoint_cb
+
             if args.format == "csv" and not columns:
                 columns = []
 
@@ -1556,7 +1653,7 @@ def main(argv: list[str] | None = None) -> int:
             ):
                 stream_kwargs = dict(
                     query_filter=query_filter,
-                    page=args.page,
+                    page=resume_page,
                     max_page_size=args.max_page_size,
                     max_page_count=args.max_page_count,
                     get_all=args.get_all,
@@ -1564,7 +1661,12 @@ def main(argv: list[str] | None = None) -> int:
                     # Keep machine-readable stdout clean; status/progress goes to stderr.
                     status_to_stderr=True,
                     max_assets=args.max_assets or 0,
+                    orderby=args.orderby,
                 )
+                if resume_mark:
+                    stream_kwargs["mark"] = resume_mark
+                if progress_callback is not None:
+                    stream_kwargs["progress_callback"] = progress_callback
                 if args.progress_every_pages and args.progress_every_pages > 0:
                     stream_kwargs["track_every_N_pages"] = args.progress_every_pages
                 else:
@@ -1583,7 +1685,7 @@ def main(argv: list[str] | None = None) -> int:
             get_kwargs = dict(
                 query_filter=query_filter,
                 asset_list_name=args.asset_list_name,
-                page=args.page,
+                page=resume_page,
                 max_page_size=args.max_page_size,
                 max_page_count=args.max_page_count,
                 get_all=args.get_all,
@@ -1592,7 +1694,12 @@ def main(argv: list[str] | None = None) -> int:
                 # Keep machine-readable stdout clean; status/progress goes to stderr.
                 status_to_stderr=True,
                 max_assets=args.max_assets or 0,
+                orderby=args.orderby,
             )
+            if resume_mark:
+                get_kwargs["mark"] = resume_mark
+            if progress_callback is not None:
+                get_kwargs["progress_callback"] = progress_callback
             if args.progress_every_pages and args.progress_every_pages > 0:
                 get_kwargs["track_every_N_pages"] = args.progress_every_pages
             else:

@@ -60,6 +60,22 @@ def configure_logging(level: str | int | None = None, *, force: bool = False) ->
     )
 
 
+def _response_items(payload):
+    """
+    Return list payload rows across known API shapes.
+
+    Defender EASM preview endpoints have used both `content` and `value` for list results.
+    """
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("content")
+    if items is None:
+        items = payload.get("value")
+    if isinstance(items, list):
+        return items
+    return []
+
+
 class Workspaces:
     _state_map = requests.structures.CaseInsensitiveDict(
         {
@@ -393,8 +409,9 @@ class Workspaces:
         date_range_start="",
         date_range_end="",
     ):
+        payload = response_object.json()
         if asset_list_name:
-            for asset in response_object.json()["content"]:
+            for asset in _response_items(payload):
                 getattr(self, asset_list_name).__add_asset__(
                     Asset().__parse_workspace_assets__(
                         asset,
@@ -406,7 +423,7 @@ class Workspaces:
                 )
         elif asset_id:
             getattr(self, asset_id).__parse_workspace_assets__(
-                response_object.json(),
+                payload,
                 get_recent=get_recent,
                 last_seen_days_back=last_seen_days_back,
                 date_range_start=date_range_start,
@@ -905,14 +922,14 @@ class Workspaces:
                 raise Exception("no resource_group_name")
         if not region:
             region = self._region
-            if region and region not in self._easm_regions:
-                logging.error(f"region {region} must be one of {', '.join(self._easm_regions)}")
-                raise Exception(region)
-            else:
-                logging.error(
-                    "an EASM_REGION must be set in ENVIRONMENT .env file, or passed during Workspaces() initialization, or in this function via region=='<easm_region_name>'"
-                )
-                raise Exception("no region")
+        if not region:
+            logging.error(
+                "an EASM_REGION must be set in ENVIRONMENT .env file, or passed during Workspaces() initialization, or in this function via region=='<easm_region_name>'"
+            )
+            raise Exception("no region")
+        if region not in self._easm_regions:
+            logging.error(f"region {region} must be one of {', '.join(self._easm_regions)}")
+            raise Exception(region)
         if not workspace_name:
             workspace_name = self._default_workspace_name
             if not workspace_name:
@@ -1145,6 +1162,10 @@ class Workspaces:
         quiet = bool(kwargs.get("quiet"))
         status_fh = sys.stderr if kwargs.get("status_to_stderr") else sys.stdout
         max_assets = int(kwargs.get("max_assets") or 0)
+        orderby = kwargs.get("orderby", "")
+        mark = str(kwargs.get("mark") or "").strip()
+        use_mark = bool(mark)
+        progress_callback = kwargs.get("progress_callback")
 
         def _status(msg: str) -> None:
             if quiet:
@@ -1180,7 +1201,13 @@ class Workspaces:
             if max_assets:
                 get_all = True
 
-            params = {"filter": query_filter, "skip": page, "maxpagesize": max_page_size}
+            params = {"filter": query_filter, "maxpagesize": max_page_size}
+            if orderby:
+                params["orderby"] = orderby
+            if use_mark:
+                params["mark"] = mark
+            else:
+                params["skip"] = page
             run_query = True
             page_counter = 0
             time_counter_start = datetime.datetime.now().replace(microsecond=0)
@@ -1192,8 +1219,9 @@ class Workspaces:
                     params=params,
                     workspace_name=workspace_name,
                 )
+                payload = r.json()
 
-                total_assets = r.json()["totalElements"]
+                total_assets = int(payload.get("totalElements", 0) or 0)
                 if page_counter == 0:
                     _status(
                         f"{time_counter_start.strftime('%d-%b-%y %H:%M:%S')} -- {total_assets} assets identified by query"
@@ -1221,11 +1249,20 @@ class Workspaces:
                     run_query = False
                 elif max_page_count and page_counter >= max_page_count:
                     run_query = False
-                elif r.json()["last"]:
+                elif payload.get("last"):
                     run_query = False
                 else:
-                    page = r.json()["number"] + 1
-                    params["skip"] = page
+                    if use_mark:
+                        next_mark = payload.get("mark")
+                        if next_mark:
+                            params["mark"] = next_mark
+                            params.pop("skip", None)
+                        else:
+                            use_mark = False
+                    if not use_mark:
+                        page = int(payload.get("number", page) or page) + 1
+                        params["skip"] = page
+                        params.pop("mark", None)
 
                     # a counter for tracking and printing assets retrieved + estimated time left until completion
                     # can modify by passing kwarg track_every_N_pages=NN (defaults to every 100 pages)
@@ -1242,6 +1279,21 @@ class Workspaces:
                         _status(
                             f"\nretrieved {assets_so_far} assets in {time_counter_diff}\nestimated time for remaining {total_assets - assets_so_far} assets: {str((time_counter_diff * (total_assets / assets_so_far)) - time_counter_diff).split('.')[0]}"
                         )
+
+                if callable(progress_callback):
+                    try:
+                        progress_callback(
+                            {
+                                "pages_completed": page_counter,
+                                "assets_emitted": len(getattr(self, asset_list_name).assets),
+                                "total_elements": total_assets,
+                                "last": not run_query,
+                                "next_page": params.get("skip") if run_query else None,
+                                "next_mark": params.get("mark") if run_query else None,
+                            }
+                        )
+                    except Exception as cb_err:
+                        logging.warning("progress callback failed: %s", cb_err)
 
             _status(
                 f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- query complete, {len(getattr(self, asset_list_name).assets)} assets retrieved\ncan check available asset lists via <mdeasm.Workspaces object>.asset_lists()"
@@ -1290,6 +1342,10 @@ class Workspaces:
         quiet = bool(kwargs.get("quiet"))
         status_fh = sys.stderr if kwargs.get("status_to_stderr") else sys.stdout
         max_assets = int(kwargs.get("max_assets") or 0)
+        orderby = kwargs.get("orderby", "")
+        mark = str(kwargs.get("mark") or "").strip()
+        use_mark = bool(mark)
+        progress_callback = kwargs.get("progress_callback")
 
         def _status(msg: str) -> None:
             if quiet:
@@ -1314,7 +1370,13 @@ class Workspaces:
         if max_assets:
             get_all = True
 
-        params = {"filter": query_filter, "skip": page, "maxpagesize": max_page_size}
+        params = {"filter": query_filter, "maxpagesize": max_page_size}
+        if orderby:
+            params["orderby"] = orderby
+        if use_mark:
+            params["mark"] = mark
+        else:
+            params["skip"] = page
         run_query = True
         page_counter = 0
         emitted = 0
@@ -1328,13 +1390,13 @@ class Workspaces:
                 workspace_name=workspace_name,
             )
             payload = r.json()
-            total_assets = payload.get("totalElements", 0)
+            total_assets = int(payload.get("totalElements", 0) or 0)
             if page_counter == 0:
                 _status(
                     f"{time_counter_start.strftime('%d-%b-%y %H:%M:%S')} -- {total_assets} assets identified by query"
                 )
 
-            for asset in payload.get("content") or []:
+            for asset in _response_items(payload):
                 parsed = Asset().__parse_workspace_assets__(
                     asset,
                     get_recent=get_recent,
@@ -1363,8 +1425,17 @@ class Workspaces:
             elif payload.get("last"):
                 run_query = False
             else:
-                page = payload.get("number", page) + 1
-                params["skip"] = page
+                if use_mark:
+                    next_mark = payload.get("mark")
+                    if next_mark:
+                        params["mark"] = next_mark
+                        params.pop("skip", None)
+                    else:
+                        use_mark = False
+                if not use_mark:
+                    page = int(payload.get("number", page) or page) + 1
+                    params["skip"] = page
+                    params.pop("mark", None)
 
                 if not (
                     page_counter % kwargs.get("track_every_N_pages", 100)
@@ -1377,6 +1448,21 @@ class Workspaces:
                     _status(
                         f"\nretrieved {assets_so_far} assets in {time_counter_diff}\nestimated time for remaining {max(total_assets - assets_so_far, 0)} assets: {str((time_counter_diff * (total_assets / assets_so_far)) - time_counter_diff).split('.')[0]}"
                     )
+
+            if callable(progress_callback):
+                try:
+                    progress_callback(
+                        {
+                            "pages_completed": page_counter,
+                            "assets_emitted": emitted,
+                            "total_elements": total_assets,
+                            "last": not run_query,
+                            "next_page": params.get("skip") if run_query else None,
+                            "next_mark": params.get("mark") if run_query else None,
+                        }
+                    )
+                except Exception as cb_err:
+                    logging.warning("progress callback failed: %s", cb_err)
 
         _status(
             f"\n{datetime.datetime.now().strftime('%d-%b-%y %H:%M:%S')} -- query complete, {emitted} assets retrieved"
@@ -1601,20 +1687,23 @@ class Workspaces:
                 "one of either asset_list_name or asset_id must be passed to this function"
             )
             raise Exception("no asset_list_name and no asset_id")
-        if not isinstance(getattr(self, asset_list_name), AssetList):
-            logging.error(
-                f"{asset_list_name} is of type {type(asset_list_name)}; must be AssetList object"
-            )
-            raise Exception(type(asset_list_name))
-        if not len(getattr(self, asset_list_name).assets) > 0:
-            logging.error(f"{asset_list_name} has no items")
-            raise Exception(asset_list_name)
 
         if asset_list_name:
+            if not isinstance(getattr(self, asset_list_name), AssetList):
+                logging.error(
+                    f"{asset_list_name} is of type {type(asset_list_name)}; must be AssetList object"
+                )
+                raise Exception(type(asset_list_name))
+            if not len(getattr(self, asset_list_name).assets) > 0:
+                logging.error(f"{asset_list_name} has no items")
+                raise Exception(asset_list_name)
             self.__facet_filter_helper__(
                 asset_list_name=asset_list_name, attribute_name=attribute_name
             )
         elif asset_id:
+            if not hasattr(self, asset_id):
+                logging.error(f"{asset_id} not found")
+                raise Exception(asset_id)
             self.__facet_filter_helper__(asset_id=asset_id, attribute_name=attribute_name)
 
         # print(f"facet filter created, available at <mdeasm.Workspaces object>.filters.<attribute_name>")
