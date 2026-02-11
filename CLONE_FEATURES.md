@@ -9,7 +9,7 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 15 planning; delivered items moved to Implemented below)
+Priority order (cycle 16 planning; delivered items moved to Implemented below)
 
 - [ ] **Resource tags CRUD parity**
   - Gap class: missing (feature parity)
@@ -90,6 +90,11 @@ Priority order (cycle 15 planning; delivered items moved to Implemented below)
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
 ## Implemented
+- [x] **CLI command plumbing cleanup: shared logging/output/row helpers**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_data_connections.py`, `tests/test_cli_tasks.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && make verify` (pass)
+
 - [x] **Legacy helper typed-exception migration (phase 3)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`, `tests/test_data_connections_helpers.py`

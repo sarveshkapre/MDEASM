@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Prioritize cycle 16 on targeted CLI cleanup/refactor (`mdeasm_cli` shared command plumbing) before new feature expansion | Bounded local scan showed repeated logging/output/list-shape handling across command families as the highest-impact safe readability/maintainability gap that could be reduced without behavior changes | Cycle 16 gap map + delivered scope captured in `CLONE_FEATURES.md`; focused CLI tests selected for regression safety | n/a | high | trusted
+- 2026-02-11 | Ship cycle 16 cleanup batch: deduplicate CLI log-level + out-path resolution, centralize tab-line row rendering, and reuse shared paged-list extraction for `tasks list`/`data-connections list` | Reduced repeated branches and parsing drift risk in the highest-traffic CLI surfaces while preserving command output contracts | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && make verify` (pass) | 84ac954 | high | trusted
+- 2026-02-11 | Add focused reliability coverage for alternate paged payload shape (`content`) in CLI list flows | API preview payloads can drift between `value` and `content`; explicit contract tests prevent regressions while refactoring | `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass) | n/a | high | trusted
 - 2026-02-11 | Prioritize cycle 15 on typed helper exception completion, doctor probe latency telemetry, credential-aware docs smoke, and Python 3.13 CI coverage | Bounded market scan + code review showed broad helper exceptions and low latency visibility as highest-impact safe reliability gaps, while CI/runtime compatibility remained a near-term risk reducer | Cycle 15 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Censys, Shodan) | n/a | medium | untrusted
 - 2026-02-11 | Ship cycle 15 reliability batch: phase-3 typed exceptions, doctor `elapsedMs`/summary diagnostics, secret-gated docs smoke command, and Python 3.13 CI lane | This batch closed the most actionable backlog items that improve automation contracts, incident triage speed, docs drift detection, and interpreter compatibility confidence without changing default CLI command semantics | `source .venv/bin/activate && make verify` (pass); focused helper/doctor tests pass; push CI run `21911885587` succeeded with `3.11/3.12/3.13` jobs green | 92d50e8 | high | trusted
 - 2026-02-11 | Keep live tenant integration checks opt-in for cycle 15 while enforcing deterministic local coverage | Required Defender EASM credentials are still absent in this local environment, so credentialed live API flows cannot be validated deterministically in-session; docs smoke now performs a real command only when required env vars exist | `source .venv/bin/activate && make docs-smoke` (pass; credentialed step skipped with explicit message when env vars missing) | 92d50e8 | high | trusted
@@ -127,12 +130,16 @@
 - Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`), gated behind explicit env flags once credentials are available.
 - Add helper + CLI resource-tags CRUD parity for governance metadata workflows.
 - Run live tenant smoke for saved-filters lifecycle (`list/get/put/delete`) behind explicit env gating.
-- Complete CLI `--format lines` consistency sweep across command families.
+- Complete user-facing CLI `--format lines` consistency sweep across command families (cleanup groundwork landed in cycle 16).
 - Add discovery-group delete retry hardening for transient control-plane/data-plane failures.
 - Add optional command presets/profile files for repeated export/task automation invocations.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `..............................` | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `153 passed, 8 skipped`; compile + smoke + docs-smoke passed | pass
+- 2026-02-11 | `git push origin main` | pushed cleanup commit `84ac954` to `origin/main` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event,headBranch || true` | latest pre-cycle-15 `main` CI runs were successful | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
