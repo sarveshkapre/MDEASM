@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Record cycle 3 CI verification follow-through for pushed tracker-only commit | Preserve an auditable link between the final pushed SHA and successful GitHub Actions checks | `gh run watch 21900541969 -R sarveshkapre/MDEASM --exit-status` (pass) | 546a5e5 | high | trusted
 - 2026-02-11 | Refresh autonomous trackers for cycle 3 (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `INCIDENTS.md`, `AGENTS.md`) | Keep backlog, memory, incident prevention, and mutable repo facts aligned with shipped code and CI evidence | Tracker files updated with selected-task closure, cycle 3 market/gap insights, and verification records | c418d9a | high | trusted
 - 2026-02-11 | Add `mdeasm tasks fetch` to download task artifacts atomically with retry/backoff controls | Defender EASM automation was missing the final artifact retrieval step; existing `tasks download` only returned reference payloads | `source .venv/bin/activate && pytest -q` (pass); `source .venv/bin/activate && python -m mdeasm_cli tasks fetch --help >/dev/null` (pass) | e955667 | high | trusted
 - 2026-02-11 | Centralize secret redaction in helper error/log strings (`redact_sensitive_text`) | Protect bearer tokens/client secrets/SAS signatures from leaking into CI logs and automation diagnostics | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_redact_sensitive_text_masks_bearer_tokens_fields_and_query_params tests/test_mdeasm_helpers.py::test_workspace_query_helper_redacts_failure_exception_text` (pass) | e955667 | high | trusted
@@ -78,6 +79,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh run watch 21900541969 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `546a5e5` | pass
 - 2026-02-11 | `gh run watch 21900519064 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `c418d9a` | pass
 - 2026-02-11 | `gh run watch 21900485772 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `e955667` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 50 --json number,title,author,state,url` | repository has issues disabled (no owner/bot issue backlog available) | pass
