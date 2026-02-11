@@ -9,7 +9,7 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 19 backlog after current shipment)
+Priority order (cycle 20 backlog after current shipment)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
@@ -17,10 +17,10 @@ Priority order (cycle 19 backlog after current shipment)
   - Why: closes remaining confidence gap between unit coverage and tenant behavior.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **Legacy stdout side-effect cleanup (phase 2)**
-  - Gap class: weak (quality)
-  - Scope: continue converting helper methods to `noprint`-safe structured returns.
-  - Why: preserves machine-readable stdout semantics for automation.
+- [ ] **API changelog modernization for post-2023 releases**
+  - Gap class: weak (maintainability)
+  - Scope: align `API/changelog.md` with shipped 2026 features and move verbose history to tracker/docs.
+  - Why: reduces operator confusion caused by stale release notes.
   - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Preview API version canary smoke helper**
@@ -29,59 +29,35 @@ Priority order (cycle 19 backlog after current shipment)
   - Why: early warning for preview endpoint drift.
   - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
-- [ ] **API changelog modernization for post-2023 releases**
-  - Gap class: weak (maintainability)
-  - Scope: align `API/changelog.md` with shipped 2026 features and move verbose history to tracker/docs.
-  - Why: reduces operator confusion caused by stale release notes.
-  - Score: Impact 3 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Discovery-groups CLI parity expansion (`create/run`)**
-  - Gap class: missing
-  - Scope: expose discovery-group create/run flows in CLI with JSON/lines contracts.
-  - Why: closes lifecycle parity gaps for operator automation.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
-
-- [ ] **Checkpoint/profile file schema docs + fixtures**
-  - Gap class: weak (DX)
-  - Scope: document and validate checkpoint/profile formats with examples.
-  - Why: reduces operator confusion and parsing mistakes.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
+- [ ] **Legacy stdout side-effect cleanup (phase 2)**
+  - Gap class: weak (quality)
+  - Scope: continue converting helper methods to `noprint`-safe structured returns.
+  - Why: preserves machine-readable stdout semantics for automation.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Tracker trust-label validation automation**
   - Gap class: differentiator
   - Scope: add a checker for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
   - Why: keeps autonomous memory auditable and consistent across cycles.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
-
-- [ ] **End-to-end command presets (`--profile @file`)**
-  - Gap class: differentiator
-  - Scope: reusable local preset files for filter/orderby/output/reliability flags.
-  - Why: reduces repetitive long commands and operator mistakes in scheduled jobs.
-  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
-
-- [ ] **Export throughput benchmark harness**
-  - Gap class: differentiator
-  - Scope: repeatable local benchmark for ndjson/csv/json streaming paths.
-  - Why: enables data-backed default tuning.
-  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 2
-
-- [ ] **Request telemetry hooks (opt-in)**
-  - Gap class: differentiator
-  - Scope: per-request timing/status counters for long automation runs.
-  - Why: improves diagnosability of tenant/API drift and throttling.
-  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
 - [ ] **CLI docs command matrix for JSON/lines/text contracts**
   - Gap class: weak (DX)
   - Scope: add compact contract tables in docs for each command family.
   - Why: prevents downstream parser regressions during CLI evolution.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Repository smoke profile script (`scripts/smoke_cycle.sh`)**
   - Gap class: weak (maintainability)
   - Scope: codify repeatable local smoke commands used in tracker evidence.
   - Why: speeds cycle execution and reduces operator variance.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
+
+- [ ] **Doctor probe JSON contract snapshot fixture**
+  - Gap class: weak (reliability)
+  - Scope: add golden-file contract validation for doctor probe output shape.
+  - Why: prevents accidental response-shape drift for automation consumers.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
 
 - [ ] **Data-connections live smoke expansion (`put/delete` guarded lifecycle)**
   - Gap class: weak (quality)
@@ -89,13 +65,54 @@ Priority order (cycle 19 backlog after current shipment)
   - Why: catches payload drift earlier than list/get-only checks.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **Doctor probe JSON contract snapshot fixture**
-  - Gap class: weak (reliability)
-  - Scope: add golden-file contract validation for doctor probe output shape.
-  - Why: prevents accidental response-shape drift for automation consumers.
+- [ ] **End-to-end command presets (`--profile @file`)**
+  - Gap class: differentiator
+  - Scope: reusable local preset files for filter/orderby/output/reliability flags.
+  - Why: reduces repetitive long commands and operator mistakes in scheduled jobs.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Checkpoint/profile file schema docs + fixtures**
+  - Gap class: weak (DX)
+  - Scope: document and validate checkpoint/profile formats with examples.
+  - Why: reduces operator confusion and parsing mistakes.
   - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
 
+- [ ] **Request telemetry hooks (opt-in)**
+  - Gap class: differentiator
+  - Scope: per-request timing/status counters for long automation runs.
+  - Why: improves diagnosability of tenant/API drift and throttling.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Export throughput benchmark harness**
+  - Gap class: differentiator
+  - Scope: repeatable local benchmark for ndjson/csv/json streaming paths.
+  - Why: enables data-backed default tuning.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 2
+
+- [ ] **CLI in-command `--dry-run` support for destructive operations**
+  - Gap class: weak (safety)
+  - Scope: add dry-run previews for delete/cancel paths (`workspaces`, `saved-filters`, `data-connections`, `discovery-groups`, `tasks`).
+  - Why: reduces operator error risk in scripted and interactive sessions.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 1 | Risk 2 | Confidence 2
+
+- [ ] **Structured command metrics emission (`--metrics-out`)**
+  - Gap class: differentiator
+  - Scope: emit deterministic command timing + count metrics for automations.
+  - Why: improves observability without depending on verbose logs.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Codebase modularization pass for `mdeasm_cli.py` command families**
+  - Gap class: weak (maintainability)
+  - Scope: split monolithic CLI handler into per-command-family modules without behavior changes.
+  - Why: lowers long-term change risk and improves reviewer velocity.
+  - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+
 ## Implemented
+- [x] **Discovery-group lifecycle parity expansion (`mdeasm discovery-groups create/run`) + helper validation hardening**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_discovery_groups.py`, `tests/test_integration_smoke.py`, `docs/discovery_groups.md`, `Makefile`
+  - Evidence (trusted: local tests + smoke + CI): `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_discovery_groups.py tests/test_integration_smoke.py` (pass); `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -k "discovery_group or discovery" tests/test_cli_discovery_groups.py tests/test_integration_smoke.py -k "discovery_groups"` (pass; integration smokes skipped by default without env/credentials); `source .venv/bin/activate && python -m mdeasm_cli discovery-groups create --template "Contoso---tmpl-123" --workspace-name demo --format json --out - >/tmp/mdeasm_discovery_groups_create_cycle20.json 2>/tmp/mdeasm_discovery_groups_create_cycle20.err; rc=$?; echo discovery_groups_create_rc=$rc; test "$rc" -eq 1` (pass; expected missing env credentials locally); `source .venv/bin/activate && make verify` (pass); `gh run watch 21917452832 -R sarveshkapre/MDEASM --exit-status` (pass)
+
 - [x] **CLI shell completions + concise recipes (`mdeasm completions bash|zsh`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_completions.py`, `docs/completions.md`, `README.md`, `API/README.md`, `Makefile`
@@ -502,6 +519,24 @@ Priority order (cycle 19 backlog after current shipment)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 20 session):
+  - Defender EASM control-plane preview docs keep discovery-group `create`, `run`, `list`, and `remove` as first-class lifecycle operations, so missing CLI parity on `create/run` was the highest-impact remaining feature gap in this repository.
+  - Peer ASM platforms still emphasize seed-driven discovery and recurring run execution, reinforcing a product baseline of explicit run controls plus machine-readable output contracts for automation.
+  - Gap map (cycle 20 session):
+    - Missing -> closed this cycle: `mdeasm discovery-groups create` and `mdeasm discovery-groups run` parity with JSON/lines output.
+    - Weak -> closed this cycle: template/custom payload validation hardening and explicit `run_discovery_group()` helper for programmatic parity.
+    - Weak -> closed this cycle: docs + smoke coverage refresh for new command surfaces (`docs/discovery_groups.md`, `make docs-smoke`, focused tests).
+    - Weak -> remaining: protected artifact URL auth-fallback live smoke in a credentialed tenant.
+  - Top 5 high-impact opportunities now:
+    - 1) protected artifact fallback live smoke, 2) API changelog modernization, 3) preview API canary helper, 4) tracker trust-label validator, 5) CLI command contract matrix docs.
+  - Sources reviewed (untrusted):
+    - Defender EASM discovery-groups operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/discovery-groups?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - Defender EASM discovery-groups create/update: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/discovery-groups/create-or-update?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - Defender EASM discovery-groups run: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/discovery-groups/run?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - runZero discovery API examples (create and run discover org): https://help.runzero.com/docs/leveraging-the-runzero-api/
+    - runZero active scanning schedules: https://help.runzero.com/docs/active-scanning/
+    - Censys seed asset groups with continuous refresh: https://docs.censys.com/docs/asm-seeds-and-scans
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 19 session):
   - Defender EASM remains API-first and preview-version heavy, which keeps CLI reliability and operator ergonomics (discoverability, low-friction command usage) as a near-term PMF lever for this repo.
   - Adjacent CLI ecosystems treat shell completion as baseline UX (`kubectl completion`, Azure CLI tab completion), reinforcing completions as a parity-quality improvement rather than optional polish.
