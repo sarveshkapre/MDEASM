@@ -19,6 +19,8 @@ jobs:
       EASM_CP_API_VERSION: ${{ secrets.MDEASM_CP_API_VERSION }}
       EASM_DP_API_VERSION: ${{ secrets.MDEASM_DP_API_VERSION }}
       EASM_API_VERSION: ${{ secrets.MDEASM_API_VERSION }}
+      MDEASM_DOCTOR_PROBE_TARGETS: ${{ secrets.MDEASM_DOCTOR_PROBE_TARGETS }}
+      MDEASM_DOCTOR_PROBE_MAX_PAGE_SIZE: ${{ secrets.MDEASM_DOCTOR_PROBE_MAX_PAGE_SIZE }}
 
     steps:
       - name: Checkout
@@ -50,4 +52,10 @@ jobs:
             exit 0
           fi
 
-          python -m mdeasm_cli doctor --probe --format json --out -
+          probe_targets="${MDEASM_DOCTOR_PROBE_TARGETS:-workspaces}"
+          probe_max_page_size="${MDEASM_DOCTOR_PROBE_MAX_PAGE_SIZE:-1}"
+          python -m mdeasm_cli doctor --probe \
+            --probe-targets "$probe_targets" \
+            --probe-max-page-size "$probe_max_page_size" \
+            --format json \
+            --out -

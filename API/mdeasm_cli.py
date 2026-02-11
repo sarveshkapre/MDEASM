@@ -30,6 +30,20 @@ _DOWNLOAD_URL_PRIORITY_KEYS = (
 )
 _DEFAULT_RETRY_ON_STATUSES = (408, 425, 429, 500, 502, 503, 504)
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+_DOCTOR_PROBE_TARGETS = ("workspaces", "assets", "tasks", "data-connections")
+_DOCTOR_PROBE_TARGET_ALIASES = {
+    "workspaces": "workspaces",
+    "workspace": "workspaces",
+    "assets": "assets",
+    "asset": "assets",
+    "tasks": "tasks",
+    "task": "tasks",
+    "data-connections": "data-connections",
+    "data_connections": "data-connections",
+    "dataconnections": "data-connections",
+    "data-connection": "data-connections",
+    "dataconnection": "data-connections",
+}
 
 
 def _json_default(obj):
@@ -86,6 +100,44 @@ def _parse_retry_on_statuses(value: str) -> set[int]:
     if not out:
         raise ValueError("empty retry-on status list")
     return out
+
+
+def _parse_doctor_probe_targets(value: str) -> list[str]:
+    raw = (value or "").strip().lower()
+    if not raw:
+        return ["workspaces"]
+    targets: list[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        if token == "all":
+            for target in _DOCTOR_PROBE_TARGETS:
+                if target not in seen:
+                    seen.add(target)
+                    targets.append(target)
+            continue
+        normalized = _DOCTOR_PROBE_TARGET_ALIASES.get(token)
+        if not normalized:
+            raise ValueError(
+                f"unsupported probe target: {token}; use one of: all, {', '.join(_DOCTOR_PROBE_TARGETS)}"
+            )
+        if normalized not in seen:
+            seen.add(normalized)
+            targets.append(normalized)
+    if not targets:
+        raise ValueError("empty probe target list")
+    return targets
+
+
+def _payload_items(payload) -> list:
+    if not isinstance(payload, dict):
+        return []
+    rows = payload.get("value")
+    if rows is None:
+        rows = payload.get("content")
+    return rows if isinstance(rows, list) else []
 
 
 def _normalize_sha256_hex(value: str) -> str:
@@ -746,7 +798,32 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument(
         "--probe",
         action="store_true",
-        help="Attempt a tiny control-plane probe (list workspaces). Requires env credentials.",
+        help=(
+            "Attempt endpoint probes. Default target is control-plane workspaces; "
+            "use --probe-targets to include data-plane checks."
+        ),
+    )
+    doctor.add_argument(
+        "--probe-targets",
+        default="workspaces",
+        help=(
+            "Comma-separated probe targets: workspaces,assets,tasks,data-connections,all "
+            "(default: workspaces)"
+        ),
+    )
+    doctor.add_argument(
+        "--probe-max-page-size",
+        type=int,
+        default=1,
+        help="Max page size for list-based probe targets (default: 1)",
+    )
+    doctor.add_argument(
+        "--workspace-name",
+        default="",
+        help=(
+            "Workspace name override for data-plane probes "
+            "(default: env WORKSPACE_NAME / helper default)"
+        ),
     )
     doctor.add_argument(
         "-v",
@@ -2000,6 +2077,19 @@ def main(argv: list[str] | None = None) -> int:
             },
         }
 
+        probe_targets: list[str] = []
+        if args.probe:
+            try:
+                probe_targets = _parse_doctor_probe_targets(args.probe_targets)
+            except ValueError as e:
+                sys.stderr.write(f"invalid --probe-targets: {e}\n")
+                return 2
+            payload["checks"]["probe"] = {
+                "ok": False,
+                "targets": probe_targets,
+                "results": {},
+            }
+
         if args.probe and not missing_required:
             try:
                 import mdeasm  # type: ignore
@@ -2015,20 +2105,132 @@ def main(argv: list[str] | None = None) -> int:
                     mdeasm.configure_logging(level)
 
                 ws_kwargs = _build_ws_kwargs(args)
-                # Control-plane-only probe; do not require data-plane scope.
-                ws_kwargs["workspace_name"] = ""
-                ws_kwargs["init_data_plane_token"] = False
                 ws_kwargs["emit_workspace_guidance"] = False
+                needs_data_plane_probe = any(t != "workspaces" for t in probe_targets)
+                if not needs_data_plane_probe:
+                    # Control-plane-only probe; do not require data-plane scope.
+                    ws_kwargs["workspace_name"] = ""
+                    ws_kwargs["init_data_plane_token"] = False
 
                 ws = mdeasm.Workspaces(**ws_kwargs)
                 names = sorted(list((getattr(ws, "_workspaces", {}) or {}).keys()), key=str.lower)
-                payload["checks"]["probe"] = {
-                    "ok": True,
-                    "workspaces": {"count": len(names), "names": names},
-                }
+                probe = payload.get("checks", {}).get("probe") or {}
+                results = probe.get("results") or {}
+
+                if "workspaces" in probe_targets:
+                    workspaces_probe = {"ok": True, "count": len(names), "names": names}
+                    results["workspaces"] = workspaces_probe
+                    # Keep backwards compatibility with the previous doctor payload shape.
+                    probe["workspaces"] = {"count": len(names), "names": names}
+
+                probe_workspace = str(getattr(ws, "_default_workspace_name", "") or "").strip()
+                workspace_override = str(getattr(args, "workspace_name", "") or "").strip()
+                if workspace_override:
+                    probe_workspace = workspace_override
+                if not probe_workspace and names:
+                    probe_workspace = names[0]
+                page_size = max(int(args.probe_max_page_size or 1), 1)
+
+                def _probe_error(message: str) -> dict:
+                    return {
+                        "ok": False,
+                        "error": message,
+                        "workspace": probe_workspace,
+                    }
+
+                if "assets" in probe_targets:
+                    if not probe_workspace:
+                        results["assets"] = _probe_error(
+                            "no workspace available for assets probe; set WORKSPACE_NAME or --workspace-name"
+                        )
+                    else:
+                        try:
+                            list_name = "doctor_probe_assets"
+                            ws.get_workspace_assets(
+                                query_filter='state = "confirmed"',
+                                asset_list_name=list_name,
+                                page=0,
+                                max_page_size=page_size,
+                                max_page_count=1,
+                                get_all=False,
+                                auto_create_facet_filters=False,
+                                workspace_name=probe_workspace,
+                                status_to_stderr=True,
+                                no_track_time=True,
+                            )
+                            asset_list = getattr(ws, list_name, None)
+                            rows = getattr(asset_list, "assets", []) if asset_list else []
+                            results["assets"] = {
+                                "ok": True,
+                                "workspace": probe_workspace,
+                                "count": len(rows) if isinstance(rows, list) else 0,
+                            }
+                        except Exception as e:
+                            results["assets"] = _probe_error(str(e))
+
+                if "tasks" in probe_targets:
+                    if not probe_workspace:
+                        results["tasks"] = _probe_error(
+                            "no workspace available for tasks probe; set WORKSPACE_NAME or --workspace-name"
+                        )
+                    else:
+                        try:
+                            tasks_payload = ws.list_tasks(
+                                workspace_name=probe_workspace,
+                                skip=0,
+                                max_page_size=page_size,
+                                get_all=False,
+                                noprint=True,
+                            )
+                            results["tasks"] = {
+                                "ok": True,
+                                "workspace": probe_workspace,
+                                "count": len(_payload_items(tasks_payload)),
+                            }
+                        except Exception as e:
+                            results["tasks"] = _probe_error(str(e))
+
+                if "data-connections" in probe_targets:
+                    if not probe_workspace:
+                        results["data-connections"] = _probe_error(
+                            "no workspace available for data-connections probe; set WORKSPACE_NAME or --workspace-name"
+                        )
+                    else:
+                        try:
+                            dc_payload = ws.list_data_connections(
+                                workspace_name=probe_workspace,
+                                skip=0,
+                                max_page_size=page_size,
+                                get_all=False,
+                                noprint=True,
+                            )
+                            results["data-connections"] = {
+                                "ok": True,
+                                "workspace": probe_workspace,
+                                "count": len(_payload_items(dc_payload)),
+                            }
+                        except Exception as e:
+                            results["data-connections"] = _probe_error(str(e))
+
+                probe_ok = True
+                for target in probe_targets:
+                    target_payload = results.get(target)
+                    if not target_payload or not bool(target_payload.get("ok")):
+                        probe_ok = False
+                        break
+                probe["results"] = results
+                probe["ok"] = probe_ok
+                payload["checks"]["probe"] = probe
+                if not probe_ok:
+                    payload["ok"] = False
             except Exception as e:
                 payload["ok"] = False
-                payload["checks"]["probe"] = {"ok": False, "error": str(e)}
+                payload["checks"]["probe"] = {
+                    "ok": False,
+                    "targets": probe_targets or ["workspaces"],
+                    "results": {},
+                    "error": str(e),
+                }
 
         out_path = None if (not args.out or args.out == "-") else Path(args.out)
         if args.format == "json":
@@ -2046,10 +2248,24 @@ def main(argv: list[str] | None = None) -> int:
             if args.probe:
                 probe = payload.get("checks", {}).get("probe") or {}
                 if probe.get("ok"):
-                    ws = probe.get("workspaces") or {}
-                    lines.append(f"probe: ok (workspaces={ws.get('count')})")
+                    lines.append(f"probe: ok (targets={','.join(probe.get('targets') or [])})")
                 else:
                     lines.append(f"probe: failed ({probe.get('error', '')})")
+                for target in probe.get("targets") or []:
+                    target_payload = (probe.get("results") or {}).get(target) or {}
+                    if target_payload.get("ok"):
+                        count = target_payload.get("count")
+                        workspace = target_payload.get("workspace") or ""
+                        if workspace:
+                            lines.append(
+                                f"probe.{target}: ok (workspace={workspace}, count={count})"
+                            )
+                        else:
+                            lines.append(f"probe.{target}: ok (count={count})")
+                    else:
+                        lines.append(
+                            f"probe.{target}: failed ({target_payload.get('error', '')})"
+                        )
             _write_lines(out_path, lines)
 
         return 0 if payload["ok"] else 1

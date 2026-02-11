@@ -63,9 +63,19 @@ To also run a tiny control-plane probe (list workspaces):
 mdeasm doctor --probe --format json
 ```
 
+To run an endpoint matrix probe (control-plane + selected data-plane surfaces):
+```bash
+mdeasm doctor --probe \
+  --probe-targets workspaces,assets,tasks,data-connections \
+  --probe-max-page-size 1 \
+  --format json
+```
+
 Notes:
 - Exit code is `0` when checks pass, `1` when required env vars are missing or the probe fails.
 - `CLIENT_SECRET` is never printed; only presence is reported.
+- `--probe-targets` supports `workspaces`, `assets`, `tasks`, `data-connections`, or `all`.
+- Data-plane probe targets require a resolvable workspace (`WORKSPACE_NAME` or `--workspace-name`).
 
 `401` (Unauthorized)
 - Bad client id/secret, wrong tenant, or token scope mismatch.
