@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Prioritize cycle 12 on CLI API error payload parity for list/get command families | Defender EASM REST references and peer API guidance keep structured error details (`status/code/message`) as baseline operator expectations; this was the highest-impact safe operability gap remaining in backlog | Cycle 12 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero) | n/a | medium | untrusted
+- 2026-02-11 | Ship cycle 12 operability batch: standardized redacted CLI error diagnostics (`status`, `code`, `message`) across `saved-filters`, `data-connections`, `tasks`, and `assets` paths | Previous command families emitted inconsistent exceptions and often hid structured API failure metadata, slowing incident triage | `source .venv/bin/activate && make verify` (pass); focused CLI parity tests for saved-filters/data-connections/tasks/assets pass | f429270 | high | trusted
+- 2026-02-11 | Keep live integration checks opt-in for this cycle while enforcing deterministic local coverage | Local environment does not include Defender EASM credentials, so reproducible live API calls are unavailable; skip-by-default integration smoke remains runnable in configured tenants | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` (pass; skipped without env) | f429270 | high | trusted
 - 2026-02-11 | Refresh cycle 11 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep backlog prioritization, market-scan gap map, mutable facts, and verification evidence synchronized with pushed `main` commits | Tracker files updated after feature commit `a4e356f`; follow-up tracker push CI run `21907801347` succeeded | 482a554 | high | trusted
 - 2026-02-11 | Ship cycle 11 reliability batch: standards-compliant `Retry-After` parsing (delay-seconds + HTTP-date) for helper retries and CLI task artifact fetch | Highest-value safe gap was retry behavior drift across gateways that emit HTTP-date `Retry-After` values, which could ignore server pacing and amplify transient failures | `source .venv/bin/activate && make verify` (pass); focused retry parser/backoff tests pass; pushed commit CI run `21907766257` succeeded | a4e356f | high | trusted
 - 2026-02-11 | Prioritize cycle 11 around retry semantics and task-export reliability from bounded market scan | Microsoft Defender EASM task/export docs plus peer API guidance and HTTP spec semantics all reinforce server-directed retry timing as baseline production behavior | Cycle 11 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, RFC 9110) | n/a | medium | untrusted
@@ -111,13 +114,23 @@
 
 ## Next Prioritized Tasks
 - Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`), gated behind explicit env flags once credentials are available.
+- Add workflow-level docs smoke checks in CI for high-value README/docs command paths.
+- Expand opt-in data-connections integration smoke coverage to `get` and `validate`.
 - Continue typed exception migration across remaining broad `Exception` paths (saved filters, discovery/workspace lifecycle, and asset helper validation).
-- Add CLI error payload parity for list/get flows (status + redacted code/message) with contract tests.
 - Add optional command presets/profile files for repeated export/task automation invocations.
 - Add CLI error-code contract tests across doctor/task/data-connection failure classes to keep automation exit behavior stable.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest `main` CI run `21907830028` succeeded before cycle 12 code changes | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_saved_filters.py tests/test_cli_data_connections.py tests/test_cli_tasks.py tests/test_cli_export.py docs/auth.md` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_saved_filters.py tests/test_cli_data_connections.py tests/test_cli_tasks.py tests/test_cli_export.py` | focused CLI suites passed (`...........................................................................`) | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `136 passed, 6 skipped`; compile + CLI smoke commands passed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli tasks list --format json --out - >/tmp/mdeasm_tasks_list_cycle12.json 2>/tmp/mdeasm_tasks_list_cycle12.err; rc=$?; echo tasks_list_rc=$rc; test \"$rc\" -eq 1` | `tasks_list_rc=1` with expected missing required env vars and standardized CLI error output | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` | integration smoke path remains opt-in and skipped without tenant credentials (`s`) | pass
+- 2026-02-11 | `git push origin main` | pushed commit `f429270` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21908809934 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `f429270` | pass
 - 2026-02-11 | `git push origin main` | pushed commit `482a554` to `origin/main` | pass
 - 2026-02-11 | `gh run watch 21907801347 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `482a554` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass

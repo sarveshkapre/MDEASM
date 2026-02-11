@@ -9,7 +9,7 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 11 planning; selected cycle 11 task moved to Implemented below)
+Priority order (cycle 12 planning; selected task moved to Implemented below)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
@@ -17,121 +17,120 @@ Priority order (cycle 11 planning; selected cycle 11 task moved to Implemented b
   - Why: closes the remaining real-tenant confidence gap beyond deterministic unit tests.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **List/get parity for API error payload surfacing in CLI**
-  - Gap class: weak (operability)
-  - Scope: standardize CLI error output to include status + redacted API code/message across command families.
-  - Why: improves incident triage and automation alert quality.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Data-connections live smoke expansion**
+- [ ] **Data-connections live smoke expansion (`get` + `validate`)**
   - Gap class: weak (quality)
-  - Scope: add opt-in integration smoke for `get` and `validate` in addition to `list`.
-  - Why: catches tenant/API drift across more endpoint shapes.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+  - Scope: extend opt-in integration smoke from `list` to `get` and `validate`.
+  - Why: catches preview endpoint drift across more payload shapes.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Workflow-level docs smoke checks**
-  - Gap class: weak (DX)
-  - Scope: add CI job that executes high-value `--help`/smoke commands referenced in README and docs.
-  - Why: prevents docs drift and stale command examples.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **Workflow-level docs smoke checks in CI**
+  - Gap class: weak (DX/reliability)
+  - Scope: add CI lane that executes high-value `--help` and documented smoke command paths.
+  - Why: prevents docs drift and stale automation examples.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Legacy helper typed-exception migration (phase 2)**
   - Gap class: weak (reliability)
-  - Scope: replace remaining broad `Exception` raises in high-use helper paths with typed exceptions.
-  - Why: improves catch behavior in automation and reduces ambiguous failures.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+  - Scope: replace high-use broad `Exception` raises with typed helper exceptions.
+  - Why: improves caller-side retry logic and precision in failure handling.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Task wait failure detail parity**
+  - Gap class: weak (UX/operability)
+  - Scope: include terminal failure metadata (`errorCode`, `message`) in `tasks wait` outputs.
+  - Why: shortens triage loops during export failures.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Resource tags CRUD parity**
   - Gap class: missing (feature parity)
-  - Scope: add helper + CLI list/get/put/delete operations for resource tags.
-  - Why: unlocks governance metadata automation workflows.
+  - Scope: helper + CLI list/get/put/delete operations for resource tags.
+  - Why: unlocks governance metadata workflows expected in enterprise ASM automation.
   - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+
+- [ ] **CLI `--format lines` consistency sweep**
+  - Gap class: weak (DX)
+  - Scope: standardize field ordering and ID-first behavior across line output families.
+  - Why: improves shell pipeline portability (`awk`/`cut`/`grep`) and scripting stability.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
   - Gap class: weak (reliability)
-  - Scope: add a `3.13` CI lane once dependency compatibility is validated.
-  - Why: keeps runtime compatibility current and reduces upgrade risk.
+  - Scope: validate and add a `3.13` lane when dependency/tooling compatibility is confirmed.
+  - Why: reduces runtime upgrade risk and keeps support window current.
   - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **CLI completions + concise recipes**
-  - Gap class: weak (DX)
-  - Scope: ship bash/zsh completion scripts and short, copy-paste workflow recipes.
-  - Why: lowers onboarding friction and command syntax mistakes.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **End-to-end command presets (`--profile @file`)**
-  - Gap class: differentiator
-  - Scope: support reusable local preset files for filter/orderby/output/reliability flags across commands.
-  - Why: reduces repeated long commands and operator error in scheduled jobs.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 2 | Risk 2 | Confidence 2
-
-- [ ] **Tracker trust-label validation automation**
-  - Gap class: differentiator
-  - Scope: add a lightweight check for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
-  - Why: keeps autonomous memory auditable and consistent.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
-
-- [ ] **Legacy stdout side-effect cleanup (phase 2)**
+- [ ] **Saved-filter payload schema validation**
   - Gap class: weak (quality)
-  - Scope: continue migrating helper methods to `noprint`-safe structured returns.
-  - Why: preserves machine-readable CLI/library behavior.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+  - Scope: validate user-supplied saved-filter payload shape before API submit.
+  - Why: returns clear local diagnostics before remote request failures.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Doctor probe latency summary**
+  - Gap class: weak (operability)
+  - Scope: include per-target elapsed timings + aggregate summary in `doctor --probe` payload.
+  - Why: improves fast diagnosis of endpoint degradation and throttling patterns.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
 
 - [ ] **Discovery-group delete retry hardening**
   - Gap class: weak (reliability)
   - Scope: add bounded retry/jitter around transient discovery-group delete failures.
-  - Why: reduces flaky cleanup in batch automation.
+  - Why: reduces flaky cleanup in batch automations.
   - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Request telemetry hooks (opt-in)**
-  - Gap class: differentiator
-  - Scope: provide optional per-request timing/status counters for long automation runs.
-  - Why: improves diagnosability of tenant/API drift and throttling patterns.
-  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
-
-- [ ] **Export throughput benchmarking harness (local)**
-  - Gap class: differentiator
-  - Scope: add repeatable local benchmark script for streamed ndjson/csv/json paths.
-  - Why: informs safe defaults using measured cost rather than intuition.
-  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 2
-
-- [ ] **CLI UX consistency sweep for `--format lines` outputs**
+- [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
-  - Scope: standardize line output field ordering and put stable IDs first across command families.
-  - Why: improves grep/awk compatibility and script portability.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+  - Scope: ship bash/zsh completion scripts and short copy-paste workflow recipes.
+  - Why: lowers onboarding friction and command syntax errors.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Doctor probe output budget + latency summary**
-  - Gap class: weak (operability)
-  - Scope: include per-target elapsed timing and aggregate status summary in `doctor --probe` output.
-  - Why: improves fast diagnosis of endpoint drift and throttling.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
-
-- [ ] **Task wait failure detail parity**
-  - Gap class: weak (UX)
-  - Scope: include terminal error metadata (`errorCode`, `message`) when task state is failed/canceled.
-  - Why: shortens manual follow-up triage loops.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Saved-filter payload schema validation**
+- [ ] **Legacy stdout side-effect cleanup (phase 2)**
   - Gap class: weak (quality)
-  - Scope: validate user-supplied saved-filter JSON against expected shape before API submit.
-  - Why: catches malformed payloads locally with clearer diagnostics.
+  - Scope: continue converting helper methods to `noprint`-safe structured returns.
+  - Why: preserves machine-readable stdout semantics for automation.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Checkpoint/profile file JSON schema docs**
-  - Gap class: weak (DX)
-  - Scope: document and validate checkpoint/profile file formats with example fixtures.
-  - Why: reduces operator confusion and parsing errors in automation.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
 
 - [ ] **Preview API version canary smoke helper**
   - Gap class: weak (reliability)
-  - Scope: add a local script/test path that runs low-cost list probes against configurable preview versions.
-  - Why: gives early warning when preview API versions drift.
+  - Scope: add lightweight probe script against configurable preview API versions.
+  - Why: early warning for preview endpoint drift.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
+- [ ] **End-to-end command presets (`--profile @file`)**
+  - Gap class: differentiator
+  - Scope: reusable local preset files for filter/orderby/output/reliability flags.
+  - Why: reduces repetitive long commands and operator mistakes in scheduled jobs.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Tracker trust-label validation automation**
+  - Gap class: differentiator
+  - Scope: add a lightweight checker for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
+  - Why: keeps autonomous memory auditable and consistent over long cycles.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
+
+- [ ] **Export throughput benchmark harness**
+  - Gap class: differentiator
+  - Scope: repeatable local benchmark for ndjson/csv/json streaming paths.
+  - Why: enables data-backed default tuning.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 2
+
+- [ ] **Request telemetry hooks (opt-in)**
+  - Gap class: differentiator
+  - Scope: per-request timing/status counters for long automation runs.
+  - Why: improves diagnosability of tenant/API drift and throttling.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Checkpoint/profile file schema docs + fixtures**
+  - Gap class: weak (DX)
+  - Scope: document and validate checkpoint/profile file formats with examples.
+  - Why: reduces operator confusion and parsing mistakes.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
+
 ## Implemented
+- [x] **List/get parity for API error payload surfacing in CLI**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_saved_filters.py`, `tests/test_cli_data_connections.py`, `tests/test_cli_tasks.py`, `tests/test_cli_export.py`, `docs/auth.md`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_saved_filters.py tests/test_cli_data_connections.py tests/test_cli_tasks.py tests/test_cli_export.py docs/auth.md` (pass); `source .venv/bin/activate && pytest -q tests/test_cli_saved_filters.py tests/test_cli_data_connections.py tests/test_cli_tasks.py tests/test_cli_export.py` (pass); `source .venv/bin/activate && python -m mdeasm_cli tasks list --format json --out - >/tmp/mdeasm_tasks_list_cycle12.json 2>/tmp/mdeasm_tasks_list_cycle12.err; rc=$?; echo tasks_list_rc=$rc; test \"$rc\" -eq 1` (pass; expected missing env credentials locally)
+
 - [x] **Retry-After standards support in helper + CLI artifact retries**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_tasks.py`, `docs/tasks.md`, `docs/exports.md`
@@ -458,6 +457,19 @@ Priority order (cycle 11 planning; selected cycle 11 task moved to Implemented b
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 12):
+  - Microsoft Defender EASM REST references for `tasks`, `savedFilters`, and `dataConnections` keep documenting structured error response contracts (status + `x-ms-error-code` + error payload objects), reinforcing that CLI surfaces should preserve code/message details for operators.
+  - Peer API guidance (runZero) still emphasizes HTTP status-aware automation behavior, including `429` handling and delayed retries, which aligns with surfacing explicit status and code in failure output.
+  - Gap map (cycle 12):
+    - Weak -> closed this cycle: standardized redacted CLI error diagnostics with `status=...`, `code=...`, and `message=...` across selected list/get flows in `saved-filters`, `data-connections`, `tasks`, and `assets`.
+    - Weak -> closed this cycle: regression tests for parity + redaction behavior in command-family failure paths.
+    - Remaining high-priority weak gaps: live protected artifact fetch smoke and expanded live data-connections smoke (`get`/`validate`).
+  - Sources reviewed (untrusted):
+    - Microsoft Learn Defender EASM tasks operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM list-saved-filter operation (error response metadata): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/savedfilters/list-saved-filter?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM list-data-connections operation (error response metadata): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/data-connections/list-data-connections?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API guidance (`429 Too Many Requests` and delay handling): https://help.runzero.com/docs/leverage-the-api/
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 11):
   - Microsoft Defender EASM task endpoints continue to center asynchronous exports and task polling/download operations, so resilient retry behavior for artifact fetch remains a baseline reliability requirement.
   - Peer API guidance (runZero) explicitly documents `429` handling with delayed retries, reinforcing the need to honor server-provided retry timing instead of fixed-only exponential backoff.
