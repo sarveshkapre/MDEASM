@@ -34,6 +34,7 @@ python3 -m pip install -r requirements.txt --upgrade
 
 ## CLI exports (optional)
 See `docs/exports.md` for JSON/CSV export recipes using `API/mdeasm_cli.py`.
+For task lifecycle operations (`mdeasm tasks ...`), see `docs/tasks.md`.
 
 ## Saved filters (optional)
 Saved filters are stored server-side in Defender EASM and can reduce repeated filter strings in scripts.

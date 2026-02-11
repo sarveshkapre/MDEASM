@@ -6,8 +6,11 @@ import math
 import os
 import sys
 import tempfile
+import time
 from importlib.metadata import PackageNotFoundError, version as pkg_version
 from pathlib import Path
+
+_TASK_TERMINAL_STATES = {"complete", "completed", "failed", "incomplete", "cancelled", "canceled"}
 
 
 def _json_default(obj):
@@ -283,6 +286,28 @@ def _build_ws_kwargs(args) -> dict:
     if getattr(args, "backoff_max_s", None) is not None:
         ws_kwargs["backoff_max_s"] = args.backoff_max_s
     return ws_kwargs
+
+
+def _wait_for_task_state(
+    ws,
+    *,
+    task_id: str,
+    workspace_name: str,
+    poll_interval_s: float,
+    timeout_s: float,
+):
+    started = time.monotonic()
+    last = ws.get_task(task_id, workspace_name=workspace_name, noprint=True)
+    while True:
+        state = str((last or {}).get("state", "")).strip().lower()
+        if state in _TASK_TERMINAL_STATES:
+            return last
+        if timeout_s > 0 and (time.monotonic() - started) >= timeout_s:
+            raise TimeoutError(
+                f"timed out waiting for task {task_id} after {timeout_s}s (last state={state or 'unknown'})"
+            )
+        time.sleep(max(poll_interval_s, 0.1))
+        last = ws.get_task(task_id, workspace_name=workspace_name, noprint=True)
 
 
 def _write_csv(path: Path | None, rows: list[dict], *, columns: list[str] | None = None) -> None:
@@ -687,6 +712,220 @@ def build_parser() -> argparse.ArgumentParser:
     sf_delete.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
     sf_delete.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
 
+    tasks = sub.add_parser("tasks", help="Data-plane task operations")
+    tasks_sub = tasks.add_subparsers(dest="tasks_cmd", required=True)
+
+    tasks_list = tasks_sub.add_parser("list", help="List tasks")
+    tasks_list.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    tasks_list.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_list.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_list.add_argument("--out", default="", help="Output path (default: stdout)")
+    tasks_list.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_list.add_argument("--filter", default="", help="Optional server-side filter expression")
+    tasks_list.add_argument("--orderby", default="", help="Optional ordering expression")
+    tasks_list.add_argument("--get-all", action="store_true", help="Fetch all pages")
+    tasks_list.add_argument("--page", type=int, default=0, help="Starting page (skip)")
+    tasks_list.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
+    tasks_list.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_list.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_list.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_list.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_list.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    tasks_list.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_list.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    tasks_get = tasks_sub.add_parser("get", help="Get task details")
+    tasks_get.add_argument("task_id", help="Task id")
+    tasks_get.add_argument("--out", default="", help="Output path (default: stdout)")
+    tasks_get.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_get.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_get.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_get.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_get.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_get.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_get.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_get.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    tasks_get.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_get.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    tasks_cancel = tasks_sub.add_parser("cancel", help="Cancel a task")
+    tasks_cancel.add_argument("task_id", help="Task id")
+    tasks_cancel.add_argument("--out", default="", help="Output path (default: stdout)")
+    tasks_cancel.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_cancel.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_cancel.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_cancel.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_cancel.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_cancel.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_cancel.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_cancel.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    tasks_cancel.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_cancel.add_argument(
+        "--backoff-max-s", type=float, default=None, help="Max backoff seconds"
+    )
+
+    tasks_run = tasks_sub.add_parser("run", help="Run a paused task")
+    tasks_run.add_argument("task_id", help="Task id")
+    tasks_run.add_argument("--out", default="", help="Output path (default: stdout)")
+    tasks_run.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_run.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_run.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_run.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_run.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_run.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_run.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_run.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    tasks_run.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_run.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    tasks_download = tasks_sub.add_parser("download", help="Get a task download artifact reference")
+    tasks_download.add_argument("task_id", help="Task id")
+    tasks_download.add_argument("--out", default="", help="Output path (default: stdout)")
+    tasks_download.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_download.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_download.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_download.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_download.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_download.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_download.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_download.add_argument(
+        "--no-retry", action="store_true", help="Disable HTTP retry/backoff"
+    )
+    tasks_download.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_download.add_argument(
+        "--backoff-max-s", type=float, default=None, help="Max backoff seconds"
+    )
+
     assets = sub.add_parser("assets", help="Asset inventory operations")
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
 
@@ -701,6 +940,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["json", "ndjson", "csv"],
         default="json",
         help="Output format",
+    )
+    export.add_argument(
+        "--mode",
+        choices=["client", "server"],
+        default="client",
+        help="Export mode: client-side paging (default) or server-side task export",
     )
     export.add_argument(
         "-v",
@@ -722,15 +967,47 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export.add_argument("--out", default="", help="Output path (default: stdout)")
     export.add_argument(
+        "--server-file-name",
+        default="",
+        help="Server export mode: requested output file name for the generated export artifact",
+    )
+    export.add_argument(
         "--columns",
         action="append",
         default=None,
-        help="CSV only: column name(s) to include (repeatable or comma-separated)",
+        help="CSV mode: output columns; server mode: export task columns (repeatable or comma-separated)",
     )
     export.add_argument(
         "--columns-from",
         default="",
-        help="CSV only: path to a newline-delimited columns file (blank lines and #comments ignored)",
+        help="CSV mode: output columns file; server mode: export task columns file",
+    )
+    export.add_argument(
+        "--server-orderby",
+        default="",
+        help="Server export mode: optional orderby expression",
+    )
+    export.add_argument(
+        "--wait",
+        action="store_true",
+        help="Server export mode: poll task status until terminal state",
+    )
+    export.add_argument(
+        "--poll-interval-s",
+        type=float,
+        default=5.0,
+        help="Server export mode: polling interval seconds when --wait is set (default: 5)",
+    )
+    export.add_argument(
+        "--wait-timeout-s",
+        type=float,
+        default=900.0,
+        help="Server export mode: max wait seconds when --wait is set (default: 900)",
+    )
+    export.add_argument(
+        "--download-on-complete",
+        action="store_true",
+        help="Server export mode: call tasks/{id}:download after a completed task and include response in output",
     )
     export.add_argument(
         "--max-assets",
@@ -1113,6 +1390,80 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("unknown saved-filters command\n")
         return 2
 
+    if args.cmd == "tasks":
+        import mdeasm
+
+        level = None
+        if getattr(args, "log_level", ""):
+            level = args.log_level
+        elif getattr(args, "verbose", 0) >= 2:
+            level = "DEBUG"
+        elif getattr(args, "verbose", 0) == 1:
+            level = "INFO"
+        if level and hasattr(mdeasm, "configure_logging"):
+            mdeasm.configure_logging(level)
+
+        ws_kwargs = _build_ws_kwargs(args)
+        ws = mdeasm.Workspaces(**ws_kwargs)
+        out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
+
+        if args.tasks_cmd == "list":
+            payload = ws.list_tasks(
+                workspace_name=args.workspace_name,
+                filter_expr=args.filter,
+                orderby=args.orderby,
+                skip=args.page,
+                max_page_size=args.max_page_size,
+                get_all=args.get_all,
+                noprint=True,
+            )
+            values = payload.get("value") if isinstance(payload, dict) else None
+            if values is None:
+                values = payload.get("content") if isinstance(payload, dict) else []
+            if not isinstance(values, list):
+                values = []
+
+            if args.format == "json":
+                _write_json(out_path, values, pretty=True)
+            else:
+                lines = []
+                for item in values:
+                    lines.append(
+                        "\t".join(
+                            [
+                                str(item.get("id", "")),
+                                str(item.get("state", "")),
+                                str(item.get("startedAt", "")),
+                                str(item.get("completedAt", "")),
+                            ]
+                        )
+                    )
+                _write_lines(out_path, lines)
+            return 0
+
+        if args.tasks_cmd == "get":
+            payload = ws.get_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.tasks_cmd == "cancel":
+            payload = ws.cancel_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.tasks_cmd == "run":
+            payload = ws.run_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.tasks_cmd == "download":
+            payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            _write_json(out_path, payload, pretty=True)
+            return 0
+
+        sys.stderr.write("unknown tasks command\n")
+        return 2
+
     if args.cmd == "assets" and args.assets_cmd in ("export", "schema"):
         # Import inside the command so `--help` works without requiring env/config.
         import mdeasm
@@ -1138,13 +1489,65 @@ def main(argv: list[str] | None = None) -> int:
         if args.assets_cmd == "export":
             out_path = None if (not args.out or args.out == "-") else Path(args.out)
 
-            columns: list[str] = []
-            if args.format == "csv":
-                columns = _parse_columns_arg(args.columns)
-                if args.columns_from:
-                    columns = _read_columns_file(Path(args.columns_from)) + columns
-                    # Dedup while preserving file order first.
-                    columns = _parse_columns_arg(columns)
+            columns: list[str] = _parse_columns_arg(args.columns)
+            if args.columns_from:
+                columns = _read_columns_file(Path(args.columns_from)) + columns
+                # Dedup while preserving file order first.
+                columns = _parse_columns_arg(columns)
+
+            if args.mode == "server":
+                if args.format != "json":
+                    sys.stderr.write("server export mode only supports --format json\n")
+                    return 2
+                if not columns:
+                    sys.stderr.write(
+                        "server export mode requires --columns or --columns-from\n"
+                    )
+                    return 2
+                if args.download_on_complete and not args.wait:
+                    sys.stderr.write("--download-on-complete requires --wait\n")
+                    return 2
+
+                task = ws.create_assets_export_task(
+                    columns=columns,
+                    query_filter=query_filter,
+                    file_name=args.server_file_name,
+                    orderby=args.server_orderby,
+                    workspace_name=args.workspace_name,
+                    noprint=True,
+                )
+                output_payload = task
+                task_id = str((task or {}).get("id", "")).strip()
+                if args.wait:
+                    if not task_id:
+                        sys.stderr.write("server export task response did not include an id\n")
+                        return 1
+                    try:
+                        final_task = _wait_for_task_state(
+                            ws,
+                            task_id=task_id,
+                            workspace_name=args.workspace_name,
+                            poll_interval_s=args.poll_interval_s,
+                            timeout_s=args.wait_timeout_s,
+                        )
+                    except TimeoutError as e:
+                        sys.stderr.write(f"{e}\n")
+                        return 1
+                    output_payload = final_task
+                    state = str((final_task or {}).get("state", "")).strip().lower()
+                    if args.download_on_complete and state in {"complete", "completed"}:
+                        dl = ws.download_task(
+                            task_id,
+                            workspace_name=args.workspace_name,
+                            noprint=True,
+                        )
+                        output_payload = {"task": final_task, "download": dl}
+
+                _write_json(out_path, output_payload, pretty=bool(args.pretty))
+                return 0
+
+            if args.format == "csv" and not columns:
+                columns = []
 
             if (
                 args.no_facet_filters

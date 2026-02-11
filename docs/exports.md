@@ -85,6 +85,28 @@ mdeasm assets export \
   --columns id,kind,displayName,domain,firstSeen,lastSeen
 ```
 
+## Server-side asset export task (recommended for large inventories)
+```bash
+source .venv/bin/activate
+
+# Server-side export requires explicit columns.
+mdeasm assets export \
+  --mode server \
+  --filter 'state = "confirmed" AND kind = "host"' \
+  --columns id,kind,displayName,ipAddress,lastSeen \
+  --server-file-name hosts_export.csv \
+  --wait \
+  --download-on-complete \
+  --format json \
+  --out export_task.json
+```
+
+Notes:
+- `--mode server` uses Defender EASM `POST /assets:export` and returns task metadata.
+- `--wait` polls `tasks/{id}` until a terminal state; use `--poll-interval-s` / `--wait-timeout-s` to tune behavior.
+- `--download-on-complete` calls `tasks/{id}:download` after completion and includes that response in output.
+- For direct task operations, see `docs/tasks.md`.
+
 ## Export schema (columns file)
 ```bash
 source .venv/bin/activate
@@ -114,3 +136,4 @@ mdeasm assets export \
 - For reliability tuning without code edits, see `mdeasm assets export --help` for: `--api-version` (or `--cp-api-version`/`--dp-api-version`), `--http-timeout`, `--no-retry`, `--max-retry`, and `--backoff-max-s`.
 - `--http-timeout` examples: `--http-timeout 120` (connect=10, read=120) or `--http-timeout 5,120`.
 - For debugging, use `-v`/`-vv` or `--log-level DEBUG`.
+- Task export mode (`--mode server`) may require a newer data-plane `api-version` in some tenants; if needed, set `--dp-api-version 2024-10-01-preview` (or `EASM_DP_API_VERSION`).

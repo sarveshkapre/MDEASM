@@ -1952,6 +1952,211 @@ class Workspaces:
             print(json.dumps({"status": r.status_code, "name": name}, indent=2))
         return None
 
+    def list_tasks(
+        self,
+        workspace_name="",
+        filter_expr="",
+        orderby="",
+        skip=0,
+        max_page_size=25,
+        get_all=False,
+        **kwargs,
+    ):
+        """
+        List data-plane tasks.
+
+        Returns a JSON payload with a `value` list. Use `noprint=True` for programmatic use.
+        """
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        page = max(int(skip or 0), 0)
+        page_size = max(int(max_page_size or 25), 1)
+        values = []
+        total_elements = None
+        while True:
+            params = {"skip": page, "maxpagesize": page_size}
+            if filter_expr:
+                params["filter"] = filter_expr
+            if orderby:
+                params["orderby"] = orderby
+
+            r = self.__workspace_query_helper__(
+                "list_tasks",
+                method="get",
+                endpoint="tasks",
+                params=params,
+                workspace_name=workspace_name,
+            )
+            payload = r.json()
+            batch = payload.get("value")
+            if batch is None:
+                # Defensive fallback for legacy/alternate payload shapes.
+                batch = payload.get("content") or []
+            if not isinstance(batch, list):
+                batch = []
+
+            if not get_all:
+                if kwargs.get("noprint"):
+                    return payload
+                print(json.dumps(payload, indent=2))
+                return payload
+
+            values.extend(batch)
+            if total_elements is None:
+                total_elements = payload.get("totalElements")
+
+            try:
+                if total_elements is not None and (page + len(batch)) >= int(total_elements):
+                    break
+            except Exception:
+                pass
+            if not batch or len(batch) < page_size:
+                break
+            page += len(batch)
+
+        out = {"value": values}
+        if total_elements is not None:
+            out["totalElements"] = total_elements
+        else:
+            out["totalElements"] = len(values)
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def get_task(self, task_id, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        r = self.__workspace_query_helper__(
+            "get_task",
+            method="get",
+            endpoint=f"tasks/{task_id}",
+            workspace_name=workspace_name,
+        )
+        payload = r.json()
+        if kwargs.get("noprint"):
+            return payload
+        print(json.dumps(payload, indent=2))
+        return payload
+
+    def cancel_task(self, task_id, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        r = self.__workspace_query_helper__(
+            "cancel_task",
+            method="post",
+            endpoint=f"tasks/{task_id}:cancel",
+            workspace_name=workspace_name,
+        )
+        payload = r.json()
+        if kwargs.get("noprint"):
+            return payload
+        print(json.dumps(payload, indent=2))
+        return payload
+
+    def run_task(self, task_id, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        r = self.__workspace_query_helper__(
+            "run_task",
+            method="post",
+            endpoint=f"tasks/{task_id}:run",
+            workspace_name=workspace_name,
+        )
+        payload = r.json()
+        if kwargs.get("noprint"):
+            return payload
+        print(json.dumps(payload, indent=2))
+        return payload
+
+    def download_task(self, task_id, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        r = self.__workspace_query_helper__(
+            "download_task",
+            method="post",
+            endpoint=f"tasks/{task_id}:download",
+            workspace_name=workspace_name,
+        )
+        payload = r.json()
+        if kwargs.get("noprint"):
+            return payload
+        print(json.dumps(payload, indent=2))
+        return payload
+
+    def create_assets_export_task(
+        self,
+        columns,
+        query_filter="",
+        file_name="",
+        orderby="",
+        workspace_name="",
+        **kwargs,
+    ):
+        """
+        Start a server-side asset export task (`POST /assets:export`).
+
+        Returns the created task payload; use `noprint=True` for programmatic usage.
+        """
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            logging.error(f"{workspace_name} not found")
+            raise Exception(workspace_name)
+
+        if not isinstance(columns, list):
+            logging.error("columns must be a list of strings")
+            raise Exception(type(columns))
+        columns = [str(c).strip() for c in columns if str(c).strip()]
+        if not columns:
+            logging.error("columns cannot be empty")
+            raise Exception("columns cannot be empty")
+
+        if not file_name:
+            file_name = (
+                f"mdeasm-assets-export-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.csv"
+            )
+        payload = {"columns": columns, "fileName": file_name}
+        params = {}
+        if query_filter:
+            params["filter"] = query_filter
+        if orderby:
+            params["orderby"] = orderby
+
+        r = self.__workspace_query_helper__(
+            "create_assets_export_task",
+            method="post",
+            endpoint="assets:export",
+            params=(params or None),
+            payload=payload,
+            workspace_name=workspace_name,
+        )
+        out = r.json()
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
     def update_assets(
         self,
         query_filter,

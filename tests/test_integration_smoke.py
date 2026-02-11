@@ -115,3 +115,37 @@ def test_integration_smoke_cli_assets_export():
         ]
     )
     assert rc == 0
+
+
+def test_integration_smoke_server_export_task():
+    """
+    Optional task-based server export smoke.
+
+    This verifies the newer `assets:export` + task retrieval flow. It is skipped by default
+    because it requires real credentials/workspace access and may depend on preview API versions.
+    """
+    if os.getenv("MDEASM_INTEGRATION_TASK_EXPORT") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_TASK_EXPORT=1 to enable server export task integration smoke tests"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip("set WORKSPACE_NAME (or ensure only one workspace exists) to run task smoke")
+
+    task = ws.create_assets_export_task(
+        columns=["id", "kind"],
+        query_filter='kind = "domain"',
+        file_name="mdeasm-smoke-export.csv",
+        noprint=True,
+    )
+    task_id = (task or {}).get("id")
+    assert task_id
+
+    task_details = ws.get_task(task_id, noprint=True)
+    assert (task_details or {}).get("id") == task_id

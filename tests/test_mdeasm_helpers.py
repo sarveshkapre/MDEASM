@@ -360,3 +360,117 @@ def test_get_workspaces_missing_default_does_not_write_to_stdout(capsys):
     assert "no WORKSPACE_NAME set" in out.err
     assert "\twsA" in out.err
     assert "\twsB" in out.err
+
+
+def test_list_tasks_get_all_paginates_by_skip():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    responses = [
+        Resp(
+            {
+                "totalElements": 3,
+                "value": [{"id": "t1"}, {"id": "t2"}],
+            }
+        ),
+        Resp(
+            {
+                "totalElements": 3,
+                "value": [{"id": "t3"}],
+            }
+        ),
+    ]
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append(kwargs)
+        return responses[len(calls) - 1]
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.list_tasks(get_all=True, max_page_size=2, noprint=True)
+
+    assert [t["id"] for t in payload["value"]] == ["t1", "t2", "t3"]
+    assert calls[0]["params"]["skip"] == 0
+    assert calls[1]["params"]["skip"] == 2
+
+
+def test_create_assets_export_task_builds_expected_request():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    captured = {}
+
+    class Resp:
+        def json(self):
+            return {"id": "task-123", "state": "notStarted"}
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **kwargs):
+        captured.update(kwargs)
+        return Resp()
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.create_assets_export_task(
+        columns=["id", "kind"],
+        query_filter='kind = "domain"',
+        file_name="assets.csv",
+        orderby="name asc",
+        noprint=True,
+    )
+
+    assert payload["id"] == "task-123"
+    assert captured["method"] == "post"
+    assert captured["endpoint"] == "assets:export"
+    assert captured["params"]["filter"] == 'kind = "domain"'
+    assert captured["params"]["orderby"] == "name asc"
+    assert captured["payload"] == {"columns": ["id", "kind"], "fileName": "assets.csv"}
+
+
+def test_task_endpoints_use_expected_routes():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    seen = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **kwargs):
+        seen.append((kwargs["method"], kwargs["endpoint"]))
+        return Resp({"id": "task-123"})
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    assert ws.get_task("task-123", noprint=True)["id"] == "task-123"
+    assert ws.cancel_task("task-123", noprint=True)["id"] == "task-123"
+    assert ws.run_task("task-123", noprint=True)["id"] == "task-123"
+    assert ws.download_task("task-123", noprint=True)["id"] == "task-123"
+
+    assert seen == [
+        ("get", "tasks/task-123"),
+        ("post", "tasks/task-123:cancel"),
+        ("post", "tasks/task-123:run"),
+        ("post", "tasks/task-123:download"),
+    ]
