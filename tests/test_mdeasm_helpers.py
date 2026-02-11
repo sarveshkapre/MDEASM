@@ -944,6 +944,138 @@ def test_discovery_helpers_raise_typed_validation_and_workspace_errors():
         )
 
 
+def test_get_discovery_groups_supports_filter_and_paging_params():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    captured = {}
+
+    class Resp:
+        def json(self):
+            return {"content": []}
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    def fake_query_helper(*_args, **kwargs):
+        captured["kwargs"] = dict(kwargs)
+        return Resp()
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.get_discovery_groups(
+        workspace_name="ws1",
+        filter_expr='name eq "Contoso"',
+        skip=5,
+        max_page_size=10,
+        noprint=True,
+    )
+    assert payload == {"content": []}
+    assert captured["kwargs"]["params"] == {
+        "filter": 'name eq "Contoso"',
+        "skip": 5,
+        "maxpagesize": 10,
+    }
+
+
+def test_discovery_group_runs_retry_retries_transient_statuses():
+    ws = _new_ws()
+    calls = {"count": 0}
+
+    def fake_get_runs(disco_name="", workspace_name=""):
+        calls["count"] += 1
+        if calls["count"] < 3:
+            raise mdeasm.ApiRequestError(
+                "called by: __get_discovery_group_runs__ -- last_status: 404 -- last_text: not yet"
+            )
+        return {disco_name: [{"state": "complete"}]}
+
+    ws.__get_discovery_group_runs__ = fake_get_runs  # type: ignore[attr-defined]
+
+    with mock.patch.object(mdeasm.time, "sleep") as sleep_mock:
+        payload = ws.__get_discovery_group_runs_with_retry__(
+            "contoso",
+            workspace_name="ws1",
+            max_attempts=3,
+            backoff_max_s=5,
+        )
+
+    assert payload == {"contoso": [{"state": "complete"}]}
+    assert calls["count"] == 3
+    assert sleep_mock.call_args_list == [mock.call(1), mock.call(2)]
+
+
+def test_discovery_group_runs_retry_stops_on_non_retryable_status():
+    ws = _new_ws()
+    calls = {"count": 0}
+
+    def fake_get_runs(*_args, **_kwargs):
+        calls["count"] += 1
+        raise mdeasm.ApiRequestError(
+            "called by: __get_discovery_group_runs__ -- last_status: 400 -- last_text: bad request"
+        )
+
+    ws.__get_discovery_group_runs__ = fake_get_runs  # type: ignore[attr-defined]
+
+    with mock.patch.object(mdeasm.time, "sleep") as sleep_mock:
+        with pytest.raises(mdeasm.ApiRequestError):
+            ws.__get_discovery_group_runs_with_retry__(
+                "contoso",
+                workspace_name="ws1",
+                max_attempts=3,
+                backoff_max_s=5,
+            )
+
+    assert calls["count"] == 1
+    sleep_mock.assert_not_called()
+
+
+def test_delete_discovery_group_supports_optional_verification(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    captured = {"delete_calls": 0, "list_calls": 0}
+
+    class Resp:
+        status_code = 204
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    def fake_query_helper(*_args, **kwargs):
+        assert kwargs["method"] == "delete"
+        assert kwargs["endpoint"] == "discoGroups/Contoso Group"
+        captured["delete_calls"] += 1
+        return Resp()
+
+    def fake_get_discovery_groups(*_args, **_kwargs):
+        captured["list_calls"] += 1
+        if captured["list_calls"] == 1:
+            return {"content": [{"name": "Contoso Group"}]}
+        return {"content": []}
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+    ws.get_discovery_groups = fake_get_discovery_groups  # type: ignore[attr-defined]
+
+    with mock.patch.object(mdeasm.time, "sleep") as sleep_mock:
+        payload = ws.delete_discovery_group(
+            "Contoso Group",
+            workspace_name="ws1",
+            verify_deleted=True,
+            verify_max_retry=3,
+            verify_backoff_max_s=5,
+            noprint=True,
+        )
+
+    assert payload == {
+        "workspaceName": "ws1",
+        "name": "Contoso Group",
+        "deleted": True,
+        "status": 204,
+        "verifiedDeleted": True,
+    }
+    assert captured["delete_calls"] == 1
+    assert captured["list_calls"] == 2
+    sleep_mock.assert_called_once_with(1)
+    assert capsys.readouterr().out == ""
+
+
 def test_label_helpers_support_noprint_and_consistent_returns(capsys):
     ws = _new_ws()
     ws._default_workspace_name = "ws1"

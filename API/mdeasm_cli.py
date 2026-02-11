@@ -1271,6 +1271,133 @@ def build_parser() -> argparse.ArgumentParser:
         help="Max backoff sleep seconds between retries (default: helper default)",
     )
 
+    discovery_groups = sub.add_parser(
+        "discovery-groups",
+        help="Discovery group operations (data plane)",
+    )
+    dg_sub = discovery_groups.add_subparsers(dest="discovery_groups_cmd", required=True)
+
+    dg_list = dg_sub.add_parser("list", help="List discovery groups")
+    dg_list.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    dg_list.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    dg_list.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dg_list.add_argument("--out", default="", help="Output path (default: stdout)")
+    dg_list.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dg_list.add_argument(
+        "--filter",
+        default="",
+        help="Optional server-side filter expression for listing",
+    )
+    dg_list.add_argument("--get-all", action="store_true", help="Fetch all pages")
+    dg_list.add_argument("--page", type=int, default=0, help="Starting page (skip)")
+    dg_list.add_argument("--max-page-size", type=int, default=25, help="Max page size (1-100)")
+    dg_list.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dg_list.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dg_list.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dg_list.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dg_list.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dg_list.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dg_list.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dg_delete = dg_sub.add_parser("delete", help="Delete a discovery group by name")
+    dg_delete.add_argument("name", help="Discovery group name")
+    dg_delete.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    dg_delete.add_argument("--out", default="", help="Output path (default: stdout)")
+    dg_delete.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log verbosity (repeatable; maps to INFO/DEBUG)",
+    )
+    dg_delete.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dg_delete.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dg_delete.add_argument(
+        "--verify-delete",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Best-effort post-delete verification via list calls (default: true)",
+    )
+    dg_delete.add_argument(
+        "--verify-max-retry",
+        type=int,
+        default=3,
+        help="Verification list retries when --verify-delete is enabled (default: 3)",
+    )
+    dg_delete.add_argument(
+        "--verify-backoff-max-s",
+        type=float,
+        default=5.0,
+        help="Max verification backoff sleep seconds (default: 5)",
+    )
+    dg_delete.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dg_delete.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dg_delete.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dg_delete.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dg_delete.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dg_delete.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dg_delete.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
     resource_tags = sub.add_parser(
         "resource-tags",
         help="Workspace Azure resource tags operations (control plane)",
@@ -2950,6 +3077,95 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         sys.stderr.write("unknown workspaces command\n")
+        return 2
+
+    if args.cmd == "discovery-groups":
+        import mdeasm
+
+        _configure_cli_logging(mdeasm, args)
+
+        ws_kwargs = _build_ws_kwargs(args)
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            return _emit_cli_error(
+                "discovery-groups client initialization", e, mdeasm_module=mdeasm
+            )
+
+        out_path = _resolve_out_path(getattr(args, "out", ""))
+
+        if args.discovery_groups_cmd == "list":
+            try:
+                page = max(int(args.page or 0), 0)
+                max_page_size = max(int(args.max_page_size or 25), 1)
+                values: list[dict] = []
+                while True:
+                    payload = ws.get_discovery_groups(
+                        workspace_name=args.workspace_name,
+                        filter_expr=args.filter,
+                        skip=page,
+                        max_page_size=max_page_size,
+                        noprint=True,
+                    )
+                    batch = _payload_items(payload)
+                    values.extend(batch if args.get_all else batch[:])
+
+                    if not args.get_all:
+                        break
+                    total = payload.get("totalElements") if isinstance(payload, dict) else None
+                    try:
+                        if total is not None and (page + len(batch)) >= int(total):
+                            break
+                    except Exception:
+                        pass
+                    if not batch or len(batch) < max_page_size:
+                        break
+                    page += len(batch)
+
+                if args.format == "json":
+                    _write_json(out_path, values, pretty=True)
+                else:
+                    rows = []
+                    for row in values:
+                        seeds = (row or {}).get("seeds") or []
+                        rows.append(
+                            {
+                                "name": (row or {}).get("name"),
+                                "tier": (row or {}).get("tier"),
+                                "state": (row or {}).get("state"),
+                                "seedCount": len(seeds) if isinstance(seeds, list) else 0,
+                            }
+                        )
+                    _write_lines(out_path, _rows_to_tab_lines(rows, ["name", "tier", "state", "seedCount"]))
+                return 0
+            except Exception as e:
+                return _emit_cli_error("discovery-groups list", e, mdeasm_module=mdeasm)
+
+        if args.discovery_groups_cmd == "delete":
+            try:
+                payload = ws.delete_discovery_group(
+                    args.name,
+                    workspace_name=args.workspace_name,
+                    verify_deleted=args.verify_delete,
+                    verify_max_retry=args.verify_max_retry,
+                    verify_backoff_max_s=args.verify_backoff_max_s,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            [payload],
+                            ["workspaceName", "name", "deleted", "verifiedDeleted", "status"],
+                        ),
+                    )
+                return 0
+            except Exception as e:
+                return _emit_cli_error("discovery-groups delete", e, mdeasm_module=mdeasm)
+
+        sys.stderr.write("unknown discovery-groups command\n")
         return 2
 
     if args.cmd == "resource-tags":

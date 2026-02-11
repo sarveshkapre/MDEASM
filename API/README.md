@@ -36,6 +36,7 @@ python3 -m pip install -r requirements.txt --upgrade
 See `docs/exports.md` for JSON/CSV export recipes using `API/mdeasm_cli.py`.
 For task lifecycle operations (`mdeasm tasks ...`), see `docs/tasks.md`.
 For data connection operations (`mdeasm data-connections ...`), see `docs/data_connections.md`.
+For discovery group operations (`mdeasm discovery-groups ...`), see `docs/discovery_groups.md`.
 For workspace operations (`mdeasm workspaces ...`), see `docs/workspaces.md`.
 For workspace resource tag operations (`mdeasm resource-tags ...`), see `docs/resource_tags.md`.
 

@@ -269,6 +269,33 @@ def test_integration_smoke_data_connections_validate():
         assert isinstance(payload, dict)
 
 
+def test_integration_smoke_discovery_groups_list():
+    """
+    Optional discovery-groups API drift smoke.
+
+    This is a non-destructive, tiny list probe for discovery group endpoint compatibility.
+    """
+    if os.getenv("MDEASM_INTEGRATION_DISCOVERY_GROUPS") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_DISCOVERY_GROUPS=1 to enable discovery-groups integration smoke"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip(
+            "set WORKSPACE_NAME (or ensure only one workspace exists) to run discovery-groups smoke"
+        )
+
+    payload = ws.get_discovery_groups(max_page_size=1, noprint=True)
+    assert isinstance(payload, dict)
+    assert "content" in payload or "value" in payload
+
+
 def test_integration_smoke_saved_filters_lifecycle():
     """
     Optional saved-filters lifecycle smoke.

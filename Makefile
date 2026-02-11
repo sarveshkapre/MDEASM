@@ -18,6 +18,7 @@ smoke:
 	$(PYTHON) -m mdeasm_cli --version >/dev/null
 	$(PYTHON) -m mdeasm_cli assets --help >/dev/null
 	$(PYTHON) -m mdeasm_cli tasks --help >/dev/null
+	$(PYTHON) -m mdeasm_cli discovery-groups --help >/dev/null
 	$(PYTHON) -m mdeasm_cli doctor --help >/dev/null
 
 docs-smoke:
@@ -25,6 +26,8 @@ docs-smoke:
 	$(PYTHON) -m mdeasm_cli assets schema diff --help >/dev/null
 	$(PYTHON) -m mdeasm_cli tasks wait --help >/dev/null
 	$(PYTHON) -m mdeasm_cli tasks fetch --help >/dev/null
+	$(PYTHON) -m mdeasm_cli discovery-groups list --help >/dev/null
+	$(PYTHON) -m mdeasm_cli discovery-groups delete --help >/dev/null
 	$(PYTHON) -m mdeasm_cli data-connections validate --help >/dev/null
 	$(PYTHON) -m mdeasm_cli saved-filters put --help >/dev/null
 	$(PYTHON) -m mdeasm_cli workspaces delete --help >/dev/null
