@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Prioritize cycle 16 session on workspace resource-tags parity (`list/get/put/delete`) | Bounded market scan and local gap map showed resource-governance metadata as the highest-impact missing control-plane capability that could be shipped safely with deterministic tests | Cycle 16 session gap map + ranked tasks captured in `CLONE_FEATURES.md` with Microsoft Learn + peer API references | n/a | high | untrusted
+- 2026-02-11 | Ship resource-tags helper + CLI + docs-smoke coverage in one batch | Implementing helper methods and CLI contracts together prevented drift and immediately raised confidence via focused + full-suite verification | `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_resource_tags.py docs/resource_tags.md README.md API/README.md` (pass); `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -k \"resource_tag or resource_tags\" tests/test_cli_resource_tags.py` (pass); `source .venv/bin/activate && make verify` (pass); `gh run watch 21913264606 -R sarveshkapre/MDEASM --exit-status` (pass) | 6880aec | high | trusted
+- 2026-02-11 | Keep resource-tags live tenant integration validation as explicit follow-up | Local environment still lacks required Defender EASM credentials, so deterministic in-session live ARM tag lifecycle checks are unavailable; keep a real smoke backlog item with env gating | `source .venv/bin/activate && python -m mdeasm_cli resource-tags list --workspace-name demo --format json --out - >/tmp/mdeasm_resource_tags_cycle16.json 2>/tmp/mdeasm_resource_tags_cycle16.err; rc=$?; echo resource_tags_list_rc=$rc; test \"$rc\" -eq 1` (pass; expected missing env credentials locally) | n/a | high | trusted
 - 2026-02-11 | Prioritize cycle 16 on targeted CLI cleanup/refactor (`mdeasm_cli` shared command plumbing) before new feature expansion | Bounded local scan showed repeated logging/output/list-shape handling across command families as the highest-impact safe readability/maintainability gap that could be reduced without behavior changes | Cycle 16 gap map + delivered scope captured in `CLONE_FEATURES.md`; focused CLI tests selected for regression safety | n/a | high | trusted
 - 2026-02-11 | Ship cycle 16 cleanup batch: deduplicate CLI log-level + out-path resolution, centralize tab-line row rendering, and reuse shared paged-list extraction for `tasks list`/`data-connections list` | Reduced repeated branches and parsing drift risk in the highest-traffic CLI surfaces while preserving command output contracts | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && make verify` (pass) | 84ac954 | high | trusted
 - 2026-02-11 | Add focused reliability coverage for alternate paged payload shape (`content`) in CLI list flows | API preview payloads can drift between `value` and `content`; explicit contract tests prevent regressions while refactoring | `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` (pass) | n/a | high | trusted
@@ -129,7 +132,7 @@
 
 ## Next Prioritized Tasks
 - Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`), gated behind explicit env flags once credentials are available.
-- Add helper + CLI resource-tags CRUD parity for governance metadata workflows.
+- Add opt-in live tenant smoke for workspace resource-tags lifecycle (`list/get/put/delete`) with explicit env gating.
 - Run live tenant smoke for saved-filters lifecycle (`list/get/put/delete`) behind explicit env gating.
 - Complete user-facing CLI `--format lines` consistency sweep across command families (cleanup groundwork landed in cycle 16).
 - Add discovery-group delete retry hardening for transient control-plane/data-plane failures.
@@ -137,6 +140,15 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 15 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event,headBranch` | recent `main` CI runs completed with `success`; no failing checks to remediate before this session's change | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_resource_tags.py docs/resource_tags.md README.md API/README.md` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -k \"resource_tag or resource_tags\"` | `....` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_resource_tags.py` | `......` | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `163 passed, 8 skipped`; compile + smoke + docs-smoke passed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli resource-tags --help >/dev/null && python -m mdeasm_cli resource-tags list --workspace-name demo --format json --out - >/tmp/mdeasm_resource_tags_cycle16.json 2>/tmp/mdeasm_resource_tags_cycle16.err; rc=$?; echo resource_tags_list_rc=$rc; test \"$rc\" -eq 1` | `resource_tags_list_rc=1` with expected missing required env vars in local env | pass
+- 2026-02-11 | `git push origin main` | pushed feature commit `6880aec` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21913264606 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `6880aec`; `3.11`, `3.12`, and `3.13` jobs green | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `All checks passed!` | pass
 - 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `..............................` | pass
 - 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `153 passed, 8 skipped`; compile + smoke + docs-smoke passed | pass

@@ -9,13 +9,7 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 16 planning; delivered items moved to Implemented below)
-
-- [ ] **Resource tags CRUD parity**
-  - Gap class: missing (feature parity)
-  - Scope: helper + CLI list/get/put/delete operations for resource tags.
-  - Why: unlocks governance metadata workflows expected in enterprise ASM automation.
-  - Score: Impact 5 | Effort 3 | Strategic fit 5 | Differentiation 1 | Risk 2 | Confidence 2
+Priority order (cycle 16 session planning after current shipment)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
@@ -39,6 +33,12 @@ Priority order (cycle 16 planning; delivered items moved to Implemented below)
   - Gap class: weak (reliability)
   - Scope: add opt-in tenant smoke for full saved-filter lifecycle.
   - Why: validates API preview drift beyond unit coverage.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Resource-tags live integration smoke (`list/get/put/delete`)**
+  - Gap class: weak (reliability)
+  - Scope: add opt-in tenant smoke flow for workspace tag lifecycle.
+  - Why: validates real ARM tag semantics and permission edge-cases.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **CLI completions + concise recipes**
@@ -90,6 +90,11 @@ Priority order (cycle 16 planning; delivered items moved to Implemented below)
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
 ## Implemented
+- [x] **Workspace resource-tags parity (`mdeasm resource-tags list/get/put/delete`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_resource_tags.py`, `docs/resource_tags.md`, `README.md`, `API/README.md`, `Makefile`
+  - Evidence (trusted: local tests + smoke + CI): `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_resource_tags.py docs/resource_tags.md README.md API/README.md` (pass); `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -k \"resource_tag or resource_tags\" tests/test_cli_resource_tags.py` (pass); `source .venv/bin/activate && make verify` (pass); `source .venv/bin/activate && python -m mdeasm_cli resource-tags --help >/dev/null && python -m mdeasm_cli resource-tags list --workspace-name demo --format json --out - >/tmp/mdeasm_resource_tags_cycle16.json 2>/tmp/mdeasm_resource_tags_cycle16.err; rc=$?; echo resource_tags_list_rc=$rc; test \"$rc\" -eq 1` (pass; expected missing env credentials locally); `gh run watch 21913264606 -R sarveshkapre/MDEASM --exit-status` (pass)
+
 - [x] **CLI command plumbing cleanup: shared logging/output/row helpers**
   - Date: 2026-02-11
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_data_connections.py`, `tests/test_cli_tasks.py`
@@ -466,6 +471,23 @@ Priority order (cycle 16 planning; delivered items moved to Implemented below)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 16 session):
+  - Microsoft Defender EASM control-plane APIs and Azure ARM tag APIs keep workspace-level metadata tagging as baseline governance capability, so adding first-class tag CRUD in helper/CLI was the highest-impact missing parity gap.
+  - Peer ASM/API UX (runZero, Censys, Shodan) continues to emphasize discoverability and scriptable filtering/tagging, reinforcing stable JSON/lines contracts and concise command surfaces.
+  - Gap map (cycle 16 session):
+    - Missing -> closed this session: workspace resource-tags helper + CLI parity (`list/get/put/delete`).
+    - Weak -> closed this session: docs/smoke contract coverage for new command family (`docs/resource_tags.md`, `make docs-smoke`).
+    - Remaining highest-priority gaps: live protected-artifact fallback integration smoke, lines-format consistency sweep, and discovery-group delete retry hardening.
+  - Top 5 high-impact opportunities now:
+    - 1) protected artifact fallback live smoke, 2) lines-format consistency sweep, 3) discovery-group delete retry hardening, 4) saved-filters live lifecycle smoke, 5) resource-tags live lifecycle smoke.
+  - Sources reviewed (untrusted):
+    - Microsoft Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - Microsoft Defender EASM workspace create/update reference: https://learn.microsoft.com/en-us/rest/api/defendereasm/controlplanepreview/workspaces/create-and-update?view=rest-defendereasm-controlplanepreview-2024-10-01-preview
+    - Azure ARM tags create/update at scope: https://learn.microsoft.com/en-us/rest/api/resources/tags/create-or-update-at-scope?view=rest-resources-2021-04-01
+    - runZero API reference: https://help.runzero.com/docs/platform-api/
+    - Censys query tags API: https://docs.censys.com/reference/postsearchv2query-tags
+    - Shodan API overview: https://developer.shodan.io/api
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 15):
   - Microsoft Defender EASM references continue to center task/data-plane automation endpoints and preview-version evolution, so typed helper failures and probe-level operability telemetry remain high-value baseline quality work.
   - Peer ASM/API guidance (runZero, Censys, Shodan) still emphasizes API-first operations and quick diagnosis loops for reliability issues, reinforcing per-target probe timing visibility and multi-version CI coverage.
