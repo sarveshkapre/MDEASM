@@ -115,5 +115,7 @@ easm.filters.headers
 easm.query_facet_filter(  
     search=<search_term>,  
     out_format=<print,csv,json>,  
-    out_path=<only_used_with_csv_or_json>)
+    out_path=<only_used_with_csv_or_json>,  
+    noprint=<True|False>)
 ```
+Returns a dict of matched facet entries. Use `noprint=True` to suppress terminal output in automation paths while still returning results and writing files.

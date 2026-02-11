@@ -1777,6 +1777,7 @@ class Workspaces:
         sort_order="descending",
         out_format="print",
         out_path="",
+        noprint=False,
     ):
         """Expects a search string and optionally the name of an alread-created facet filter. Valid values for facet_filter can be identified via:
 
@@ -1796,11 +1797,16 @@ class Workspaces:
 
         Optional parameter 'sort_order' must be one of 'descending' or 'ascending' and dictates how to display found search strings. This only sorts based on the count of the found search string, not on the found search string value itself. Defaults to 'descending'.
 
-        Optional parameter 'out_format' can be used to either save the results to file or print to terminal. Accepted arguments are 'csv' and 'json' (if ommitted or set to any other value, will print to terminal). Default behavior is 'print'.
+        Optional parameter 'out_format' can be used to either save the results to file or print to terminal. Accepted arguments are 'csv' and 'json' (if omitted or set to any other value, will print to terminal). Default behavior is 'print'.
 
         If out_format is set to 'csv' or 'json', optional parameter out_path can be used to save results to a particular location on disk. If no out_path value is submitted this will default to the script's current directory.
+
+        Optional parameter 'noprint' suppresses all terminal output while still returning matched results and writing requested files.
         """
         search = str(search)
+        if not hasattr(self, "filters"):
+            logging.error("no facet filters found; run create_facet_filter() first")
+            raise Exception("no facet filters found")
         if search_type.lower() not in ("contains", "starts", "ends"):
             logging.error(
                 f"{search_type} must be one of 'contains', 'starts', or 'ends' (case-insensitive)"
@@ -1817,40 +1823,48 @@ class Workspaces:
             )
             raise Exception(f"{facet_filter} not exists")
 
-        def __nested_output_formatter__(out_format="", out_path=""):
+        def __nested_output_formatter__(current_facet_filter, facet_key, facet_val):
+            out_dict.setdefault(current_facet_filter, {}).update({facet_key: facet_val})
+            if noprint and out_format not in ("csv", "json"):
+                return
+
             if not out_path:
-                out_path = pathlib.Path(__file__).parent.resolve()
+                resolved_out_path = pathlib.Path(__file__).parent.resolve()
             else:
                 if out_path.endswith("\\") or out_path.endswith("/"):
-                    out_path = out_path[:-1]
-                out_path = pathlib.Path(out_path)
-            file_name = f"{facet_filter}_{'_'.join([str(f) for f in facet_key if not f == None])}"
+                    resolved_out_path = pathlib.Path(out_path[:-1])
+                else:
+                    resolved_out_path = pathlib.Path(out_path)
+            file_name = (
+                f"{current_facet_filter}_{'_'.join([str(f) for f in facet_key if f is not None])}"
+            )
             file_name = re.sub(r"[^\w_. -]", "_", file_name)
             if out_format == "csv":
                 file_name += ".csv"
-                out_path = out_path / file_name
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(out_path, "w") as f:
+                resolved_file_path = resolved_out_path / file_name
+                resolved_file_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(resolved_file_path, "w") as f:
                     f.write(",".join(facet_val["assets"]))
-                    print(f"saving {search} query results to {out_path}")
+                if not noprint:
+                    print(f"saving {search} query results to {resolved_file_path}")
             elif out_format == "json":
                 file_name += ".json"
-                out_path = out_path / file_name
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(out_path, "w") as f:
+                resolved_file_path = resolved_out_path / file_name
+                resolved_file_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(resolved_file_path, "w") as f:
                     f.write(json.dumps(facet_val))
-                    print(f"saving {search} query results to {out_path}")
+                if not noprint:
+                    print(f"saving {search} query results to {resolved_file_path}")
             else:
-                out_dict.update({facet_key: facet_val})
                 newlinenewtab = f"\n\t"
-                ffkeys = f"\n{self._facet_filters.get(facet_filter)}"
-                if ffkeys == None:
-                    ffkeys == ""
-                print(
-                    f"\nSearch in '{facet_filter}' for '{search_type} {search}' found:{ffkeys}\n{facet_key}\nCount: {facet_val['count']}\nAsset IDs:\n\t{newlinenewtab.join(facet_val['assets'])}"
-                )
-                # print(self._facet_filters.get(facet_filter))
-                # print(f"{facet_key}", '\nCount:', facet_val['count'], '\nAsset IDs:\n       ', '\n\t'.join(facet_val['assets']))
+                ffkeys = self._facet_filters.get(current_facet_filter)
+                ffkeys_text = f"\n{ffkeys}" if ffkeys is not None else ""
+                if not noprint:
+                    print(
+                        f"\nSearch in '{current_facet_filter}' for '{search_type} {search}' found:{ffkeys_text}\n{facet_key}\nCount: {facet_val['count']}\nAsset IDs:\n\t{newlinenewtab.join(facet_val['assets'])}"
+                    )
+                    # print(self._facet_filters.get(current_facet_filter))
+                    # print(f"{facet_key}", '\nCount:', facet_val['count'], '\nAsset IDs:\n       ', '\n\t'.join(facet_val['assets']))
 
         sort_order_bool = bool
         if sort_order.lower() == "descending":
@@ -1884,15 +1898,11 @@ class Workspaces:
                     try:
                         if case_insensitive:
                             if re.search(filter_search, str(i).lower()):
-                                __nested_output_formatter__(
-                                    out_format=out_format, out_path=out_path
-                                )
+                                __nested_output_formatter__(facet_filter, facet_key, facet_val)
                                 break  # found it already, no need to evaluate rest of facet_key[i] items
                         else:
                             if re.search(filter_search, str(i)):
-                                __nested_output_formatter__(
-                                    out_format=out_format, out_path=out_path
-                                )
+                                __nested_output_formatter__(facet_filter, facet_key, facet_val)
                                 break  # found it already, no need to evaluate rest of facet_key[i] items
 
                     except AttributeError as e:
@@ -1901,7 +1911,6 @@ class Workspaces:
 
         else:
             for key, val in vars(self.filters).items():
-                facet_filter = key
                 for facet_key, facet_val in sorted(
                     val.items(), key=lambda x: x[1]["count"], reverse=sort_order_bool
                 ):
@@ -1909,15 +1918,11 @@ class Workspaces:
                         try:
                             if case_insensitive:
                                 if re.search(filter_search, str(i).lower()):
-                                    __nested_output_formatter__(
-                                        out_format=out_format, out_path=out_path
-                                    )
+                                    __nested_output_formatter__(key, facet_key, facet_val)
                                     break  # found it already, no need to evaluate rest of facet_key[i] items
                             else:
                                 if re.search(filter_search, str(i)):
-                                    __nested_output_formatter__(
-                                        out_format=out_format, out_path=out_path
-                                    )
+                                    __nested_output_formatter__(key, facet_key, facet_val)
                                     break  # found it already, no need to evaluate rest of facet_key[i] items
                         except AttributeError as e:
                             logging.warning(i, str(e))

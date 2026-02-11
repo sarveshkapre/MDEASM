@@ -1,4 +1,5 @@
 import base64
+import json
 import sys
 import time
 from pathlib import Path
@@ -800,3 +801,63 @@ def test_asset_lists_and_facet_filters_support_noprint(capsys):
     assert ws.asset_lists(noprint=True) == ["some_assets"]
     assert ws.facet_filters(noprint=True) == ["headers"]
     assert capsys.readouterr().out == ""
+
+
+def test_query_facet_filter_supports_noprint_and_structured_return(capsys):
+    ws = _new_ws()
+    ws.filters = mdeasm.FacetFilter()
+    ws.filters.headers = {
+        ("Server", "nginx"): {"count": 2, "assets": ["host$$a.example", "host$$b.example"]},
+        ("Server", "apache"): {"count": 1, "assets": ["host$$c.example"]},
+    }
+
+    out = ws.query_facet_filter("nginx", facet_filter="headers", noprint=True)
+    assert "headers" in out
+    assert out["headers"][("Server", "nginx")]["count"] == 2
+    assert ("Server", "apache") not in out["headers"]
+    assert capsys.readouterr().out == ""
+
+
+def test_query_facet_filter_csv_json_outputs_and_return_payload(tmp_path, capsys):
+    ws = _new_ws()
+    ws.filters = mdeasm.FacetFilter()
+    ws.filters.headers = {
+        ("Server", "nginx"): {"count": 2, "assets": ["host$$a.example", "host$$b.example"]},
+    }
+
+    out_csv = ws.query_facet_filter(
+        "nginx",
+        facet_filter="headers",
+        out_format="csv",
+        out_path=str(tmp_path),
+        noprint=True,
+    )
+    csv_path = tmp_path / "headers_Server_nginx.csv"
+    assert csv_path.exists()
+    assert csv_path.read_text() == "host$$a.example,host$$b.example"
+    assert out_csv["headers"][("Server", "nginx")]["count"] == 2
+
+    out_json = ws.query_facet_filter(
+        "nginx",
+        facet_filter="headers",
+        out_format="json",
+        out_path=str(tmp_path),
+        noprint=True,
+    )
+    json_path = tmp_path / "headers_Server_nginx.json"
+    assert json_path.exists()
+    assert json.loads(json_path.read_text()) == {
+        "count": 2,
+        "assets": ["host$$a.example", "host$$b.example"],
+    }
+    assert out_json["headers"][("Server", "nginx")]["count"] == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_query_facet_filter_requires_precomputed_filters():
+    ws = _new_ws()
+    try:
+        ws.query_facet_filter("nginx")
+        assert False, "expected exception"
+    except Exception as e:
+        assert "no facet filters found" in str(e)

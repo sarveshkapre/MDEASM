@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -149,3 +150,71 @@ def test_integration_smoke_server_export_task():
 
     task_details = ws.get_task(task_id, noprint=True)
     assert (task_details or {}).get("id") == task_id
+
+
+def test_integration_smoke_server_export_task_artifact_fetch(tmp_path):
+    """
+    Optional full artifact lifecycle smoke.
+
+    This covers `assets:export -> tasks get/poll -> tasks download -> tasks fetch` end-to-end.
+    It is skipped by default because it requires real credentials/workspace access and may
+    take longer than basic smoke tests.
+    """
+    if os.getenv("MDEASM_INTEGRATION_TASK_ARTIFACT") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_TASK_ARTIFACT=1 to enable task artifact lifecycle smoke"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip("set WORKSPACE_NAME (or ensure only one workspace exists) to run task smoke")
+
+    task = ws.create_assets_export_task(
+        columns=["id", "kind"],
+        query_filter='kind = "domain"',
+        file_name="mdeasm-smoke-export.csv",
+        noprint=True,
+    )
+    task_id = str((task or {}).get("id") or "").strip()
+    assert task_id
+
+    deadline = time.time() + 300
+    task_state = ""
+    while time.time() < deadline:
+        task_details = ws.get_task(task_id, noprint=True)
+        task_state = str((task_details or {}).get("state") or "").strip().lower()
+        if task_state in mdeasm_cli._TASK_TERMINAL_STATES:
+            break
+        time.sleep(5)
+    else:
+        pytest.skip(f"task did not reach terminal state within timeout: {task_id}")
+
+    if task_state not in {"complete", "completed"}:
+        pytest.skip(f"task ended in non-downloadable state: {task_state}")
+
+    download_ref = ws.download_task(task_id, noprint=True)
+    assert mdeasm_cli._extract_download_url(download_ref)
+
+    artifact_path = tmp_path / "mdeasm-task-artifact-smoke.csv"
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "fetch",
+            task_id,
+            "--workspace-name",
+            ws._default_workspace_name,
+            "--artifact-out",
+            str(artifact_path),
+            "--overwrite",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    assert artifact_path.exists()
+    assert artifact_path.stat().st_size > 0
