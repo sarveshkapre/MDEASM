@@ -2,6 +2,7 @@ import json
 import hashlib
 import sys
 import types
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -9,6 +10,21 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "API"))
 
 import mdeasm_cli  # noqa: E402
+
+
+def test_parse_retry_after_seconds_supports_delay_and_http_date():
+    now = datetime(2026, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
+
+    assert mdeasm_cli._parse_retry_after_seconds("5", now=now) == 5
+    assert mdeasm_cli._parse_retry_after_seconds("Wed, 11 Feb 2026 00:00:03 GMT", now=now) == 3
+
+
+def test_parse_retry_after_seconds_handles_invalid_and_past_values():
+    now = datetime(2026, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
+
+    assert mdeasm_cli._parse_retry_after_seconds("", now=now) is None
+    assert mdeasm_cli._parse_retry_after_seconds("invalid", now=now) is None
+    assert mdeasm_cli._parse_retry_after_seconds("Tue, 10 Feb 2026 23:59:59 GMT", now=now) == 0
 
 
 def test_cli_tasks_list_json(monkeypatch, capsys):
@@ -490,6 +506,68 @@ def test_cli_tasks_fetch_does_not_retry_non_retryable_status(monkeypatch, capsys
     assert rc == 1
     assert calls["count"] == 1
     assert "artifact fetch failed" in capsys.readouterr().err
+
+
+def test_cli_tasks_fetch_respects_retry_after_header(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+    calls = {"count": 0}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 3
+            self._backoff_max_s = 0.0
+            self._dp_token = ""
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/export.csv"}
+
+    class RetryResp:
+        status_code = 503
+        text = "busy"
+        headers = {"Retry-After": "2"}
+
+        def iter_content(self, chunk_size=65536):
+            return iter([])
+
+        def close(self):
+            return None
+
+    class OkResp:
+        status_code = 200
+        text = ""
+        headers = {}
+
+        def iter_content(self, chunk_size=65536):
+            yield b"ok\n"
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return RetryResp()
+        return OkResp()
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(mdeasm_cli.time, "sleep", fake_sleep)
+
+    rc = mdeasm_cli.main(["tasks", "fetch", "abc", "--artifact-out", str(artifact), "--out", "-"])
+    assert rc == 0
+    assert calls["count"] == 2
+    assert sleep_calls == [2.0]
+    assert artifact.read_bytes() == b"ok\n"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status_code"] == 200
 
 
 def test_cli_assets_export_server_mode_wait_download(monkeypatch, capsys):

@@ -2,6 +2,7 @@ import base64
 import json
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -75,6 +76,21 @@ def test_redact_sensitive_text_masks_bearer_tokens_fields_and_query_params():
     assert "ref456" not in cooked
     assert "verysecret" not in cooked
     assert "[REDACTED]" in cooked
+
+
+def test_parse_retry_after_seconds_supports_delay_and_http_date():
+    now = datetime(2026, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
+
+    assert mdeasm._parse_retry_after_seconds("7", now=now) == 7
+    assert mdeasm._parse_retry_after_seconds("Wed, 11 Feb 2026 00:00:03 GMT", now=now) == 3
+
+
+def test_parse_retry_after_seconds_handles_invalid_and_past_values():
+    now = datetime(2026, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
+
+    assert mdeasm._parse_retry_after_seconds("", now=now) is None
+    assert mdeasm._parse_retry_after_seconds("not-a-date", now=now) is None
+    assert mdeasm._parse_retry_after_seconds("Tue, 10 Feb 2026 23:59:59 GMT", now=now) == 0
 
 
 def test_asset_to_dict_returns_dict_and_can_suppress_print(capsys):

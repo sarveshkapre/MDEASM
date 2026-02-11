@@ -11,6 +11,8 @@ import sys
 import tempfile
 import time
 import urllib.parse
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from importlib.metadata import PackageNotFoundError, version as pkg_version
 from pathlib import Path
 
@@ -100,6 +102,29 @@ def _parse_retry_on_statuses(value: str) -> set[int]:
     if not out:
         raise ValueError("empty retry-on status list")
     return out
+
+
+def _parse_retry_after_seconds(value, *, now: datetime | None = None) -> int | None:
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return None
+    if raw.isdigit():
+        return max(int(raw), 0)
+
+    try:
+        when = parsedate_to_datetime(raw)
+    except Exception:
+        return None
+    if when is None:
+        return None
+
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    now_dt = now if now is not None else datetime.now(timezone.utc)
+    delay_s = (when - now_dt).total_seconds()
+    if delay_s <= 0:
+        return 0
+    return int(math.ceil(delay_s))
 
 
 def _parse_doctor_probe_targets(value: str) -> list[str]:
@@ -307,6 +332,7 @@ def _download_url_to_file(
 
     for attempt in range(1, attempts + 1):
         should_retry_attempt = False
+        retry_after_s = None
         # Most task downloads return signed URLs that don't need auth headers, but some
         # environments can return protected URLs. Try unsigned first, then bearer-auth fallback.
         auth_modes = [False, True] if auth_token else [False]
@@ -372,6 +398,9 @@ def _download_url_to_file(
                     body_snippet = ""
                 last_error = f"http {last_status}: {body_snippet}"
                 should_retry_attempt = bool(last_status in retry_on_statuses)
+                retry_after_s = _parse_retry_after_seconds(
+                    (getattr(resp, "headers", {}) or {}).get("Retry-After")
+                )
                 if last_status not in (401, 403) or use_auth:
                     break
 
@@ -388,8 +417,11 @@ def _download_url_to_file(
                         pass
 
         if attempt < attempts and should_retry_attempt:
-            sleep_s = min(2 ** (attempt - 1), float(backoff_max_s or 30))
-            sleep_s += random.uniform(0, min(0.25, sleep_s / 4 if sleep_s else 0.0))
+            if retry_after_s is not None:
+                sleep_s = min(float(retry_after_s), 60.0)
+            else:
+                sleep_s = min(2 ** (attempt - 1), float(backoff_max_s or 30))
+                sleep_s += random.uniform(0, min(0.25, sleep_s / 4 if sleep_s else 0.0))
             time.sleep(sleep_s)
             continue
         if not should_retry_attempt:

@@ -15,6 +15,7 @@ import binascii
 import datetime
 import json
 import logging
+import math
 import os
 import pathlib
 import re
@@ -22,6 +23,7 @@ import sys
 import time
 import urllib.parse
 import uuid
+from email.utils import parsedate_to_datetime
 
 import jwt
 import requests
@@ -92,6 +94,35 @@ def _response_items(payload):
     if isinstance(items, list):
         return items
     return []
+
+
+def _parse_retry_after_seconds(value, *, now=None):
+    """
+    Parse a Retry-After header value into non-negative delay seconds.
+
+    Supports either integer delay-seconds or HTTP-date. Returns `None` when the
+    value is missing or unparsable.
+    """
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return None
+    if raw.isdigit():
+        return max(int(raw), 0)
+
+    try:
+        when = parsedate_to_datetime(raw)
+    except Exception:
+        return None
+    if when is None:
+        return None
+
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    now_dt = now if now is not None else datetime.datetime.now(datetime.timezone.utc)
+    delay_s = (when - now_dt).total_seconds()
+    if delay_s <= 0:
+        return 0
+    return int(math.ceil(delay_s))
 
 
 def redact_sensitive_text(value) -> str:
@@ -954,6 +985,7 @@ class Workspaces:
         last_status = None
         last_text = None
         for attempt in range(1, attempts + 1):
+            r = None
             try:
                 request_fn = (
                     self._session.request if hasattr(self, "_session") else requests.request
@@ -1028,10 +1060,12 @@ class Workspaces:
             if attempt < attempts:
                 sleep_s = min(2 ** (attempt - 1), getattr(self, "_backoff_max_s", 30))
                 try:
-                    if "r" in locals():
-                        ra = r.headers.get("Retry-After")
-                        if ra and str(ra).isdigit():
-                            sleep_s = min(int(ra), 60)
+                    if r is not None:
+                        retry_after_s = _parse_retry_after_seconds(
+                            (getattr(r, "headers", {}) or {}).get("Retry-After")
+                        )
+                        if retry_after_s is not None:
+                            sleep_s = min(float(retry_after_s), 60.0)
                 except Exception:
                     pass
                 time.sleep(sleep_s)

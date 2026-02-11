@@ -65,5 +65,6 @@ Notes:
 - Reliability and API version flags are available on all task commands (`--http-timeout`, `--no-retry`, `--max-retry`, `--backoff-max-s`, `--api-version`, `--dp-api-version`, `--cp-api-version`).
 - `tasks wait` exits with a non-zero status on timeout and prints the timeout reason to stderr.
 - `tasks fetch` supports `--retry-on-statuses` (default `408,425,429,500,502,503,504`) to tune which HTTP responses are treated as transient during artifact download.
+- `tasks fetch` respects `Retry-After` response headers in either delay-seconds or HTTP-date format for retryable download responses.
 - `tasks fetch` supports `--sha256` to verify artifact integrity before moving the download into place.
 - `tasks fetch` follows the URL returned by `tasks/{id}:download` and writes bytes atomically to avoid partial files.
