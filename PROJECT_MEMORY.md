@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Prioritize cycle 15 on typed helper exception completion, doctor probe latency telemetry, credential-aware docs smoke, and Python 3.13 CI coverage | Bounded market scan + code review showed broad helper exceptions and low latency visibility as highest-impact safe reliability gaps, while CI/runtime compatibility remained a near-term risk reducer | Cycle 15 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Censys, Shodan) | n/a | medium | untrusted
+- 2026-02-11 | Ship cycle 15 reliability batch: phase-3 typed exceptions, doctor `elapsedMs`/summary diagnostics, secret-gated docs smoke command, and Python 3.13 CI lane | This batch closed the most actionable backlog items that improve automation contracts, incident triage speed, docs drift detection, and interpreter compatibility confidence without changing default CLI command semantics | `source .venv/bin/activate && make verify` (pass); focused helper/doctor tests pass; push CI run `21911885587` succeeded with `3.11/3.12/3.13` jobs green | 92d50e8 | high | trusted
+- 2026-02-11 | Keep live tenant integration checks opt-in for cycle 15 while enforcing deterministic local coverage | Required Defender EASM credentials are still absent in this local environment, so credentialed live API flows cannot be validated deterministically in-session; docs smoke now performs a real command only when required env vars exist | `source .venv/bin/activate && make docs-smoke` (pass; credentialed step skipped with explicit message when env vars missing) | 92d50e8 | high | trusted
 - 2026-02-11 | Prioritize cycle 14 on saved-filter payload validation and typed workspace-not-found errors in helper surfaces | Defender EASM saved-filter API docs and peer ASM filter UX keep reusable query objects as baseline, and local code review found avoidable 4xx/input drift plus broad exceptions in saved-filter/label paths | Cycle 14 market scan + gap map recorded in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero) | n/a | medium | untrusted
 - 2026-02-11 | Ship cycle 14 reliability batch: saved-filter local schema validation, path-safe saved-filter names, and typed workspace exceptions for saved-filter/label helpers | Highest-impact safe backlog item reduced avoidable API-submit failures and made automation failure contracts deterministic without changing default command semantics | `source .venv/bin/activate && make verify` (pass); focused helper tests pass; push CI run `21910786305` succeeded | 8406a3d | high | trusted
 - 2026-02-11 | Keep live saved-filter tenant integration verification as explicit follow-up | Local environment still lacks Defender EASM credentials, so deterministic live saved-filter API validation cannot run in-session; integration smoke remains opt-in and skip-safe | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` (pass; skipped without env) | 8406a3d | high | trusted
@@ -121,15 +124,22 @@
 
 ## Next Prioritized Tasks
 - Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`), gated behind explicit env flags once credentials are available.
-- Continue typed exception migration across remaining broad `Exception` paths (discovery/workspace lifecycle, tasks/report helpers, and asset helper validation).
-- Evaluate and add a Python 3.13 CI lane once dependency compatibility is confirmed.
 - Add helper + CLI resource-tags CRUD parity for governance metadata workflows.
-- Extend docs smoke with one credential-aware, secret-gated real command path when secrets exist.
+- Run live tenant smoke for saved-filters lifecycle (`list/get/put/delete`) behind explicit env gating.
+- Complete CLI `--format lines` consistency sweep across command families.
+- Add discovery-group delete retry hardening for transient control-plane/data-plane failures.
 - Add optional command presets/profile files for repeated export/task automation invocations.
-- Add CLI error-code contract tests across doctor/task/data-connection failure classes to keep automation exit behavior stable.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event,headBranch || true` | latest pre-cycle-15 `main` CI runs were successful | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_data_connections_helpers.py tests/test_mdeasm_helpers.py tests/test_cli_doctor.py` | focused suites passed (`....................................................`) | pass
+- 2026-02-11 | `source .venv/bin/activate && make docs-smoke` | docs-smoke passed; credential-aware workspace command was skip-safe without required env vars | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `149 passed, 8 skipped`; compile + smoke + docs-smoke passed | pass
+- 2026-02-11 | `git push origin main` | pushed commit `92d50e8` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21911885587 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `92d50e8`; `3.11`, `3.12`, and `3.13` jobs green | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event,headBranch || true` | latest `main` CI runs were successful before cycle 14 feature push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_saved_filters_helpers.py tests/test_mdeasm_helpers.py docs/saved_filters.md` | `All checks passed!` | pass

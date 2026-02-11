@@ -9,7 +9,13 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 14 planning; delivered items moved to Implemented below)
+Priority order (cycle 15 planning; delivered items moved to Implemented below)
+
+- [ ] **Resource tags CRUD parity**
+  - Gap class: missing (feature parity)
+  - Scope: helper + CLI list/get/put/delete operations for resource tags.
+  - Why: unlocks governance metadata workflows expected in enterprise ASM automation.
+  - Score: Impact 5 | Effort 3 | Strategic fit 5 | Differentiation 1 | Risk 2 | Confidence 2
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
@@ -17,47 +23,23 @@ Priority order (cycle 14 planning; delivered items moved to Implemented below)
   - Why: closes remaining confidence gap between unit coverage and tenant behavior.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
-  - Gap class: weak (reliability)
-  - Scope: validate dependencies/tooling under Python `3.13`, then add a non-blocking or blocking lane.
-  - Why: reduces runtime upgrade risk and keeps maintenance window current.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Resource tags CRUD parity**
-  - Gap class: missing (feature parity)
-  - Scope: helper + CLI list/get/put/delete operations for resource tags.
-  - Why: unlocks governance metadata workflows expected in enterprise ASM automation.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 2 | Confidence 2
-
-- [ ] **Legacy helper typed-exception migration (phase 3)**
-  - Gap class: weak (reliability)
-  - Scope: replace remaining broad `Exception` raises in discovery/workspace lifecycle and report helper paths with typed exceptions.
-  - Why: improves retry policy precision and caller-side error contracts across all helper surfaces.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Credential-aware docs smoke command in CI**
-  - Gap class: weak (DX/reliability)
-  - Scope: extend `docs-smoke` with one secret-gated command path that validates docs examples against real credentials when available.
-  - Why: catches drift beyond `--help` without making default CI flaky.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **CLI `--format lines` consistency sweep**
   - Gap class: weak (DX)
   - Scope: standardize ID-first order and stable field columns across lines-mode families.
   - Why: improves shell pipeline portability (`awk`/`cut`/`grep`) and scripting stability.
   - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Doctor probe latency summary**
-  - Gap class: weak (operability)
-  - Scope: include per-target elapsed timings + aggregate summary in `doctor --probe` payload.
-  - Why: speeds diagnosis of endpoint degradation and throttling.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
-
 - [ ] **Discovery-group delete retry hardening**
   - Gap class: weak (reliability)
   - Scope: add bounded retry/jitter around transient discovery-group delete failures.
   - Why: reduces flaky cleanup in batch automations.
   - Score: Impact 3 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Saved-filters live integration smoke (`list/get/put/delete`)**
+  - Gap class: weak (reliability)
+  - Scope: add opt-in tenant smoke for full saved-filter lifecycle.
+  - Why: validates API preview drift beyond unit coverage.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
@@ -108,6 +90,26 @@ Priority order (cycle 14 planning; delivered items moved to Implemented below)
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
 ## Implemented
+- [x] **Legacy helper typed-exception migration (phase 3)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`, `tests/test_data_connections_helpers.py`
+  - Evidence (trusted: local tests + CI): `source .venv/bin/activate && pytest -q tests/test_data_connections_helpers.py tests/test_mdeasm_helpers.py` (pass); `source .venv/bin/activate && make verify` (pass); `gh run watch 21911885587 -R sarveshkapre/MDEASM --exit-status` (pass)
+
+- [x] **Doctor probe latency summary (`elapsedMs` + aggregate summary)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_doctor.py`, `docs/auth.md`
+  - Evidence (trusted: local tests + CI): `source .venv/bin/activate && pytest -q tests/test_cli_doctor.py` (pass); `source .venv/bin/activate && make verify` (pass); `gh run watch 21911885587 -R sarveshkapre/MDEASM --exit-status` (pass)
+
+- [x] **Credential-aware docs smoke path (`make docs-smoke`)**
+  - Date: 2026-02-11
+  - Scope: `Makefile`
+  - Evidence (trusted: local smoke + CI): `source .venv/bin/activate && make docs-smoke` (pass; credentialed step skip-safe without env); `source .venv/bin/activate && make verify` (pass); `gh run watch 21911885587 -R sarveshkapre/MDEASM --exit-status` (pass)
+
+- [x] **CI matrix expansion: Python 3.13 lane**
+  - Date: 2026-02-11
+  - Scope: `.github/workflows/ci.yml`
+  - Evidence (trusted: CI): `gh run watch 21911885587 -R sarveshkapre/MDEASM --exit-status` (pass; `3.11`, `3.12`, and `3.13` jobs green)
+
 - [x] **Saved-filter payload validation + typed workspace errors (saved filters + labels)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `tests/test_saved_filters_helpers.py`, `tests/test_mdeasm_helpers.py`, `docs/saved_filters.md`
@@ -459,6 +461,24 @@ Priority order (cycle 14 planning; delivered items moved to Implemented below)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 15):
+  - Microsoft Defender EASM references continue to center task/data-plane automation endpoints and preview-version evolution, so typed helper failures and probe-level operability telemetry remain high-value baseline quality work.
+  - Peer ASM/API guidance (runZero, Censys, Shodan) still emphasizes API-first operations and quick diagnosis loops for reliability issues, reinforcing per-target probe timing visibility and multi-version CI coverage.
+  - Gap map (cycle 15):
+    - Weak -> closed this cycle: phase-3 typed exception migration replaced broad helper exceptions in discovery/workspace/task/report/validation paths.
+    - Weak -> closed this cycle: `doctor --probe` now includes per-target `elapsedMs` and aggregate timing summary for faster incident triage.
+    - Weak -> closed this cycle: `docs-smoke` now includes a credential-aware command path that runs only when required env vars are present.
+    - Weak -> closed this cycle: CI matrix now validates Python `3.13` in addition to `3.11`/`3.12`.
+    - Remaining highest-priority gaps: resource tags CRUD parity and live protected-artifact fallback integration smoke.
+  - Top 5 high-impact opportunities now:
+    - 1) resource tags CRUD parity, 2) live protected-artifact fallback smoke, 3) lines-format consistency sweep, 4) discovery-group delete retry hardening, 5) saved-filters live lifecycle smoke.
+  - Sources reviewed (untrusted):
+    - Microsoft Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - Microsoft Learn Defender EASM tasks operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API guidance: https://help.runzero.com/docs/leveraging-the-runzero-api/
+    - Censys platform API quickstart: https://docs.censys.com/reference/get-started
+    - Shodan API overview: https://developer.shodan.io/api
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 14):
   - Microsoft Defender EASM docs continue to position saved filters as first-class reusable query objects with list/get/create-or-replace/delete APIs, so local payload/name validation before network submit is a practical reliability baseline.
   - Peer ASM guidance (runZero) emphasizes reusable filter/query workflows and API-first automation, reinforcing the importance of deterministic local validation and typed failures in CLI/helper paths.
