@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Prioritize cycle 14 on saved-filter payload validation and typed workspace-not-found errors in helper surfaces | Defender EASM saved-filter API docs and peer ASM filter UX keep reusable query objects as baseline, and local code review found avoidable 4xx/input drift plus broad exceptions in saved-filter/label paths | Cycle 14 market scan + gap map recorded in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero) | n/a | medium | untrusted
+- 2026-02-11 | Ship cycle 14 reliability batch: saved-filter local schema validation, path-safe saved-filter names, and typed workspace exceptions for saved-filter/label helpers | Highest-impact safe backlog item reduced avoidable API-submit failures and made automation failure contracts deterministic without changing default command semantics | `source .venv/bin/activate && make verify` (pass); focused helper tests pass; push CI run `21910786305` succeeded | 8406a3d | high | trusted
+- 2026-02-11 | Keep live saved-filter tenant integration verification as explicit follow-up | Local environment still lacks Defender EASM credentials, so deterministic live saved-filter API validation cannot run in-session; integration smoke remains opt-in and skip-safe | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` (pass; skipped without env) | 8406a3d | high | trusted
 - 2026-02-11 | Prioritize cycle 13 around task-failure operability + integration drift coverage + docs workflow checks | Defender EASM task/data-connection docs and peer ASM API guidance keep async task diagnostics and validation endpoint health as baseline production expectations | Cycle 13 market scan + gap map recorded in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Censys, Shodan) | n/a | medium | untrusted
 - 2026-02-11 | Ship cycle 13 reliability batch: `tasks wait` terminal failure metadata parity, expanded data-connections opt-in integration smoke (`list/get/validate`), and CI docs workflow smoke lane (`make docs-smoke`) | Highest-impact safe backlog item was faster failure triage in task polling, followed by endpoint drift coverage and docs/command drift prevention in CI | `source .venv/bin/activate && make verify` (pass); focused task wait + integration smoke tests pass/skip as expected; push CI run `21909743331` succeeded | 10b33f4 | high | trusted
 - 2026-02-11 | Keep external integration checks opt-in and skip-safe for cycle 13 | Local environment still has no Defender EASM credentials, so reproducible live `data-connections get/validate` and protected artifact URL checks cannot be executed deterministically in-session | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list tests/test_integration_smoke.py::test_integration_smoke_data_connections_get tests/test_integration_smoke.py::test_integration_smoke_data_connections_validate` (pass; skipped without env) | 10b33f4 | high | trusted
@@ -117,7 +120,7 @@
 
 ## Next Prioritized Tasks
 - Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`), gated behind explicit env flags once credentials are available.
-- Continue typed exception migration across remaining broad `Exception` paths (saved filters, discovery/workspace lifecycle, and asset helper validation).
+- Continue typed exception migration across remaining broad `Exception` paths (discovery/workspace lifecycle, tasks/report helpers, and asset helper validation).
 - Evaluate and add a Python 3.13 CI lane once dependency compatibility is confirmed.
 - Add helper + CLI resource-tags CRUD parity for governance metadata workflows.
 - Extend docs smoke with one credential-aware, secret-gated real command path when secrets exist.
@@ -126,6 +129,15 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event,headBranch || true` | latest `main` CI runs were successful before cycle 14 feature push | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_saved_filters_helpers.py tests/test_mdeasm_helpers.py docs/saved_filters.md` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_saved_filters_helpers.py tests/test_mdeasm_helpers.py::test_label_helpers_raise_workspace_not_found` | `......` | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `141 passed, 8 skipped`; compile + smoke + docs-smoke passed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli saved-filters list --format json --out - >/tmp/mdeasm_saved_filters_cycle14.json 2>/tmp/mdeasm_saved_filters_cycle14.err; rc=$?; echo saved_filters_list_rc=$rc; test \"$rc\" -eq 1` | `saved_filters_list_rc=1` with expected missing required env vars in local env | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` | integration smoke path remains opt-in and skipped without tenant credentials (`s`) | pass
+- 2026-02-11 | `git push origin main` | pushed commit `8406a3d` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21910786305 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `8406a3d` (both `3.11` and `3.12` jobs green) | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event,headBranch` | latest `main` CI runs were successful before cycle 13 push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_tasks.py tests/test_integration_smoke.py` | `All checks passed!` | pass
