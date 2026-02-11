@@ -74,6 +74,35 @@ def test_cli_saved_filters_get(monkeypatch, capsys):
     assert out["name"] == "sfA"
 
 
+def test_cli_saved_filters_get_surfaces_api_error_payload(monkeypatch, capsys):
+    class ApiRequestError(Exception):
+        pass
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_saved_filter(self, name, **kwargs):
+            raise ApiRequestError(
+                'called by: get_saved_filter -- last_status: 404 -- last_text: '
+                '{"error":{"code":"SavedFilterNotFound","message":"filter sfA missing"}}'
+            )
+
+    fake_mdeasm = types.SimpleNamespace(
+        Workspaces=DummyWS,
+        ApiRequestError=ApiRequestError,
+        redact_sensitive_text=lambda s: s,
+    )
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["saved-filters", "get", "sfA", "--out", "-"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "saved-filters get failed" in err
+    assert "status=404" in err
+    assert "code=SavedFilterNotFound" in err
+
+
 def test_cli_saved_filters_put_filter_at_file(tmp_path, monkeypatch, capsys):
     filter_path = tmp_path / "filter.txt"
     filter_path.write_text('state = "confirmed" AND\nkind = "domain"\n', encoding="utf-8")

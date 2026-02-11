@@ -48,6 +48,36 @@ def test_cli_tasks_list_json(monkeypatch, capsys):
     assert payload == [{"id": "t1", "state": "running"}]
 
 
+def test_cli_tasks_list_surfaces_api_error_payload(monkeypatch, capsys):
+    class ApiRequestError(Exception):
+        pass
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def list_tasks(self, **kwargs):
+            raise ApiRequestError(
+                'called by: list_tasks -- last_status: 429 -- last_text: '
+                '{"error":{"code":"TooManyRequests","message":"Bearer abc123 throttled"}}'
+            )
+
+    fake_mdeasm = types.SimpleNamespace(
+        Workspaces=DummyWS,
+        ApiRequestError=ApiRequestError,
+        redact_sensitive_text=lambda s: str(s).replace("abc123", "[REDACTED]"),
+    )
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["tasks", "list", "--format", "json", "--out", "-"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "tasks list failed" in err
+    assert "status=429" in err
+    assert "code=TooManyRequests" in err
+    assert "message=Bearer [REDACTED] throttled" in err
+
+
 def test_cli_tasks_get_cancel_run_download(monkeypatch, capsys):
     class DummyWS:
         def __init__(self, *args, **kwargs):
@@ -505,7 +535,9 @@ def test_cli_tasks_fetch_does_not_retry_non_retryable_status(monkeypatch, capsys
     rc = mdeasm_cli.main(["tasks", "fetch", "abc", "--artifact-out", str(artifact), "--out", "-"])
     assert rc == 1
     assert calls["count"] == 1
-    assert "artifact fetch failed" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "tasks fetch failed" in err
+    assert "status=404" in err
 
 
 def test_cli_tasks_fetch_respects_retry_after_header(monkeypatch, capsys, tmp_path):

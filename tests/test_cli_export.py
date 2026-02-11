@@ -250,6 +250,36 @@ def test_cli_assets_schema_json_to_stdout(monkeypatch, capsys):
     assert payload == ["id", "kind"]
 
 
+def test_cli_assets_schema_surfaces_api_error_payload(monkeypatch, capsys):
+    class ApiRequestError(Exception):
+        pass
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_workspace_assets(self, **kwargs):
+            raise ApiRequestError(
+                'called by: get_workspace_assets -- last_status: 403 -- last_text: '
+                '{"error":{"code":"Forbidden","message":"Authorization: bearer secret-token"}}'
+            )
+
+    fake_mdeasm = types.SimpleNamespace(
+        Workspaces=DummyWS,
+        ApiRequestError=ApiRequestError,
+        redact_sensitive_text=lambda s: str(s).replace("secret-token", "[REDACTED]"),
+    )
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["assets", "schema", "--filter", 'kind = "domain"', "--out", "-"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "assets schema failed" in err
+    assert "status=403" in err
+    assert "code=Forbidden" in err
+    assert "[REDACTED]" in err
+
+
 def test_cli_assets_schema_diff_json_no_drift(monkeypatch, capsys, tmp_path):
     baseline = tmp_path / "baseline.txt"
     baseline.write_text("id\nkind\n", encoding="utf-8")

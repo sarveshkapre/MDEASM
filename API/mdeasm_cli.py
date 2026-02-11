@@ -32,6 +32,8 @@ _DOWNLOAD_URL_PRIORITY_KEYS = (
 )
 _DEFAULT_RETRY_ON_STATUSES = (408, 425, 429, 500, 502, 503, 504)
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+_LAST_STATUS_RE = re.compile(r"\blast_status:\s*([0-9]{3})\b", flags=re.IGNORECASE)
+_LAST_TEXT_RE = re.compile(r"\blast_text:\s*(.+)$", flags=re.IGNORECASE | re.DOTALL)
 _DOCTOR_PROBE_TARGETS = ("workspaces", "assets", "tasks", "data-connections")
 _DOCTOR_PROBE_TARGET_ALIASES = {
     "workspaces": "workspaces",
@@ -299,6 +301,115 @@ def _extract_download_url(payload) -> str:
             if key == preferred_key:
                 return value
     return candidates[0][1]
+
+
+def _redact_text(mdeasm_module, value: str) -> str:
+    text = "" if value is None else str(value)
+    redactor = getattr(mdeasm_module, "redact_sensitive_text", None)
+    if callable(redactor):
+        try:
+            return str(redactor(text))
+        except Exception:
+            return text
+    return text
+
+
+def _extract_json_dict(value: str):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    candidates = [raw]
+    first_open = raw.find("{")
+    last_close = raw.rfind("}")
+    if 0 <= first_open < last_close:
+        candidates.append(raw[first_open : last_close + 1])
+    for cand in candidates:
+        try:
+            parsed = json.loads(cand)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _extract_error_code_message(payload: dict) -> tuple[str, str]:
+    if not isinstance(payload, dict):
+        return ("", "")
+
+    node = payload.get("error")
+    if isinstance(node, dict):
+        payload = node
+
+    code = str(
+        payload.get("code")
+        or payload.get("errorCode")
+        or payload.get("x-ms-error-code")
+        or payload.get("target")
+        or ""
+    ).strip()
+    message = str(
+        payload.get("message")
+        or payload.get("errorMessage")
+        or payload.get("detail")
+        or payload.get("description")
+        or ""
+    ).strip()
+    return (code, message)
+
+
+def _extract_api_error_details(message: str) -> tuple[int | None, str, str]:
+    status = None
+    msg = str(message or "")
+
+    status_match = _LAST_STATUS_RE.search(msg)
+    if status_match:
+        try:
+            status = int(status_match.group(1))
+        except Exception:
+            status = None
+
+    parse_candidates: list[str] = []
+    text_match = _LAST_TEXT_RE.search(msg)
+    if text_match:
+        parse_candidates.append(text_match.group(1).strip())
+    parse_candidates.append(msg)
+
+    code = ""
+    detail = ""
+    for candidate in parse_candidates:
+        parsed = _extract_json_dict(candidate)
+        if not isinstance(parsed, dict):
+            continue
+        code, detail = _extract_error_code_message(parsed)
+        if code or detail:
+            break
+
+    return (status, code, detail)
+
+
+def _format_cli_error(action: str, exc: Exception, *, mdeasm_module=None) -> str:
+    redacted = _redact_text(mdeasm_module, str(exc))
+    status, code, detail = _extract_api_error_details(redacted)
+    parts = [f"{action} failed"]
+    if status is not None:
+        parts.append(f"status={status}")
+    if code:
+        parts.append(f"code={code}")
+    if detail:
+        parts.append(f"message={detail}")
+    else:
+        compact = " ".join(redacted.split())
+        if compact:
+            if len(compact) > 500:
+                compact = compact[:497] + "..."
+            parts.append(f"error={compact}")
+    return "; ".join(parts)
+
+
+def _emit_cli_error(action: str, exc: Exception, *, mdeasm_module=None, exit_code: int = 1) -> int:
+    sys.stderr.write(_format_cli_error(action, exc, mdeasm_module=mdeasm_module) + "\n")
+    return int(exit_code)
 
 
 def _download_url_to_file(
@@ -2548,53 +2659,62 @@ def main(argv: list[str] | None = None) -> int:
             mdeasm.configure_logging(level)
 
         ws_kwargs = _build_ws_kwargs(args)
-        ws = mdeasm.Workspaces(**ws_kwargs)
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            return _emit_cli_error("saved-filters client initialization", e, mdeasm_module=mdeasm)
 
         out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
 
         if args.saved_filters_cmd == "list":
-            page = max(int(args.page or 0), 0)
-            max_page_size = max(int(args.max_page_size or 25), 1)
-            values: list[dict] = []
-            while True:
-                resp = ws.get_saved_filters(
-                    workspace_name=args.workspace_name,
-                    filter_expr=args.filter,
-                    skip=page,
-                    max_page_size=max_page_size,
-                    noprint=True,
-                )
-                batch = resp.get("value") or []
-                if isinstance(batch, list):
-                    values.extend(batch)
-                if not args.get_all:
-                    break
-                total = resp.get("totalElements")
-                try:
-                    if total is not None and (page + len(batch)) >= int(total):
+            try:
+                page = max(int(args.page or 0), 0)
+                max_page_size = max(int(args.max_page_size or 25), 1)
+                values: list[dict] = []
+                while True:
+                    resp = ws.get_saved_filters(
+                        workspace_name=args.workspace_name,
+                        filter_expr=args.filter,
+                        skip=page,
+                        max_page_size=max_page_size,
+                        noprint=True,
+                    )
+                    batch = resp.get("value") or []
+                    if isinstance(batch, list):
+                        values.extend(batch)
+                    if not args.get_all:
                         break
-                except Exception:
-                    pass
-                if not batch or len(batch) < max_page_size:
-                    break
-                page += len(batch)
+                    total = resp.get("totalElements")
+                    try:
+                        if total is not None and (page + len(batch)) >= int(total):
+                            break
+                    except Exception:
+                        pass
+                    if not batch or len(batch) < max_page_size:
+                        break
+                    page += len(batch)
 
-            if args.format == "json":
-                _write_json(out_path, values, pretty=True)
-            else:
-                lines = []
-                for item in values:
-                    name = item.get("name") or item.get("id") or ""
-                    display = item.get("displayName") or ""
-                    filt = item.get("filter") or ""
-                    lines.append(f"{name}\t{display}\t{filt}")
-                _write_lines(out_path, lines)
-            return 0
+                if args.format == "json":
+                    _write_json(out_path, values, pretty=True)
+                else:
+                    lines = []
+                    for item in values:
+                        name = item.get("name") or item.get("id") or ""
+                        display = item.get("displayName") or ""
+                        filt = item.get("filter") or ""
+                        lines.append(f"{name}\t{display}\t{filt}")
+                    _write_lines(out_path, lines)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("saved-filters list", e, mdeasm_module=mdeasm)
 
         if args.saved_filters_cmd == "get":
-            resp = ws.get_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
-            _write_json(out_path, resp, pretty=True)
-            return 0
+            try:
+                resp = ws.get_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
+                _write_json(out_path, resp, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("saved-filters get", e, mdeasm_module=mdeasm)
 
         if args.saved_filters_cmd == "put":
             try:
@@ -2602,23 +2722,29 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as e:
                 sys.stderr.write(f"invalid --filter: {e}\n")
                 return 2
-            resp = ws.create_or_replace_saved_filter(
-                args.name,
-                query_filter=query_filter,
-                description=args.description,
-                workspace_name=args.workspace_name,
-                noprint=True,
-            )
-            _write_json(out_path, resp, pretty=True)
-            return 0
+            try:
+                resp = ws.create_or_replace_saved_filter(
+                    args.name,
+                    query_filter=query_filter,
+                    description=args.description,
+                    workspace_name=args.workspace_name,
+                    noprint=True,
+                )
+                _write_json(out_path, resp, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("saved-filters put", e, mdeasm_module=mdeasm)
 
         if args.saved_filters_cmd == "delete":
-            ws.delete_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
-            if args.format == "json":
-                _write_json(out_path, {"deleted": args.name}, pretty=True)
-            else:
-                _write_lines(out_path, [f"deleted {args.name}"])
-            return 0
+            try:
+                ws.delete_saved_filter(args.name, workspace_name=args.workspace_name, noprint=True)
+                if args.format == "json":
+                    _write_json(out_path, {"deleted": args.name}, pretty=True)
+                else:
+                    _write_lines(out_path, [f"deleted {args.name}"])
+                return 0
+            except Exception as e:
+                return _emit_cli_error("saved-filters delete", e, mdeasm_module=mdeasm)
 
         sys.stderr.write("unknown saved-filters command\n")
         return 2
@@ -2637,47 +2763,60 @@ def main(argv: list[str] | None = None) -> int:
             mdeasm.configure_logging(level)
 
         ws_kwargs = _build_ws_kwargs(args)
-        ws = mdeasm.Workspaces(**ws_kwargs)
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            return _emit_cli_error(
+                "data-connections client initialization", e, mdeasm_module=mdeasm
+            )
         out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
 
         if args.data_connections_cmd == "list":
-            payload = ws.list_data_connections(
-                workspace_name=args.workspace_name,
-                skip=args.page,
-                max_page_size=args.max_page_size,
-                get_all=args.get_all,
-                noprint=True,
-            )
-            values = payload.get("value") if isinstance(payload, dict) else None
-            if values is None:
-                values = payload.get("content") if isinstance(payload, dict) else []
-            if not isinstance(values, list):
-                values = []
+            try:
+                payload = ws.list_data_connections(
+                    workspace_name=args.workspace_name,
+                    skip=args.page,
+                    max_page_size=args.max_page_size,
+                    get_all=args.get_all,
+                    noprint=True,
+                )
+                values = payload.get("value") if isinstance(payload, dict) else None
+                if values is None:
+                    values = payload.get("content") if isinstance(payload, dict) else []
+                if not isinstance(values, list):
+                    values = []
 
-            if args.format == "json":
-                _write_json(out_path, values, pretty=True)
-            else:
-                lines = []
-                for item in values:
-                    lines.append(
-                        "\t".join(
-                            [
-                                str(item.get("name", "")),
-                                str(item.get("kind", "")),
-                                str(item.get("content", "")),
-                                str(item.get("frequency", "")),
-                                str(item.get("frequencyOffset", "")),
-                                str(item.get("provisioningState", "")),
-                            ]
+                if args.format == "json":
+                    _write_json(out_path, values, pretty=True)
+                else:
+                    lines = []
+                    for item in values:
+                        lines.append(
+                            "\t".join(
+                                [
+                                    str(item.get("name", "")),
+                                    str(item.get("kind", "")),
+                                    str(item.get("content", "")),
+                                    str(item.get("frequency", "")),
+                                    str(item.get("frequencyOffset", "")),
+                                    str(item.get("provisioningState", "")),
+                                ]
+                            )
                         )
-                    )
-                _write_lines(out_path, lines)
-            return 0
+                    _write_lines(out_path, lines)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("data-connections list", e, mdeasm_module=mdeasm)
 
         if args.data_connections_cmd == "get":
-            payload = ws.get_data_connection(args.name, workspace_name=args.workspace_name, noprint=True)
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.get_data_connection(
+                    args.name, workspace_name=args.workspace_name, noprint=True
+                )
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("data-connections get", e, mdeasm_module=mdeasm)
 
         if args.data_connections_cmd == "put":
             try:
@@ -2685,18 +2824,21 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as e:
                 sys.stderr.write(f"invalid data connection arguments: {e}\n")
                 return 2
-            payload = ws.create_or_replace_data_connection(
-                args.name,
-                kind=args.kind,
-                properties=properties,
-                content=args.content,
-                frequency=args.frequency,
-                frequency_offset=args.frequency_offset,
-                workspace_name=args.workspace_name,
-                noprint=True,
-            )
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.create_or_replace_data_connection(
+                    args.name,
+                    kind=args.kind,
+                    properties=properties,
+                    content=args.content,
+                    frequency=args.frequency,
+                    frequency_offset=args.frequency_offset,
+                    workspace_name=args.workspace_name,
+                    noprint=True,
+                )
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("data-connections put", e, mdeasm_module=mdeasm)
 
         if args.data_connections_cmd == "validate":
             try:
@@ -2704,30 +2846,36 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as e:
                 sys.stderr.write(f"invalid data connection arguments: {e}\n")
                 return 2
-            payload = ws.validate_data_connection(
-                kind=args.kind,
-                properties=properties,
-                name=args.name,
-                content=args.content,
-                frequency=args.frequency,
-                frequency_offset=args.frequency_offset,
-                workspace_name=args.workspace_name,
-                noprint=True,
-            )
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.validate_data_connection(
+                    kind=args.kind,
+                    properties=properties,
+                    name=args.name,
+                    content=args.content,
+                    frequency=args.frequency,
+                    frequency_offset=args.frequency_offset,
+                    workspace_name=args.workspace_name,
+                    noprint=True,
+                )
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("data-connections validate", e, mdeasm_module=mdeasm)
 
         if args.data_connections_cmd == "delete":
-            payload = ws.delete_data_connection(
-                args.name,
-                workspace_name=args.workspace_name,
-                noprint=True,
-            )
-            if args.format == "json":
-                _write_json(out_path, payload, pretty=True)
-            else:
-                _write_lines(out_path, [f"deleted {args.name}"])
-            return 0
+            try:
+                payload = ws.delete_data_connection(
+                    args.name,
+                    workspace_name=args.workspace_name,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    _write_lines(out_path, [f"deleted {args.name}"])
+                return 0
+            except Exception as e:
+                return _emit_cli_error("data-connections delete", e, mdeasm_module=mdeasm)
 
         sys.stderr.write("unknown data-connections command\n")
         return 2
@@ -2746,47 +2894,56 @@ def main(argv: list[str] | None = None) -> int:
             mdeasm.configure_logging(level)
 
         ws_kwargs = _build_ws_kwargs(args)
-        ws = mdeasm.Workspaces(**ws_kwargs)
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            return _emit_cli_error("tasks client initialization", e, mdeasm_module=mdeasm)
         out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
 
         if args.tasks_cmd == "list":
-            payload = ws.list_tasks(
-                workspace_name=args.workspace_name,
-                filter_expr=args.filter,
-                orderby=args.orderby,
-                skip=args.page,
-                max_page_size=args.max_page_size,
-                get_all=args.get_all,
-                noprint=True,
-            )
-            values = payload.get("value") if isinstance(payload, dict) else None
-            if values is None:
-                values = payload.get("content") if isinstance(payload, dict) else []
-            if not isinstance(values, list):
-                values = []
+            try:
+                payload = ws.list_tasks(
+                    workspace_name=args.workspace_name,
+                    filter_expr=args.filter,
+                    orderby=args.orderby,
+                    skip=args.page,
+                    max_page_size=args.max_page_size,
+                    get_all=args.get_all,
+                    noprint=True,
+                )
+                values = payload.get("value") if isinstance(payload, dict) else None
+                if values is None:
+                    values = payload.get("content") if isinstance(payload, dict) else []
+                if not isinstance(values, list):
+                    values = []
 
-            if args.format == "json":
-                _write_json(out_path, values, pretty=True)
-            else:
-                lines = []
-                for item in values:
-                    lines.append(
-                        "\t".join(
-                            [
-                                str(item.get("id", "")),
-                                str(item.get("state", "")),
-                                str(item.get("startedAt", "")),
-                                str(item.get("completedAt", "")),
-                            ]
+                if args.format == "json":
+                    _write_json(out_path, values, pretty=True)
+                else:
+                    lines = []
+                    for item in values:
+                        lines.append(
+                            "\t".join(
+                                [
+                                    str(item.get("id", "")),
+                                    str(item.get("state", "")),
+                                    str(item.get("startedAt", "")),
+                                    str(item.get("completedAt", "")),
+                                ]
+                            )
                         )
-                    )
-                _write_lines(out_path, lines)
-            return 0
+                    _write_lines(out_path, lines)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("tasks list", e, mdeasm_module=mdeasm)
 
         if args.tasks_cmd == "get":
-            payload = ws.get_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.get_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("tasks get", e, mdeasm_module=mdeasm)
 
         if args.tasks_cmd == "wait":
             try:
@@ -2800,6 +2957,8 @@ def main(argv: list[str] | None = None) -> int:
             except TimeoutError as e:
                 sys.stderr.write(f"{e}\n")
                 return 1
+            except Exception as e:
+                return _emit_cli_error("tasks wait", e, mdeasm_module=mdeasm)
             if args.format == "json":
                 _write_json(out_path, payload, pretty=True)
             else:
@@ -2815,26 +2974,39 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.tasks_cmd == "cancel":
-            payload = ws.cancel_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.cancel_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("tasks cancel", e, mdeasm_module=mdeasm)
 
         if args.tasks_cmd == "run":
-            payload = ws.run_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.run_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("tasks run", e, mdeasm_module=mdeasm)
 
         if args.tasks_cmd == "download":
-            payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
-            _write_json(out_path, payload, pretty=True)
-            return 0
+            try:
+                payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+                _write_json(out_path, payload, pretty=True)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("tasks download", e, mdeasm_module=mdeasm)
 
         if args.tasks_cmd == "fetch":
-            payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            try:
+                payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            except Exception as e:
+                return _emit_cli_error("tasks fetch", e, mdeasm_module=mdeasm)
             artifact_url = _extract_download_url(payload)
             if not artifact_url:
                 sys.stderr.write(
-                    "task download response did not contain a usable artifact URL\n"
+                    "tasks fetch failed; "
+                    "error=task download response did not contain a usable artifact URL\n"
                 )
                 return 1
 
@@ -2885,13 +3057,7 @@ def main(argv: list[str] | None = None) -> int:
                     expected_sha256=expected_sha256,
                 )
             except Exception as e:
-                redactor = getattr(mdeasm, "redact_sensitive_text", None)
-                if callable(redactor):
-                    msg = redactor(str(e))
-                else:
-                    msg = str(e)
-                sys.stderr.write(f"artifact fetch failed: {msg}\n")
-                return 1
+                return _emit_cli_error("tasks fetch", e, mdeasm_module=mdeasm)
 
             parsed = urllib.parse.urlparse(artifact_url)
             redacted_url = artifact_url
@@ -2937,7 +3103,10 @@ def main(argv: list[str] | None = None) -> int:
             sys.stderr.write(f"invalid --filter: {e}\n")
             return 2
 
-        ws = mdeasm.Workspaces(**ws_kwargs)
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            return _emit_cli_error("assets client initialization", e, mdeasm_module=mdeasm)
         if args.assets_cmd == "export":
             out_path = None if (not args.out or args.out == "-") else Path(args.out)
 
@@ -2960,14 +3129,17 @@ def main(argv: list[str] | None = None) -> int:
                     sys.stderr.write("--download-on-complete requires --wait\n")
                     return 2
 
-                task = ws.create_assets_export_task(
-                    columns=columns,
-                    query_filter=query_filter,
-                    file_name=args.server_file_name,
-                    orderby=args.server_orderby,
-                    workspace_name=args.workspace_name,
-                    noprint=True,
-                )
+                try:
+                    task = ws.create_assets_export_task(
+                        columns=columns,
+                        query_filter=query_filter,
+                        file_name=args.server_file_name,
+                        orderby=args.server_orderby,
+                        workspace_name=args.workspace_name,
+                        noprint=True,
+                    )
+                except Exception as e:
+                    return _emit_cli_error("assets export", e, mdeasm_module=mdeasm)
                 output_payload = task
                 task_id = str((task or {}).get("id", "")).strip()
                 if args.wait:
@@ -2988,11 +3160,14 @@ def main(argv: list[str] | None = None) -> int:
                     output_payload = final_task
                     state = str((final_task or {}).get("state", "")).strip().lower()
                     if args.download_on_complete and state in {"complete", "completed"}:
-                        dl = ws.download_task(
-                            task_id,
-                            workspace_name=args.workspace_name,
-                            noprint=True,
-                        )
+                        try:
+                            dl = ws.download_task(
+                                task_id,
+                                workspace_name=args.workspace_name,
+                                noprint=True,
+                            )
+                        except Exception as e:
+                            return _emit_cli_error("assets export", e, mdeasm_module=mdeasm)
                         output_payload = {"task": final_task, "download": dl}
 
                 _write_json(out_path, output_payload, pretty=bool(args.pretty))
@@ -3107,7 +3282,10 @@ def main(argv: list[str] | None = None) -> int:
                 # Only emit the initial/final status lines by default.
                 get_kwargs["no_track_time"] = True
 
-            ws.get_workspace_assets(**get_kwargs)
+            try:
+                ws.get_workspace_assets(**get_kwargs)
+            except Exception as e:
+                return _emit_cli_error("assets export", e, mdeasm_module=mdeasm)
 
             asset_list = getattr(ws, args.asset_list_name)
             rows = asset_list.as_dicts() if hasattr(asset_list, "as_dicts") else []
@@ -3134,7 +3312,10 @@ def main(argv: list[str] | None = None) -> int:
                 # Only emit the initial/final status lines by default.
                 no_track_time=True,
             )
-            ws.get_workspace_assets(**get_kwargs)
+            try:
+                ws.get_workspace_assets(**get_kwargs)
+            except Exception as e:
+                return _emit_cli_error("assets schema", e, mdeasm_module=mdeasm)
 
             asset_list = getattr(ws, "assetList", None)
             rows = asset_list.as_dicts() if asset_list and hasattr(asset_list, "as_dicts") else []

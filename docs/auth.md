@@ -46,6 +46,10 @@ Keep access least-privilege:
 
 ## Common Failures
 
+CLI error diagnostics:
+- For API request failures, CLI commands now emit a single-line error with `status=...`, `code=...`, and `message=...` when available from the API response.
+- Secret-bearing values are redacted before printing diagnostics.
+
 `missing required configuration: ...`
 - `.env` is missing `TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, or `CLIENT_SECRET`.
 - Confirm you are running from the repo (so `.env` is discoverable) or pass args to `mdeasm.Workspaces(...)`.

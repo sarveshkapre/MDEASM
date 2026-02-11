@@ -55,6 +55,35 @@ def test_cli_data_connections_list_lines(monkeypatch, capsys):
     assert out_lines == ["dc1\tlogAnalytics\tassets\tweekly\t1\tSucceeded"]
 
 
+def test_cli_data_connections_get_surfaces_api_error_payload(monkeypatch, capsys):
+    class ApiRequestError(Exception):
+        pass
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_data_connection(self, name, **kwargs):
+            raise ApiRequestError(
+                'called by: get_data_connection -- last_status: 404 -- last_text: '
+                '{"error":{"code":"DataConnectionNotFound","message":"connection dc-missing not found"}}'
+            )
+
+    fake_mdeasm = types.SimpleNamespace(
+        Workspaces=DummyWS,
+        ApiRequestError=ApiRequestError,
+        redact_sensitive_text=lambda s: s,
+    )
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["data-connections", "get", "dc-missing", "--out", "-"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "data-connections get failed" in err
+    assert "status=404" in err
+    assert "code=DataConnectionNotFound" in err
+
+
 def test_cli_data_connections_put_log_analytics(monkeypatch, capsys):
     captured = {}
 
@@ -159,4 +188,3 @@ def test_cli_data_connections_validate_and_delete(monkeypatch, capsys):
     )
     assert rc_delete == 0
     assert capsys.readouterr().out.splitlines() == ["deleted dc-adx"]
-
