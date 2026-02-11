@@ -9,77 +9,65 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 12 planning; selected task moved to Implemented below)
+Priority order (cycle 13 planning; selected tasks moved to Implemented below)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
-  - Scope: add optional live smoke path confirming protected URL bearer fallback in `tasks fetch`.
-  - Why: closes the remaining real-tenant confidence gap beyond deterministic unit tests.
+  - Scope: execute and record a credentialed smoke for protected artifact URL fallback in `tasks fetch`.
+  - Why: closes remaining confidence gap between unit coverage and tenant behavior.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Data-connections live smoke expansion (`get` + `validate`)**
-  - Gap class: weak (quality)
-  - Scope: extend opt-in integration smoke from `list` to `get` and `validate`.
-  - Why: catches preview endpoint drift across more payload shapes.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
-- [ ] **Workflow-level docs smoke checks in CI**
-  - Gap class: weak (DX/reliability)
-  - Scope: add CI lane that executes high-value `--help` and documented smoke command paths.
-  - Why: prevents docs drift and stale automation examples.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Legacy helper typed-exception migration (phase 2)**
   - Gap class: weak (reliability)
-  - Scope: replace high-use broad `Exception` raises with typed helper exceptions.
-  - Why: improves caller-side retry logic and precision in failure handling.
+  - Scope: replace remaining broad `Exception` raises in workspace/task/data-connection helper paths with typed exceptions.
+  - Why: improves retry policy precision and caller-side error handling contracts.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **Task wait failure detail parity**
-  - Gap class: weak (UX/operability)
-  - Scope: include terminal failure metadata (`errorCode`, `message`) in `tasks wait` outputs.
-  - Why: shortens triage loops during export failures.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
+  - Gap class: weak (reliability)
+  - Scope: validate dependencies/tooling under Python `3.13`, then add a non-blocking or blocking lane.
+  - Why: reduces runtime upgrade risk and keeps maintenance window current.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Resource tags CRUD parity**
   - Gap class: missing (feature parity)
   - Scope: helper + CLI list/get/put/delete operations for resource tags.
   - Why: unlocks governance metadata workflows expected in enterprise ASM automation.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
-
-- [ ] **CLI `--format lines` consistency sweep**
-  - Gap class: weak (DX)
-  - Scope: standardize field ordering and ID-first behavior across line output families.
-  - Why: improves shell pipeline portability (`awk`/`cut`/`grep`) and scripting stability.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
-  - Gap class: weak (reliability)
-  - Scope: validate and add a `3.13` lane when dependency/tooling compatibility is confirmed.
-  - Why: reduces runtime upgrade risk and keeps support window current.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+  - Score: Impact 4 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
 - [ ] **Saved-filter payload schema validation**
   - Gap class: weak (quality)
-  - Scope: validate user-supplied saved-filter payload shape before API submit.
-  - Why: returns clear local diagnostics before remote request failures.
+  - Scope: validate saved-filter payload shape locally before API submit.
+  - Why: returns clear local diagnostics and reduces remote 4xx churn.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **CLI `--format lines` consistency sweep**
+  - Gap class: weak (DX)
+  - Scope: standardize ID-first order and stable field columns across lines-mode families.
+  - Why: improves shell pipeline portability (`awk`/`cut`/`grep`) and scripting stability.
   - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Doctor probe latency summary**
   - Gap class: weak (operability)
   - Scope: include per-target elapsed timings + aggregate summary in `doctor --probe` payload.
-  - Why: improves fast diagnosis of endpoint degradation and throttling patterns.
+  - Why: speeds diagnosis of endpoint degradation and throttling.
   - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
 
 - [ ] **Discovery-group delete retry hardening**
   - Gap class: weak (reliability)
   - Scope: add bounded retry/jitter around transient discovery-group delete failures.
   - Why: reduces flaky cleanup in batch automations.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+  - Score: Impact 3 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Credential-aware docs smoke command in CI**
+  - Gap class: weak (DX/reliability)
+  - Scope: extend `docs-smoke` with one secret-gated command path that validates docs examples against real credentials when available.
+  - Why: catches drift beyond `--help` without making default CI flaky.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
-  - Scope: ship bash/zsh completion scripts and short copy-paste workflow recipes.
+  - Scope: ship bash/zsh completion scripts and focused workflow snippets.
   - Why: lowers onboarding friction and command syntax errors.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
@@ -95,17 +83,23 @@ Priority order (cycle 12 planning; selected task moved to Implemented below)
   - Why: early warning for preview endpoint drift.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
+- [ ] **Checkpoint/profile file schema docs + fixtures**
+  - Gap class: weak (DX)
+  - Scope: document and validate checkpoint/profile formats with examples.
+  - Why: reduces operator confusion and parsing mistakes.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
+
+- [ ] **Tracker trust-label validation automation**
+  - Gap class: differentiator
+  - Scope: add a checker for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
+  - Why: keeps autonomous memory auditable and consistent across cycles.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
+
 - [ ] **End-to-end command presets (`--profile @file`)**
   - Gap class: differentiator
   - Scope: reusable local preset files for filter/orderby/output/reliability flags.
   - Why: reduces repetitive long commands and operator mistakes in scheduled jobs.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
-
-- [ ] **Tracker trust-label validation automation**
-  - Gap class: differentiator
-  - Scope: add a lightweight checker for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
-  - Why: keeps autonomous memory auditable and consistent over long cycles.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
 - [ ] **Export throughput benchmark harness**
   - Gap class: differentiator
@@ -119,13 +113,22 @@ Priority order (cycle 12 planning; selected task moved to Implemented below)
   - Why: improves diagnosability of tenant/API drift and throttling.
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
-- [ ] **Checkpoint/profile file schema docs + fixtures**
-  - Gap class: weak (DX)
-  - Scope: document and validate checkpoint/profile file formats with examples.
-  - Why: reduces operator confusion and parsing mistakes.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
-
 ## Implemented
+- [x] **Task wait failure detail parity**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_tasks.py`, `docs/tasks.md`, `docs/exports.md`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_wait_json_surfaces_terminal_failure_details tests/test_cli_tasks.py::test_cli_tasks_wait_lines_surfaces_terminal_failure_details` (pass); `source .venv/bin/activate && make docs-smoke` (pass)
+
+- [x] **Data-connections live smoke expansion (`get` + `validate`)**
+  - Date: 2026-02-11
+  - Scope: `tests/test_integration_smoke.py`, `docs/data_connections.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list tests/test_integration_smoke.py::test_integration_smoke_data_connections_get tests/test_integration_smoke.py::test_integration_smoke_data_connections_validate` (pass; skipped by default without env/credentials)
+
+- [x] **Workflow-level docs smoke checks in CI**
+  - Date: 2026-02-11
+  - Scope: `Makefile`, `.github/workflows/ci.yml`
+  - Evidence (trusted: local + CI): `source .venv/bin/activate && make docs-smoke` (pass); `gh run watch 21909743331 -R sarveshkapre/MDEASM --exit-status` (pass)
+
 - [x] **List/get parity for API error payload surfacing in CLI**
   - Date: 2026-02-11
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_saved_filters.py`, `tests/test_cli_data_connections.py`, `tests/test_cli_tasks.py`, `tests/test_cli_export.py`, `docs/auth.md`
@@ -457,6 +460,24 @@ Priority order (cycle 12 planning; selected task moved to Implemented below)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 13):
+  - Microsoft Defender EASM data-plane docs continue to center asynchronous task lifecycle operations (`tasks`, `tasks/{id}`, `tasks/{id}:download`) and explicit data-connection validation endpoints, so operator-visible terminal failure diagnostics and endpoint drift smoke coverage remain high-value reliability work.
+  - Peer ASM/export guidance (runZero, Censys, Shodan) continues to emphasize API-first workflows, automation-safe exports, and clear failure diagnostics in large inventory operations.
+  - Gap map (cycle 13):
+    - Weak -> closed this cycle: `tasks wait` now surfaces normalized `terminalErrorCode` / `terminalErrorMessage` metadata for terminal failure states.
+    - Weak -> closed this cycle: opt-in integration smoke expanded from data-connection `list` to `get` + `validate` paths.
+    - Weak -> closed this cycle: workflow-level docs smoke lane added to CI via `make docs-smoke` for documented command surfaces.
+    - Remaining highest-priority gaps: live tenant protected-URL artifact fallback smoke and phase-2 typed exception migration.
+  - Top 5 high-impact opportunities now:
+    - 1) live protected artifact fallback smoke, 2) typed exception migration phase 2, 3) Python 3.13 CI lane, 4) resource tags CRUD parity, 5) lines-format consistency sweep.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn Defender EASM tasks operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM validate data-connection operation: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/data-connections/validate-data-connection?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM assets export operation: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API guide: https://help.runzero.com/docs/leveraging-the-runzero-api/
+    - Censys export assets guidance: https://support.censys.io/hc/en-us/articles/35338966133524-Exporting-Assets-in-Censys-ASM
+    - Shodan API crawl/export guidance: https://developer.shodan.io/api/crawl-internet-data
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 12):
   - Microsoft Defender EASM REST references for `tasks`, `savedFilters`, and `dataConnections` keep documenting structured error response contracts (status + `x-ms-error-code` + error payload objects), reinforcing that CLI surfaces should preserve code/message details for operators.
   - Peer API guidance (runZero) still emphasizes HTTP status-aware automation behavior, including `429` handling and delayed retries, which aligns with surfacing explicit status and code in failure output.
