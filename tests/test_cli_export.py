@@ -478,6 +478,113 @@ def test_cli_assets_export_ndjson_streams_when_available(tmp_path, monkeypatch):
     ]
 
 
+def test_cli_assets_export_json_stream_array_when_enabled(tmp_path, monkeypatch):
+    out = tmp_path / "assets.json"
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_workspace_assets(self, **kwargs):
+            raise AssertionError("get_workspace_assets should not be used for --stream-json-array")
+
+        def stream_workspace_assets(self, **kwargs):
+            captured["stream_kwargs"] = dict(kwargs)
+            yield {"id": "domain$$example.com", "kind": "domain"}
+            yield {"id": "host$$www.example.com", "kind": "host"}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind in ("domain","host")',
+            "--format",
+            "json",
+            "--stream-json-array",
+            "--out",
+            str(out),
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 0
+    assert captured["stream_kwargs"]["query_filter"] == 'kind in ("domain","host")'
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload == [
+        {"id": "domain$$example.com", "kind": "domain"},
+        {"id": "host$$www.example.com", "kind": "host"},
+    ]
+
+
+def test_cli_assets_export_json_stream_array_requires_no_facet_filters(monkeypatch, capsys):
+    class DummyAssetList:
+        def as_dicts(self):
+            return []
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "json",
+            "--stream-json-array",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 2
+    assert "--stream-json-array requires --no-facet-filters" in capsys.readouterr().err
+
+
+def test_cli_assets_export_stream_array_requires_json_format(monkeypatch, capsys):
+    class DummyAssetList:
+        def as_dicts(self):
+            return []
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self.assetList = DummyAssetList()
+
+        def get_workspace_assets(self, **kwargs):
+            return None
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "assets",
+            "export",
+            "--filter",
+            'kind = "domain"',
+            "--format",
+            "ndjson",
+            "--stream-json-array",
+            "--out",
+            "-",
+            "--no-facet-filters",
+        ]
+    )
+    assert rc == 2
+    assert "--stream-json-array requires --format json" in capsys.readouterr().err
+
+
 def test_cli_assets_export_csv_writes_file(tmp_path, monkeypatch):
     out = tmp_path / "assets.csv"
     captured = {}
@@ -1067,3 +1174,75 @@ def test_cli_workspaces_list_lines_to_stdout(monkeypatch, capsys):
     assert rc == 0
     out = capsys.readouterr().out.strip()
     assert out.startswith("ws1\t")
+
+
+def test_cli_workspaces_delete_json_with_yes(monkeypatch, capsys):
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            captured["init_kwargs"] = dict(kwargs)
+            self._workspaces = {"ws1": ("https://dp/ws1", "management.azure.com/ws1")}
+
+        def delete_workspace(self, **kwargs):
+            captured["delete_kwargs"] = dict(kwargs)
+            return {"deleted": "ws1", "resourceGroup": "rg0", "statusCode": 204}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        ["workspaces", "delete", "ws1", "--yes", "--format", "json", "--out", "-"]
+    )
+    assert rc == 0
+    assert captured["init_kwargs"] == {
+        "workspace_name": "",
+        "init_data_plane_token": False,
+        "emit_workspace_guidance": False,
+    }
+    assert captured["delete_kwargs"] == {
+        "workspace_name": "ws1",
+        "resource_group_name": "",
+        "noprint": True,
+    }
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["deleted"] == "ws1"
+    assert payload["statusCode"] == 204
+
+
+def test_cli_workspaces_delete_requires_yes_in_noninteractive_mode(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._workspaces = {}
+
+        def delete_workspace(self, **kwargs):
+            raise AssertionError("delete_workspace should not be called")
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["workspaces", "delete", "ws1"])
+    assert rc == 2
+    assert "refusing to delete workspace without --yes" in capsys.readouterr().err
+
+
+def test_cli_workspaces_delete_aborts_when_confirmation_mismatch(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._workspaces = {"ws1": ("https://dp/ws1", "management.azure.com/ws1")}
+
+        def delete_workspace(self, **kwargs):
+            raise AssertionError("delete_workspace should not be called")
+
+    class DummyInput:
+        def isatty(self):
+            return True
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(sys, "stdin", DummyInput())
+    monkeypatch.setattr("builtins.input", lambda _prompt: "wrong-name")
+
+    rc = mdeasm_cli.main(["workspaces", "delete", "ws1"])
+    assert rc == 1
+    assert "aborted: confirmation did not match workspace name" in capsys.readouterr().err

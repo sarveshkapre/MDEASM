@@ -19,6 +19,15 @@ mdeasm assets export \
   --out assets.json \
   --get-all \
   --no-facet-filters
+
+# Stream a JSON array incrementally (lower memory, same JSON-array shape):
+mdeasm assets export \
+  --filter 'state = "confirmed" AND kind = "domain"' \
+  --format json \
+  --stream-json-array \
+  --out assets.json \
+  --get-all \
+  --no-facet-filters
 ```
 
 ## Long filters from a file (or stdin)
@@ -188,6 +197,7 @@ mdeasm assets schema diff \
 - When using `--out <path>`, exports are written atomically (temp file + replace) to avoid partial files on interruption.
 - For compact JSON in pipelines, consider `--no-pretty`. For line-oriented ingestion, consider `--format ndjson`.
 - For large exports:
+  - `--format json --stream-json-array` streams array rows incrementally when `--no-facet-filters` is set.
   - `--format ndjson` streams rows as they are fetched (constant memory) when `--no-facet-filters` is set.
   - `--format csv` can stream rows when columns are explicit (`--columns` / `--columns-from`) and `--no-facet-filters` is set. If columns are not explicit, the CLI buffers rows to infer a union-of-keys header.
 - For large exports, consider: `--max-page-size 100`, `--max-page-count N`, `--max-assets N`, and `--no-facet-filters`.

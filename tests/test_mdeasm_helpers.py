@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import jwt
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -619,6 +620,53 @@ def test_create_workspace_uses_default_region_when_argument_missing():
     out = ws.create_workspace(resource_group_name="rg0", region=None, workspace_name="ws0")
     assert "ws0" in out
     assert captured["payload"]["location"] == "eastus"
+
+
+def test_delete_workspace_uses_workspace_resource_group_metadata_and_clears_default():
+    ws = _new_ws()
+    ws._subscription_id = "sub0"
+    ws._default_workspace_name = "ws0"
+    ws._workspaces = mdeasm.requests.structures.CaseInsensitiveDict(
+        {
+            "ws0": (
+                "https://dp.example/subscriptions/sub0/resourceGroups/rg0/workspaces/ws0",
+                "management.azure.com/subscriptions/sub0/resourceGroups/rg0/providers/Microsoft.Easm/workspaces/ws0",
+            )
+        }
+    )
+    captured = {}
+
+    class Resp:
+        status_code = 204
+
+        def json(self):
+            return {}
+
+    def fake_verify_workspace(_workspace_name):
+        return True
+
+    def fake_query_helper(*_args, **kwargs):
+        captured.update(kwargs)
+        return Resp()
+
+    ws.__verify_workspace__ = fake_verify_workspace  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.delete_workspace(workspace_name="ws0", noprint=True)
+    assert payload["deleted"] == "ws0"
+    assert payload["resourceGroup"] == "rg0"
+    assert payload["statusCode"] == 204
+    assert captured["method"] == "delete"
+    assert captured["endpoint"] == "workspaces/ws0"
+    assert "/resourceGroups/rg0/providers/Microsoft.Easm" in captured["url"]
+    assert ws._default_workspace_name == ""
+
+
+def test_delete_workspace_requires_workspace_name():
+    ws = _new_ws()
+    ws._default_workspace_name = ""
+    with pytest.raises(mdeasm.ValidationError):
+        ws.delete_workspace(workspace_name="", noprint=True)
 
 
 def test_stream_workspace_assets_supports_value_payload_orderby_mark():

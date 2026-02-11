@@ -1138,6 +1138,86 @@ class Workspaces:
             self.__set_default_workspace_name__(r.json()["name"])
             return {workspace_name: self._workspaces[workspace_name]}
 
+    def delete_workspace(self, workspace_name="", resource_group_name=None, **kwargs):
+        """
+        Delete a Defender EASM workspace via control-plane API.
+
+        `resource_group_name` is optional when the workspace can be resolved via
+        `get_workspaces()` metadata. Use `noprint=True` for automation usage.
+        """
+        noprint = bool(kwargs.get("noprint"))
+
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        workspace_name = str(workspace_name or "").strip()
+        if not workspace_name:
+            raise ValidationError("workspace name is required")
+
+        if not self.__verify_workspace__(workspace_name):
+            self.__raise_workspace_not_found__(workspace_name)
+
+        resolved_rg = str(resource_group_name or "").strip()
+        if not resolved_rg:
+            cp_endpoint = ""
+            try:
+                cp_endpoint = str((self._workspaces.get(workspace_name) or ("", ""))[1] or "")
+            except Exception:
+                cp_endpoint = ""
+
+            rg_match = re.search(
+                r"/resourceGroups/([^/]+)/providers/Microsoft\.Easm/workspaces/",
+                cp_endpoint,
+                flags=re.IGNORECASE,
+            )
+            if rg_match:
+                resolved_rg = urllib.parse.unquote(rg_match.group(1))
+            elif self._resource_group:
+                resolved_rg = str(self._resource_group).strip()
+
+        if not resolved_rg:
+            raise ValidationError(
+                "resource group name is required to delete workspace; pass resource_group_name or set RESOURCE_GROUP_NAME"
+            )
+
+        url = (
+            f"https://management.azure.com/subscriptions/{self._subscription_id}/resourceGroups/"
+            f"{resolved_rg}/providers/Microsoft.Easm"
+        )
+        r = self.__workspace_query_helper__(
+            "delete_workspace",
+            method="delete",
+            endpoint=f"workspaces/{workspace_name}",
+            url=url,
+            data_plane=False,
+            workspace_name=workspace_name,
+        )
+
+        payload = {}
+        try:
+            maybe_payload = r.json()
+            if isinstance(maybe_payload, dict):
+                payload = maybe_payload
+        except Exception:
+            payload = {}
+
+        # Best effort local state refresh after deletion.
+        self._workspaces.pop(workspace_name, None)
+        if str(self._default_workspace_name or "").lower() == workspace_name.lower():
+            self._default_workspace_name = ""
+            if len(self._workspaces) == 1:
+                self.__set_default_workspace_name__(next(iter(self._workspaces)))
+
+        out = {
+            "deleted": workspace_name,
+            "resourceGroup": resolved_rg,
+            "statusCode": int(getattr(r, "status_code", 0) or 0),
+        }
+        if payload:
+            out["response"] = payload
+        if not noprint:
+            print(json.dumps(out, indent=2))
+        return out
+
     def get_discovery_templates(self, org_name, workspace_name="", **kwargs):
         if not workspace_name:
             workspace_name = self._default_workspace_name

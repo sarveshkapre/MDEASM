@@ -412,6 +412,63 @@ def _write_json(path: Path | None, payload, *, pretty: bool) -> None:
         _atomic_write_text(path, data + "\n", encoding="utf-8")
 
 
+def _write_json_array_stream(path: Path | None, rows, *, pretty: bool) -> None:
+    def _row_text(row) -> str:
+        if pretty:
+            return json.dumps(row, indent=2, default=_json_default, sort_keys=True)
+        return json.dumps(row, default=_json_default, sort_keys=True, separators=(",", ":"))
+
+    if path is None:
+        out_fh = sys.stdout
+        out_fh.write("[\n" if pretty else "[")
+        first = True
+        for row in rows:
+            if not first:
+                out_fh.write(",\n" if pretty else ",")
+            first = False
+            row_text = _row_text(row)
+            if pretty:
+                out_fh.write("\n".join(f"  {line}" for line in row_text.splitlines()))
+            else:
+                out_fh.write(row_text)
+        if pretty:
+            out_fh.write("\n]\n")
+        else:
+            out_fh.write("]\n")
+        return
+
+    tmp_fh, tmp_path = _atomic_open_text(path, encoding="utf-8", newline="\n")
+    try:
+        with tmp_fh:
+            tmp_fh.write("[\n" if pretty else "[")
+            first = True
+            for row in rows:
+                if not first:
+                    tmp_fh.write(",\n" if pretty else ",")
+                first = False
+                row_text = _row_text(row)
+                if pretty:
+                    tmp_fh.write("\n".join(f"  {line}" for line in row_text.splitlines()))
+                else:
+                    tmp_fh.write(row_text)
+            if pretty:
+                tmp_fh.write("\n]\n")
+            else:
+                tmp_fh.write("]\n")
+            tmp_fh.flush()
+            try:
+                os.fsync(tmp_fh.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
+
 def _write_ndjson(path: Path | None, rows) -> None:
     if path is None:
         out_fh = sys.stdout
@@ -924,6 +981,73 @@ def build_parser() -> argparse.ArgumentParser:
         help="Max retry attempts when retry is enabled (default: helper default)",
     )
     ws_list.add_argument(
+        "--backoff-max-s",
+        type=float,
+        default=None,
+        help="Max backoff sleep seconds between retries (default: helper default)",
+    )
+
+    ws_delete = workspaces_sub.add_parser(
+        "delete", help="Delete a workspace (control-plane operation)"
+    )
+    ws_delete.add_argument("name", help="Workspace name")
+    ws_delete.add_argument(
+        "--resource-group-name",
+        default="",
+        help="Optional resource group name override",
+    )
+    ws_delete.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip interactive confirmation prompt",
+    )
+    ws_delete.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    ws_delete.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log verbosity (repeatable; maps to INFO/DEBUG)",
+    )
+    ws_delete.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    ws_delete.add_argument("--out", default="", help="Output path (default: stdout)")
+    ws_delete.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    ws_delete.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    ws_delete.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    ws_delete.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="Disable HTTP retry/backoff (default: enabled)",
+    )
+    ws_delete.add_argument(
+        "--max-retry",
+        type=int,
+        default=None,
+        help="Max retry attempts when retry is enabled (default: helper default)",
+    )
+    ws_delete.add_argument(
         "--backoff-max-s",
         type=float,
         default=None,
@@ -1936,6 +2060,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not auto-create facet filters (faster for exports)",
     )
+    export.add_argument(
+        "--stream-json-array",
+        action="store_true",
+        help=(
+            "Client json mode: stream a JSON array incrementally (requires --no-facet-filters; "
+            "reduces peak memory)"
+        ),
+    )
 
     schema = assets_sub.add_parser(
         "schema", help="Print observed columns for a query (union-of-keys)"
@@ -2270,7 +2402,7 @@ def main(argv: list[str] | None = None) -> int:
 
         return 0 if payload["ok"] else 1
 
-    if args.cmd == "workspaces" and args.workspaces_cmd == "list":
+    if args.cmd == "workspaces":
         import mdeasm
 
         level = None
@@ -2294,23 +2426,81 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ws = mdeasm.Workspaces(**ws_kwargs)
         except Exception as e:
-            sys.stderr.write(f"failed to list workspaces: {e}\n")
+            action = args.workspaces_cmd
+            sys.stderr.write(f"failed to initialize workspace client for '{action}': {e}\n")
             return 1
 
-        items = []
-        for name, endpoints in (getattr(ws, "_workspaces", {}) or {}).items():
-            dp = endpoints[0] if isinstance(endpoints, (list, tuple)) and len(endpoints) > 0 else ""
-            cp = endpoints[1] if isinstance(endpoints, (list, tuple)) and len(endpoints) > 1 else ""
-            items.append({"name": name, "dataPlane": dp, "controlPlane": cp})
-        items.sort(key=lambda d: str(d.get("name", "")).lower())
+        if args.workspaces_cmd == "list":
+            items = []
+            for name, endpoints in (getattr(ws, "_workspaces", {}) or {}).items():
+                dp = endpoints[0] if isinstance(endpoints, (list, tuple)) and len(endpoints) > 0 else ""
+                cp = endpoints[1] if isinstance(endpoints, (list, tuple)) and len(endpoints) > 1 else ""
+                items.append({"name": name, "dataPlane": dp, "controlPlane": cp})
+            items.sort(key=lambda d: str(d.get("name", "")).lower())
 
-        out_path = None if (not args.out or args.out == "-") else Path(args.out)
-        if args.format == "json":
-            _write_json(out_path, items, pretty=True)
-        else:
-            lines = [f"{d['name']}\t{d['dataPlane']}\t{d['controlPlane']}" for d in items]
-            _write_lines(out_path, lines)
-        return 0
+            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            if args.format == "json":
+                _write_json(out_path, items, pretty=True)
+            else:
+                lines = [f"{d['name']}\t{d['dataPlane']}\t{d['controlPlane']}" for d in items]
+                _write_lines(out_path, lines)
+            return 0
+
+        if args.workspaces_cmd == "delete":
+            workspace_name = str(args.name or "").strip()
+            if not workspace_name:
+                sys.stderr.write("workspace name is required\n")
+                return 2
+
+            if not args.yes:
+                if not sys.stdin.isatty():
+                    sys.stderr.write(
+                        "refusing to delete workspace without --yes in non-interactive mode\n"
+                    )
+                    return 2
+                try:
+                    confirmation = input(
+                        f"type workspace name '{workspace_name}' to confirm deletion: "
+                    )
+                except EOFError:
+                    sys.stderr.write("aborted: confirmation input unavailable; rerun with --yes\n")
+                    return 2
+                if str(confirmation).strip() != workspace_name:
+                    sys.stderr.write("aborted: confirmation did not match workspace name\n")
+                    return 1
+
+            try:
+                payload = ws.delete_workspace(
+                    workspace_name=workspace_name,
+                    resource_group_name=args.resource_group_name,
+                    noprint=True,
+                )
+            except Exception as e:
+                redactor = getattr(mdeasm, "redact_sensitive_text", None)
+                msg = redactor(str(e)) if callable(redactor) else str(e)
+                sys.stderr.write(f"failed to delete workspace: {msg}\n")
+                return 1
+
+            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            if args.format == "json":
+                _write_json(out_path, payload, pretty=True)
+            else:
+                _write_lines(
+                    out_path,
+                    [
+                        "\t".join(
+                            [
+                                str(payload.get("deleted", "")),
+                                str(payload.get("resourceGroup", "")),
+                                str(payload.get("statusCode", "")),
+                            ]
+                        )
+                    ],
+                )
+            return 0
+
+        sys.stderr.write("unknown workspaces command\n")
+        return 2
 
     if args.cmd == "saved-filters":
         import mdeasm
@@ -2776,6 +2966,14 @@ def main(argv: list[str] | None = None) -> int:
                 _write_json(out_path, output_payload, pretty=bool(args.pretty))
                 return 0
 
+            if args.stream_json_array:
+                if args.format != "json":
+                    sys.stderr.write("--stream-json-array requires --format json\n")
+                    return 2
+                if not args.no_facet_filters:
+                    sys.stderr.write("--stream-json-array requires --no-facet-filters\n")
+                    return 2
+
             try:
                 resume_state = _parse_resume_from(args.resume_from)
             except Exception as e:
@@ -2813,7 +3011,7 @@ def main(argv: list[str] | None = None) -> int:
             if (
                 args.no_facet_filters
                 and hasattr(ws, "stream_workspace_assets")
-                and args.format in ("ndjson", "csv")
+                and (args.format in ("ndjson", "csv") or bool(args.stream_json_array))
             ):
                 stream_kwargs = dict(
                     query_filter=query_filter,
@@ -2839,6 +3037,13 @@ def main(argv: list[str] | None = None) -> int:
 
                 if args.format == "ndjson":
                     _write_ndjson(out_path, ws.stream_workspace_assets(**stream_kwargs))
+                    return 0
+                if args.format == "json" and args.stream_json_array:
+                    _write_json_array_stream(
+                        out_path,
+                        ws.stream_workspace_assets(**stream_kwargs),
+                        pretty=bool(args.pretty),
+                    )
                     return 0
                 if args.format == "csv" and columns:
                     _write_csv_stream(
