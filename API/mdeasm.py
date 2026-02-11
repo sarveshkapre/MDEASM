@@ -37,6 +37,21 @@ load_dotenv()
 
 _DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
 _DEFAULT_LOG_DATEFMT = "%d-%b-%y %H:%M:%S"
+_SENSITIVE_QUERY_KEYS = {
+    "access_token",
+    "client_secret",
+    "refresh_token",
+    "sig",
+    "signature",
+    "token",
+}
+_SENSITIVE_JSON_FIELD_RE = re.compile(
+    r'(?i)("?(access_token|refresh_token|client_secret|id_token)"?\s*:\s*")([^"]+)(")'
+)
+_SENSITIVE_KV_FIELD_RE = re.compile(
+    r"(?i)\b(access_token|refresh_token|client_secret|id_token)\b(\s*=\s*)([^\s&,\"']+)"
+)
+_AUTH_BEARER_RE = re.compile(r"(?i)\b(authorization\s*[:=]\s*bearer\s+|bearer\s+)([A-Za-z0-9._\-+/=]+)")
 
 
 def configure_logging(level: str | int | None = None, *, force: bool = False) -> None:
@@ -74,6 +89,32 @@ def _response_items(payload):
     if isinstance(items, list):
         return items
     return []
+
+
+def redact_sensitive_text(value) -> str:
+    """
+    Best-effort sanitization for error/log strings.
+
+    This helper intentionally focuses on common auth/token leak patterns while preserving enough
+    context for troubleshooting.
+    """
+    text = "" if value is None else str(value)
+    if not text:
+        return text
+
+    text = _AUTH_BEARER_RE.sub(r"\1[REDACTED]", text)
+    text = _SENSITIVE_JSON_FIELD_RE.sub(r"\1[REDACTED]\4", text)
+    text = _SENSITIVE_KV_FIELD_RE.sub(r"\1\2[REDACTED]", text)
+
+    def _mask_query(match):
+        key = match.group(1)
+        val = match.group(2)
+        if key.lower() in _SENSITIVE_QUERY_KEYS:
+            return f"{key}=[REDACTED]"
+        return f"{key}={val}"
+
+    text = re.sub(r"([A-Za-z_][A-Za-z0-9_]{1,64})=([^&\s]+)", _mask_query, text)
+    return text
 
 
 class Workspaces:
@@ -277,7 +318,7 @@ class Workspaces:
         r = post_fn(url, headers=headers, data=data, timeout=self._http_timeout)
         if r.status_code != 200:
             logging.error(r.status_code)
-            raise Exception(r.text)
+            raise Exception(redact_sensitive_text(r.text))
         else:
             return r.json()["access_token"]
 
@@ -810,7 +851,7 @@ class Workspaces:
                         helper_params.get("skip"),
                         attempt,
                         attempts,
-                        r.text,
+                        redact_sensitive_text(r.text),
                     )
                     if data_plane:
                         if r.status_code in (401, 403) or self.__token_expiry__(self._dp_token):
@@ -824,7 +865,7 @@ class Workspaces:
                         helper_headers = {"Authorization": f"Bearer {token}"}
 
             except Exception as e:
-                last_err = str(e)
+                last_err = redact_sensitive_text(str(e))
                 logging.warning(
                     "called by: %s -- endpoint: %s -- page: %s -- attempt: %s of %s -- error: %s",
                     calling_func,
@@ -832,7 +873,7 @@ class Workspaces:
                     helper_params.get("skip"),
                     attempt,
                     attempts,
-                    str(e),
+                    last_err,
                 )
                 if data_plane:
                     if self.__token_expiry__(self._dp_token):
@@ -868,7 +909,8 @@ class Workspaces:
         )
         raise Exception(
             f"called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- "
-            f"max attempts: {attempts} -- last_status: {last_status} -- last_error: {last_err} -- last_text: {last_text}"
+            f"max attempts: {attempts} -- last_status: {last_status} -- last_error: {last_err} -- "
+            f"last_text: {redact_sensitive_text(last_text)}"
         )
 
     def get_workspaces(self, workspace_name="", emit_guidance=True):

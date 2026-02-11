@@ -64,6 +64,94 @@ def test_cli_tasks_get_cancel_run_download(monkeypatch, capsys):
     assert "downloadUrl" in json.loads(capsys.readouterr().out)
 
 
+def test_cli_tasks_fetch_downloads_artifact(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 2
+            self._backoff_max_s = 0.01
+            self._dp_token = "token-abc"
+
+        def download_task(self, task_id, **kwargs):
+            return {
+                "id": task_id,
+                "result": {"downloadUrl": "https://files.example.test/export.csv?sig=secret"},
+            }
+
+    class FakeResp:
+        status_code = 200
+        text = ""
+
+        def iter_content(self, chunk_size=65536):
+            assert chunk_size == 65536
+            yield b"col1,col2\n"
+            yield b"a,b\n"
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        assert "files.example.test" in url
+        assert kwargs["stream"] is True
+        assert kwargs["allow_redirects"] is True
+        return FakeResp()
+
+    fake_mdeasm = types.SimpleNamespace(
+        Workspaces=DummyWS,
+        redact_sensitive_text=lambda s: str(s).replace("sig=secret", "sig=[REDACTED]"),
+    )
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "fetch",
+            "abc",
+            "--artifact-out",
+            str(artifact),
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    assert artifact.read_bytes() == b"col1,col2\na,b\n"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["task_id"] == "abc"
+    assert payload["bytes_written"] == len(b"col1,col2\na,b\n")
+    assert payload["download_url"].endswith("sig=[REDACTED]")
+
+
+def test_cli_tasks_fetch_fails_when_download_url_missing(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "metadata": {"note": "no URL here"}}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "tasks",
+            "fetch",
+            "abc",
+            "--artifact-out",
+            str(artifact),
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 1
+    assert "did not contain a usable artifact URL" in capsys.readouterr().err
+
+
 def test_cli_assets_export_server_mode_wait_download(monkeypatch, capsys):
     class DummyWS:
         def __init__(self, *args, **kwargs):

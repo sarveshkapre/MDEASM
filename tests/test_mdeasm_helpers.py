@@ -59,6 +59,22 @@ def test_validate_asset_id_formats():
                 assert "not-a-uuid-or-base64" in str(e)
 
 
+def test_redact_sensitive_text_masks_bearer_tokens_fields_and_query_params():
+    raw = (
+        "Authorization: Bearer abc.def.ghi "
+        "client_secret=supersecret "
+        '{"access_token":"tok123","refresh_token":"ref456"} '
+        "https://example.test/download?sig=verysecret&sv=2023-01-01"
+    )
+    cooked = mdeasm.redact_sensitive_text(raw)
+    assert "abc.def.ghi" not in cooked
+    assert "supersecret" not in cooked
+    assert "tok123" not in cooked
+    assert "ref456" not in cooked
+    assert "verysecret" not in cooked
+    assert "[REDACTED]" in cooked
+
+
 def test_asset_to_dict_returns_dict_and_can_suppress_print(capsys):
     a = mdeasm.Asset()
     a.id = "domain$$example.com"
@@ -116,6 +132,45 @@ def test_workspace_query_helper_retries_and_refreshes_token_on_401():
 
     # Retry-After respected.
     sleep_mock.assert_called_once_with(1)
+
+
+def test_workspace_query_helper_redacts_failure_exception_text():
+    ws = _new_ws()
+
+    class Resp:
+        def __init__(self):
+            self.ok = False
+            self.status_code = 500
+            self.text = (
+                "request failed: bearer bad.token.value "
+                'access_token":"token-secret" '
+                "client_secret=hunter2 "
+                "https://blob.example.test/file.csv?sig=mysecret"
+            )
+            self.headers = {}
+
+    def fake_request(**kwargs):
+        return Resp()
+
+    with mock.patch.object(mdeasm.requests, "request", side_effect=fake_request):
+        with mock.patch.object(ws, "__token_expiry__", return_value=False):
+            try:
+                ws.__workspace_query_helper__(
+                    "t",
+                    method="get",
+                    endpoint="assets",
+                    url="https://example.test",
+                    data_plane=True,
+                    retry=False,
+                    max_retry=1,
+                )
+                assert False, "expected exception"
+            except Exception as e:
+                msg = str(e)
+                assert "token-secret" not in msg
+                assert "hunter2" not in msg
+                assert "mysecret" not in msg
+                assert "[REDACTED]" in msg
 
 
 def test_workspace_query_helper_prefers_requests_session_when_present():

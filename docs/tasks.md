@@ -33,6 +33,22 @@ mdeasm tasks run <task_id>
 mdeasm tasks download <task_id>
 ```
 
+## Fetch Artifact Bytes To File
+```bash
+mdeasm tasks fetch <task_id> \
+  --artifact-out ./export.csv
+```
+
+Optional:
+```bash
+# Persist the raw tasks/{id}:download payload for troubleshooting.
+mdeasm tasks fetch <task_id> \
+  --artifact-out ./export.csv \
+  --reference-out ./download-reference.json \
+  --overwrite
+```
+
 Notes:
 - `--workspace-name` can override `WORKSPACE_NAME`.
 - Reliability and API version flags are available on all task commands (`--http-timeout`, `--no-retry`, `--max-retry`, `--backoff-max-s`, `--api-version`, `--dp-api-version`, `--cp-api-version`).
+- `tasks fetch` follows the URL returned by `tasks/{id}:download` and writes bytes atomically to avoid partial files.

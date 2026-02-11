@@ -4,13 +4,28 @@ import csv
 import json
 import math
 import os
+import random
 import sys
 import tempfile
 import time
+import urllib.parse
 from importlib.metadata import PackageNotFoundError, version as pkg_version
 from pathlib import Path
 
+import requests
+
 _TASK_TERMINAL_STATES = {"complete", "completed", "failed", "incomplete", "cancelled", "canceled"}
+_DOWNLOAD_URL_PRIORITY_KEYS = (
+    "downloadurl",
+    "downloaduri",
+    "artifacturl",
+    "sasurl",
+    "bloburl",
+    "url",
+    "uri",
+    "href",
+    "link",
+)
 
 
 def _json_default(obj):
@@ -132,6 +147,150 @@ def _atomic_open_text(path: Path, *, encoding: str = "utf-8", newline: str | Non
         suffix=".tmp",
     )
     return tmp_fh, Path(tmp_fh.name)
+
+
+def _atomic_open_binary(path: Path):
+    tmp_fh = tempfile.NamedTemporaryFile(
+        mode="wb",
+        delete=False,
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    return tmp_fh, Path(tmp_fh.name)
+
+
+def _extract_download_url(payload) -> str:
+    """
+    Best-effort URL extraction from `tasks/{id}:download` response shapes.
+    """
+    candidates: list[tuple[str, str]] = []
+
+    def _walk(node, key_hint: str = "") -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                _walk(v, key_hint=str(k).strip().lower())
+            return
+        if isinstance(node, list):
+            for item in node:
+                _walk(item, key_hint=key_hint)
+            return
+        if isinstance(node, str):
+            url = node.strip()
+            if url.startswith(("https://", "http://")):
+                candidates.append((key_hint, url))
+
+    _walk(payload)
+    if not candidates:
+        return ""
+
+    for preferred_key in _DOWNLOAD_URL_PRIORITY_KEYS:
+        for key, value in candidates:
+            if key == preferred_key:
+                return value
+    return candidates[0][1]
+
+
+def _download_url_to_file(
+    *,
+    url: str,
+    out_path: Path,
+    timeout: tuple[float, float],
+    retry: bool,
+    max_retry: int,
+    backoff_max_s: float,
+    chunk_size: int,
+    overwrite: bool,
+    session=None,
+    auth_token: str = "",
+) -> dict:
+    if out_path.exists() and not overwrite:
+        raise FileExistsError(f"output file already exists: {out_path}")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    get_fn = getattr(session, "get", None) if session is not None else None
+    if not callable(get_fn):
+        get_fn = requests.get
+
+    attempts = max(int(max_retry or 1), 1) if retry else 1
+    chunk_size = max(int(chunk_size or 65536), 1024)
+    last_error = ""
+    last_status = None
+
+    for attempt in range(1, attempts + 1):
+        # Most task downloads return signed URLs that don't need auth headers, but some
+        # environments can return protected URLs. Try unsigned first, then bearer-auth fallback.
+        auth_modes = [False, True] if auth_token else [False]
+        for use_auth in auth_modes:
+            resp = None
+            try:
+                headers = {"Authorization": f"Bearer {auth_token}"} if use_auth else None
+                resp = get_fn(
+                    url,
+                    headers=headers,
+                    stream=True,
+                    timeout=timeout,
+                    allow_redirects=True,
+                )
+                last_status = int(getattr(resp, "status_code", 0) or 0)
+
+                if last_status == 200:
+                    tmp_fh, tmp_path = _atomic_open_binary(out_path)
+                    bytes_written = 0
+                    try:
+                        with tmp_fh:
+                            for chunk in resp.iter_content(chunk_size=chunk_size):
+                                if not chunk:
+                                    continue
+                                tmp_fh.write(chunk)
+                                bytes_written += len(chunk)
+                            tmp_fh.flush()
+                            try:
+                                os.fsync(tmp_fh.fileno())
+                            except OSError:
+                                pass
+                        os.replace(tmp_path, out_path)
+                    except Exception:
+                        try:
+                            tmp_path.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                        raise
+
+                    return {
+                        "status_code": 200,
+                        "bytes_written": bytes_written,
+                        "used_bearer_auth": bool(use_auth),
+                    }
+
+                body_snippet = ""
+                try:
+                    body_snippet = str(getattr(resp, "text", "") or "")[:500]
+                except Exception:
+                    body_snippet = ""
+                last_error = f"http {last_status}: {body_snippet}"
+                if last_status not in (401, 403) or use_auth:
+                    break
+
+            except Exception as e:
+                last_error = str(e)
+                # If network/IO failed there is no value in retrying auth mode inside same attempt.
+                break
+            finally:
+                if resp is not None:
+                    try:
+                        resp.close()
+                    except Exception:
+                        pass
+
+        if attempt < attempts:
+            sleep_s = min(2 ** (attempt - 1), float(backoff_max_s or 30))
+            sleep_s += random.uniform(0, min(0.25, sleep_s / 4 if sleep_s else 0.0))
+            time.sleep(sleep_s)
+
+    raise RuntimeError(
+        f"artifact download failed after {attempts} attempts; last_status={last_status}; error={last_error}"
+    )
 
 
 def _write_json(path: Path | None, payload, *, pretty: bool) -> None:
@@ -977,6 +1136,77 @@ def build_parser() -> argparse.ArgumentParser:
         "--backoff-max-s", type=float, default=None, help="Max backoff seconds"
     )
 
+    tasks_fetch = tasks_sub.add_parser(
+        "fetch",
+        help="Download task artifact bytes to a local file path",
+    )
+    tasks_fetch.add_argument("task_id", help="Task id")
+    tasks_fetch.add_argument(
+        "--artifact-out",
+        required=True,
+        help="Output file path for downloaded artifact bytes",
+    )
+    tasks_fetch.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite artifact output path if it already exists",
+    )
+    tasks_fetch.add_argument(
+        "--chunk-size",
+        type=int,
+        default=65536,
+        help="Streaming download chunk size in bytes (default: 65536)",
+    )
+    tasks_fetch.add_argument(
+        "--reference-out",
+        default="",
+        help="Optional path (or '-') to also write raw tasks download reference payload",
+    )
+    tasks_fetch.add_argument(
+        "--out",
+        default="",
+        help="Summary output path (default: stdout)",
+    )
+    tasks_fetch.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    tasks_fetch.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    tasks_fetch.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    tasks_fetch.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    tasks_fetch.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    tasks_fetch.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    tasks_fetch.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    tasks_fetch.add_argument(
+        "--no-retry", action="store_true", help="Disable HTTP retry/backoff"
+    )
+    tasks_fetch.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    tasks_fetch.add_argument(
+        "--backoff-max-s", type=float, default=None, help="Max backoff seconds"
+    )
+
     assets = sub.add_parser("assets", help="Asset inventory operations")
     assets_sub = assets.add_subparsers(dest="assets_cmd", required=True)
 
@@ -1525,6 +1755,75 @@ def main(argv: list[str] | None = None) -> int:
         if args.tasks_cmd == "download":
             payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
             _write_json(out_path, payload, pretty=True)
+            return 0
+
+        if args.tasks_cmd == "fetch":
+            payload = ws.download_task(args.task_id, workspace_name=args.workspace_name, noprint=True)
+            artifact_url = _extract_download_url(payload)
+            if not artifact_url:
+                sys.stderr.write(
+                    "task download response did not contain a usable artifact URL\n"
+                )
+                return 1
+
+            if args.reference_out:
+                ref_out = None if args.reference_out == "-" else Path(args.reference_out)
+                _write_json(ref_out, payload, pretty=True)
+
+            summary_out = None if (not args.out or args.out == "-") else Path(args.out)
+            artifact_path = Path(args.artifact_out)
+            timeout = args.http_timeout or getattr(ws, "_http_timeout", (10.0, 60.0))
+            retry = not bool(args.no_retry)
+            max_retry = (
+                int(args.max_retry)
+                if args.max_retry is not None
+                else int(getattr(ws, "_default_max_retry", 5))
+            )
+            backoff_max_s = (
+                float(args.backoff_max_s)
+                if args.backoff_max_s is not None
+                else float(getattr(ws, "_backoff_max_s", 30))
+            )
+            session = getattr(ws, "_session", None)
+            auth_token = str(getattr(ws, "_dp_token", "") or "")
+
+            try:
+                result = _download_url_to_file(
+                    url=artifact_url,
+                    out_path=artifact_path,
+                    timeout=timeout,
+                    retry=retry,
+                    max_retry=max_retry,
+                    backoff_max_s=backoff_max_s,
+                    chunk_size=args.chunk_size,
+                    overwrite=bool(args.overwrite),
+                    session=session,
+                    auth_token=auth_token,
+                )
+            except Exception as e:
+                redactor = getattr(mdeasm, "redact_sensitive_text", None)
+                if callable(redactor):
+                    msg = redactor(str(e))
+                else:
+                    msg = str(e)
+                sys.stderr.write(f"artifact fetch failed: {msg}\n")
+                return 1
+
+            parsed = urllib.parse.urlparse(artifact_url)
+            redacted_url = artifact_url
+            redactor = getattr(mdeasm, "redact_sensitive_text", None)
+            if callable(redactor):
+                redacted_url = redactor(artifact_url)
+            summary = {
+                "task_id": args.task_id,
+                "artifact_out": str(artifact_path),
+                "bytes_written": int(result.get("bytes_written", 0)),
+                "status_code": int(result.get("status_code", 0)),
+                "used_bearer_auth": bool(result.get("used_bearer_auth", False)),
+                "download_host": parsed.netloc,
+                "download_url": redacted_url,
+            }
+            _write_json(summary_out, summary, pretty=True)
             return 0
 
         sys.stderr.write("unknown tasks command\n")
