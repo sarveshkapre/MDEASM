@@ -3,17 +3,13 @@
 ## Context Sources
 - README and docs
 - TODO/FIXME markers in code
-- Test and build failures
+- Local test/build/smoke verification
+- GitHub issue and CI signals (author-filtered)
+- Bounded market scan of Microsoft Defender EASM + peer ASM APIs
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (remaining backlog after cycle 6 selected shipments)
-
-- [ ] **Data connections opt-in integration smoke (`MDEASM_INTEGRATION_DATA_CONNECTIONS=1`)**
-  - Gap class: weak (quality)
-  - Scope: add a live-tenant smoke path for `data-connections list` to detect API drift.
-  - Why: preview endpoints are drift-prone and need a real probe path.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+Priority order (cycle 7 planning; remaining backlog after selected shipments)
 
 - [ ] **Typed helper exceptions**
   - Gap class: weak (maintainability)
@@ -21,35 +17,41 @@ Priority order (remaining backlog after cycle 6 selected shipments)
   - Why: safer automation handling and clearer failure semantics.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
+- [ ] **Task artifact integration smoke: protected URL auth fallback**
+  - Gap class: weak (quality)
+  - Scope: add an opt-in integration path that validates bearer-auth fallback when signed URLs are not anonymously readable.
+  - Why: hardens `tasks fetch` against tenant-specific download URL policies.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+
 - [ ] **Stream-first JSON array export mode**
   - Gap class: weak (performance/parity)
   - Scope: optional streaming JSON array writer to avoid full in-memory buffering for `--format json`.
   - Why: better memory profile on very large inventories.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Task artifact integration smoke: protected URL auth fallback**
-  - Gap class: weak (quality)
-  - Scope: add an opt-in integration path that validates bearer-auth fallback when signed URLs are not anonymously readable.
-  - Why: hardens `tasks fetch` against tenant-specific download URL policies.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Task artifact checksum verification option**
+- [ ] **End-to-end command presets (`--profile @file`)**
   - Gap class: differentiator
-  - Scope: optional `--sha256` verification for `tasks fetch` output.
-  - Why: strengthens integrity checks in regulated automation pipelines.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
+  - Scope: support local preset files for reusable filter/orderby/output arguments across export/task commands.
+  - Why: reduces repeated long command lines and operator errors in scheduled jobs.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
+
+- [ ] **Doctor probe matrix for API-version compatibility**
+  - Gap class: weak (supportability)
+  - Scope: enrich `mdeasm doctor --probe` with optional minimal command checks for tasks/assets/data-connections endpoints.
+  - Why: catches preview API-version drift before production jobs fail.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
-  - Scope: generate shell completions and add usage snippets for common workflows.
+  - Scope: generate shell completions and add short recipes for common workflows.
   - Why: improves onboarding and reduces operator mistakes.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Local export/task presets**
-  - Gap class: differentiator
-  - Scope: support local profile files for reusable filter/orderby/output arguments.
-  - Why: reduces long repeated command lines in scheduled jobs.
-  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
+- [ ] **CI matrix evolution (evaluate Python 3.13 lane)**
+  - Gap class: weak (reliability)
+  - Scope: add/test a `3.13` lane and tune fail-fast strategy after dependency compatibility is confirmed.
+  - Why: keeps compatibility posture current.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Tracker trust-label validation automation**
   - Gap class: differentiator
@@ -63,34 +65,28 @@ Priority order (remaining backlog after cycle 6 selected shipments)
   - Why: lowers cognitive load and prevents drift.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **CI matrix evolution**
-  - Gap class: weak (reliability)
-  - Scope: evaluate Python `3.13` lane and fail-fast strategy once dependency compatibility is verified.
-  - Why: keeps compatibility posture current.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Atomic JSON checkpoint writes for all export metadata paths**
-  - Gap class: weak (reliability)
-  - Scope: ensure every checkpoint and metadata write path uses atomic replace semantics.
-  - Why: avoids corrupt resume state on interruption.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Docs split: keep README to one-screen operator summary**
-  - Gap class: weak (docs UX)
-  - Scope: move remaining deep command recipes to `docs/` and keep README skimmable.
-  - Why: improves first-run clarity while preserving detailed references.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
-
 - [ ] **Historical script alias deprecation plan**
   - Gap class: weak (DX)
   - Scope: document timeline for `retreive_*` typo alias while preserving compatibility.
   - Why: reduces confusion and keeps migrations predictable.
   - Score: Impact 2 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Convert upstream TODO debt to scoped backlog tickets**
+- [ ] **Atomic metadata writes coverage sweep**
+  - Gap class: weak (reliability)
+  - Scope: ensure all checkpoint/reference summary write paths use atomic replace semantics.
+  - Why: avoids corrupt resume/reference state on interruption.
+  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **README/doc split follow-through**
+  - Gap class: weak (docs UX)
+  - Scope: keep README at one-screen operator summary and move remaining deep recipes into `docs/`.
+  - Why: improves first-run clarity while preserving deep references.
+  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **Scoped TODO debt retirement tickets**
   - Gap class: missing (debt retirement)
-  - Scope: split resource tags CRUD, workspace deletion, and discovery-group delete retry into discrete backlog entries with acceptance tests.
-  - Why: turns implicit debt into auditable deliverables.
+  - Scope: split resource tags CRUD, workspace deletion, and discovery-group delete retry into auditable backlog items with acceptance tests.
+  - Why: turns implicit debt into deliverable work units.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **Workspace delete CLI/helper (`mdeasm workspaces delete`)**
@@ -111,13 +107,17 @@ Priority order (remaining backlog after cycle 6 selected shipments)
   - Why: reduces flaky cleanup steps in automation.
   - Score: Impact 2 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **CLI config doctor enrichment**
-  - Gap class: weak (supportability)
-  - Scope: add optional checks for API version compatibility against a minimal command probe matrix.
-  - Why: catches version mismatch early when new commands depend on newer preview APIs.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
-
 ## Implemented
+- [x] **Task artifact checksum verification (`mdeasm tasks fetch --sha256`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_tasks.py`, `docs/tasks.md`, `docs/exports.md`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_fetch_verifies_sha256 tests/test_cli_tasks.py::test_cli_tasks_fetch_fails_when_sha256_mismatch tests/test_cli_tasks.py::test_cli_tasks_fetch_rejects_invalid_sha256_argument` (pass); `source .venv/bin/activate && python -m mdeasm_cli tasks fetch --help >/dev/null` (pass)
+
+- [x] **Data connections opt-in integration smoke (`MDEASM_INTEGRATION_DATA_CONNECTIONS=1`)**
+  - Date: 2026-02-11
+  - Scope: `tests/test_integration_smoke.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_data_connections_list` (pass; skipped by default without env/credentials)
+
 - [x] **Data connections management (`mdeasm data-connections ...`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/data_connections.md`, `README.md`, `API/README.md`, `tests/test_data_connections_helpers.py`, `tests/test_cli_data_connections.py`
@@ -394,6 +394,21 @@ Priority order (remaining backlog after cycle 6 selected shipments)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 7):
+  - Microsoft Defender EASM docs continue to position task exports and data-connections management as first-class automation surfaces, so reliability checks around artifact integrity and data-connection API drift are high-value parity work.
+  - Peer ASM APIs (runZero, Shodan) still prioritize API-first export/query workflows, which reinforces continuing investment in machine-safe CLI flows and repeatable automation ergonomics.
+  - Gap map (cycle 7):
+    - Weak -> closed this cycle: opt-in live smoke for data-connections list endpoint drift.
+    - Differentiator -> closed this cycle: checksum-gated artifact retrieval via `mdeasm tasks fetch --sha256`.
+    - Remaining high-priority weak gaps: typed exceptions and protected-download auth-fallback integration smoke.
+  - Sources reviewed (untrusted):
+    - Microsoft Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - Microsoft Learn data-connections operations group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/data-connections?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn `assets:export` task endpoint: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API docs: https://www.runzero.com/docs/api/
+    - Shodan API docs: https://developer.shodan.io/api
+    - Shodan query assistant (DX expectation signal): https://developer.shodan.io/api/api-ai
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 6):
   - Microsoft Defender EASM preview docs expose first-class data-connections lifecycle endpoints (`list/get/create-or-replace/delete/validate`) plus paging controls (`skip`, `maxpagesize`), making CLI parity high-impact for production automation.
   - Peer API tooling (runZero, Shodan) continues to emphasize automation-safe export/query ergonomics and cursor/paging workflows, reinforcing priority on scriptable command surfaces and wait/poll helpers.
