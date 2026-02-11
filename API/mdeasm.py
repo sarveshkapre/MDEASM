@@ -57,6 +57,7 @@ _SENSITIVE_OBJECT_KEYS = {
     "idtoken",
     "refreshtoken",
 }
+_ARM_TAGS_API_VERSION = "2021-04-01"
 
 
 def configure_logging(level: str | int | None = None, *, force: bool = False) -> None:
@@ -954,6 +955,7 @@ class Workspaces:
         retry=None,
         max_retry=None,
         workspace_name="",
+        api_version=None,
     ):
         if retry is None:
             retry = getattr(self, "_default_retry", True)
@@ -986,15 +988,17 @@ class Workspaces:
 
         helper_headers = {"Authorization": f"Bearer {token}"}
         # Keep legacy fallback to `_api_version` for older instances/tests.
-        if data_plane:
-            api_version = getattr(
+        if api_version:
+            resolved_api_version = str(api_version).strip()
+        elif data_plane:
+            resolved_api_version = getattr(
                 self, "_dp_api_version", getattr(self, "_api_version", "2022-04-01-preview")
             )
         else:
-            api_version = getattr(
+            resolved_api_version = getattr(
                 self, "_cp_api_version", getattr(self, "_api_version", "2022-04-01-preview")
             )
-        helper_params = {"api-version": api_version}
+        helper_params = {"api-version": resolved_api_version}
         if params:
             helper_params.update(params)
 
@@ -1270,6 +1274,143 @@ class Workspaces:
             out["response"] = payload
         if not noprint:
             print(json.dumps(out, indent=2))
+        return out
+
+    def __get_workspace_resource_tags__(self, workspace_name):
+        r = self.__workspace_query_helper__(
+            "__get_workspace_resource_tags__",
+            method="get",
+            endpoint="providers/Microsoft.Resources/tags/default",
+            data_plane=False,
+            workspace_name=workspace_name,
+            api_version=_ARM_TAGS_API_VERSION,
+        )
+        payload = {}
+        try:
+            maybe_payload = r.json()
+            if isinstance(maybe_payload, dict):
+                payload = maybe_payload
+        except Exception:
+            payload = {}
+        tags = ((payload.get("properties") or {}).get("tags")) or {}
+        return tags if isinstance(tags, dict) else {}
+
+    def __put_workspace_resource_tags__(self, workspace_name, tags):
+        payload = {"properties": {"tags": tags}}
+        r = self.__workspace_query_helper__(
+            "__put_workspace_resource_tags__",
+            method="put",
+            endpoint="providers/Microsoft.Resources/tags/default",
+            payload=payload,
+            data_plane=False,
+            workspace_name=workspace_name,
+            api_version=_ARM_TAGS_API_VERSION,
+        )
+        out = {}
+        try:
+            maybe_payload = r.json()
+            if isinstance(maybe_payload, dict):
+                out = maybe_payload
+        except Exception:
+            out = {}
+        return out
+
+    def list_resource_tags(self, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        workspace_name = str(workspace_name or "").strip()
+        if not workspace_name:
+            raise ValidationError("workspace name is required")
+        if not self.__verify_workspace__(workspace_name):
+            self.__raise_workspace_not_found__(workspace_name)
+
+        tags = self.__get_workspace_resource_tags__(workspace_name)
+        out = {"workspaceName": workspace_name, "tags": tags}
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def get_resource_tag(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        workspace_name = str(workspace_name or "").strip()
+        if not workspace_name:
+            raise ValidationError("workspace name is required")
+        if not self.__verify_workspace__(workspace_name):
+            self.__raise_workspace_not_found__(workspace_name)
+
+        tag_name = str(name or "").strip()
+        if not tag_name:
+            raise ValidationError("resource tag name is required")
+
+        tags = self.__get_workspace_resource_tags__(workspace_name)
+        out = {"workspaceName": workspace_name, "name": tag_name, "value": tags.get(tag_name)}
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def put_resource_tag(self, name, value, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        workspace_name = str(workspace_name or "").strip()
+        if not workspace_name:
+            raise ValidationError("workspace name is required")
+        if not self.__verify_workspace__(workspace_name):
+            self.__raise_workspace_not_found__(workspace_name)
+
+        tag_name = str(name or "").strip()
+        if not tag_name:
+            raise ValidationError("resource tag name is required")
+        tag_value = str(value or "").strip()
+        if not tag_value:
+            raise ValidationError("resource tag value is required")
+
+        tags = self.__get_workspace_resource_tags__(workspace_name)
+        tags[tag_name] = tag_value
+        payload = self.__put_workspace_resource_tags__(workspace_name, tags)
+        out = {
+            "workspaceName": workspace_name,
+            "name": tag_name,
+            "value": tag_value,
+            "tags": ((payload.get("properties") or {}).get("tags")) or tags,
+        }
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
+        return out
+
+    def delete_resource_tag(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        workspace_name = str(workspace_name or "").strip()
+        if not workspace_name:
+            raise ValidationError("workspace name is required")
+        if not self.__verify_workspace__(workspace_name):
+            self.__raise_workspace_not_found__(workspace_name)
+
+        tag_name = str(name or "").strip()
+        if not tag_name:
+            raise ValidationError("resource tag name is required")
+
+        tags = self.__get_workspace_resource_tags__(workspace_name)
+        existed = tag_name in tags
+        if existed:
+            del tags[tag_name]
+            payload = self.__put_workspace_resource_tags__(workspace_name, tags)
+            remaining = ((payload.get("properties") or {}).get("tags")) or tags
+        else:
+            remaining = tags
+        out = {
+            "workspaceName": workspace_name,
+            "name": tag_name,
+            "deleted": bool(existed),
+            "tags": remaining,
+        }
+        if kwargs.get("noprint"):
+            return out
+        print(json.dumps(out, indent=2))
         return out
 
     def get_discovery_templates(self, org_name, workspace_name="", **kwargs):

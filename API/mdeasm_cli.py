@@ -1263,6 +1263,174 @@ def build_parser() -> argparse.ArgumentParser:
         help="Max backoff sleep seconds between retries (default: helper default)",
     )
 
+    resource_tags = sub.add_parser(
+        "resource-tags",
+        help="Workspace Azure resource tags operations (control plane)",
+    )
+    rt_sub = resource_tags.add_subparsers(dest="resource_tags_cmd", required=True)
+
+    rt_list = rt_sub.add_parser("list", help="List resource tags for a workspace")
+    rt_list.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    rt_list.add_argument("--out", default="", help="Output path (default: stdout)")
+    rt_list.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    rt_list.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    rt_list.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    rt_list.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    rt_list.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    rt_list.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    rt_list.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    rt_list.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    rt_list.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    rt_get = rt_sub.add_parser("get", help="Get a single resource tag value by name")
+    rt_get.add_argument("name", help="Resource tag name")
+    rt_get.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    rt_get.add_argument("--out", default="", help="Output path (default: stdout)")
+    rt_get.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    rt_get.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    rt_get.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    rt_get.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    rt_get.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    rt_get.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    rt_get.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    rt_get.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    rt_get.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    rt_put = rt_sub.add_parser("put", help="Create or update a resource tag value")
+    rt_put.add_argument("name", help="Resource tag name")
+    rt_put.add_argument("--value", required=True, help="Resource tag value")
+    rt_put.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    rt_put.add_argument("--out", default="", help="Output path (default: stdout)")
+    rt_put.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    rt_put.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    rt_put.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    rt_put.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    rt_put.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    rt_put.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    rt_put.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    rt_put.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    rt_put.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    rt_delete = rt_sub.add_parser("delete", help="Delete a resource tag by name")
+    rt_delete.add_argument("name", help="Resource tag name")
+    rt_delete.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    rt_delete.add_argument("--out", default="", help="Output path (default: stdout)")
+    rt_delete.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Increase verbosity"
+    )
+    rt_delete.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    rt_delete.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    rt_delete.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    rt_delete.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    rt_delete.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    rt_delete.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    rt_delete.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    rt_delete.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
     saved_filters = sub.add_parser("saved-filters", help="Saved filter operations (data plane)")
     sf_sub = saved_filters.add_subparsers(dest="saved_filters_cmd", required=True)
 
@@ -2774,6 +2942,109 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         sys.stderr.write("unknown workspaces command\n")
+        return 2
+
+    if args.cmd == "resource-tags":
+        import mdeasm
+
+        _configure_cli_logging(mdeasm, args)
+
+        ws_kwargs = _build_ws_kwargs(args)
+        # Resource tags are control-plane operations.
+        ws_kwargs["init_data_plane_token"] = False
+        try:
+            ws = mdeasm.Workspaces(**ws_kwargs)
+        except Exception as e:
+            return _emit_cli_error("resource-tags client initialization", e, mdeasm_module=mdeasm)
+
+        out_path = _resolve_out_path(getattr(args, "out", ""))
+        workspace_name = str(getattr(args, "workspace_name", "") or "")
+
+        if args.resource_tags_cmd == "list":
+            try:
+                payload = ws.list_resource_tags(workspace_name=workspace_name, noprint=True)
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    workspace = str((payload or {}).get("workspaceName", ""))
+                    tags = (payload or {}).get("tags") or {}
+                    lines = _rows_to_tab_lines(
+                        [
+                            {"workspaceName": workspace, "name": name, "value": value}
+                            for name, value in sorted(tags.items(), key=lambda kv: str(kv[0]).lower())
+                        ],
+                        ["workspaceName", "name", "value"],
+                    )
+                    _write_lines(out_path, lines)
+                return 0
+            except Exception as e:
+                return _emit_cli_error("resource-tags list", e, mdeasm_module=mdeasm)
+
+        if args.resource_tags_cmd == "get":
+            try:
+                payload = ws.get_resource_tag(
+                    args.name,
+                    workspace_name=workspace_name,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            [payload],
+                            ["workspaceName", "name", "value"],
+                        ),
+                    )
+                return 0
+            except Exception as e:
+                return _emit_cli_error("resource-tags get", e, mdeasm_module=mdeasm)
+
+        if args.resource_tags_cmd == "put":
+            try:
+                payload = ws.put_resource_tag(
+                    args.name,
+                    args.value,
+                    workspace_name=workspace_name,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            [payload],
+                            ["workspaceName", "name", "value"],
+                        ),
+                    )
+                return 0
+            except Exception as e:
+                return _emit_cli_error("resource-tags put", e, mdeasm_module=mdeasm)
+
+        if args.resource_tags_cmd == "delete":
+            try:
+                payload = ws.delete_resource_tag(
+                    args.name,
+                    workspace_name=workspace_name,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            [payload],
+                            ["workspaceName", "name", "deleted"],
+                        ),
+                    )
+                return 0
+            except Exception as e:
+                return _emit_cli_error("resource-tags delete", e, mdeasm_module=mdeasm)
+
+        sys.stderr.write("unknown resource-tags command\n")
         return 2
 
     if args.cmd == "saved-filters":

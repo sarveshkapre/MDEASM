@@ -40,6 +40,7 @@ Export recipes (client + server task mode): `docs/exports.md`
 Task operations (`mdeasm tasks ...`): `docs/tasks.md`
 Data connections (`mdeasm data-connections ...`): `docs/data_connections.md`
 Workspace operations (`mdeasm workspaces ...`): `docs/workspaces.md`
+Resource tag operations (`mdeasm resource-tags ...`): `docs/resource_tags.md`
 
 ## Maintainer Loop
 ```bash

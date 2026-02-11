@@ -734,6 +734,101 @@ def test_delete_workspace_requires_workspace_name():
         ws.delete_workspace(workspace_name="", noprint=True)
 
 
+def test_list_resource_tags_returns_workspace_tags_and_uses_arm_api_version():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    captured = {}
+
+    class Resp:
+        def json(self):
+            return {"properties": {"tags": {"Owner": "SecOps"}}}
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    def fake_query_helper(*_args, **kwargs):
+        captured.update(kwargs)
+        return Resp()
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.list_resource_tags(workspace_name="ws1", noprint=True)
+    assert payload == {"workspaceName": "ws1", "tags": {"Owner": "SecOps"}}
+    assert captured["data_plane"] is False
+    assert captured["endpoint"] == "providers/Microsoft.Resources/tags/default"
+    assert captured["api_version"] == "2021-04-01"
+
+
+def test_get_resource_tag_requires_name():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    with pytest.raises(mdeasm.ValidationError):
+        ws.get_resource_tag("", workspace_name="ws1", noprint=True)
+
+
+def test_put_resource_tag_merges_existing_tags():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append(dict(kwargs))
+        if kwargs["method"] == "get":
+            return Resp({"properties": {"tags": {"Owner": "SecOps"}}})
+        return Resp({"properties": {"tags": kwargs["payload"]["properties"]["tags"]}})
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.put_resource_tag("Environment", "Prod", workspace_name="ws1", noprint=True)
+    assert payload["workspaceName"] == "ws1"
+    assert payload["name"] == "Environment"
+    assert payload["value"] == "Prod"
+    assert payload["tags"] == {"Owner": "SecOps", "Environment": "Prod"}
+    assert calls[1]["method"] == "put"
+    assert calls[1]["payload"]["properties"]["tags"]["Owner"] == "SecOps"
+    assert calls[1]["payload"]["properties"]["tags"]["Environment"] == "Prod"
+
+
+def test_delete_resource_tag_removes_existing_key():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append(dict(kwargs))
+        if kwargs["method"] == "get":
+            return Resp({"properties": {"tags": {"Owner": "SecOps", "Environment": "Prod"}}})
+        return Resp({"properties": {"tags": kwargs["payload"]["properties"]["tags"]}})
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    payload = ws.delete_resource_tag("Owner", workspace_name="ws1", noprint=True)
+    assert payload["workspaceName"] == "ws1"
+    assert payload["name"] == "Owner"
+    assert payload["deleted"] is True
+    assert payload["tags"] == {"Environment": "Prod"}
+    assert calls[1]["method"] == "put"
+    assert "Owner" not in calls[1]["payload"]["properties"]["tags"]
+
+
 def test_stream_workspace_assets_supports_value_payload_orderby_mark():
     ws = _new_ws()
     ws._default_workspace_name = "ws1"
