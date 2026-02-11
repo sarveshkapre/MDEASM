@@ -9,19 +9,13 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 17 backlog after current shipment)
+Priority order (cycle 18 backlog after current shipment)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
   - Scope: execute and record a credentialed smoke for protected artifact URL fallback in `tasks fetch`.
   - Why: closes remaining confidence gap between unit coverage and tenant behavior.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **Discovery-group lifecycle parity (`delete` helper + bounded retry hardening)**
-  - Gap class: missing + weak (reliability)
-  - Scope: add explicit discovery-group delete support and bounded retry/jitter around transient failures.
-  - Why: closes control-plane lifecycle gaps and reduces flaky cleanup in batch automations.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
@@ -83,7 +77,18 @@ Priority order (cycle 17 backlog after current shipment)
   - Why: speeds cycle execution and reduces operator variance.
   - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
 
+- [ ] **API changelog modernization for post-2023 releases**
+  - Gap class: weak (maintainability)
+  - Scope: align `API/changelog.md` with shipped 2026 features and move verbose history to tracker/docs.
+  - Why: reduces operator confusion caused by stale release notes.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+
 ## Implemented
+- [x] **Discovery-group lifecycle parity + reliability hardening (`mdeasm discovery-groups list/delete`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_discovery_groups.py`, `tests/test_integration_smoke.py`, `docs/discovery_groups.md`, `README.md`, `API/README.md`, `Makefile`
+  - Evidence (trusted: local tests + smoke + CI): `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_discovery_groups.py tests/test_integration_smoke.py` (pass); `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -k "discovery" tests/test_cli_discovery_groups.py tests/test_integration_smoke.py -k "discovery_groups_list"` (pass; integration smoke skipped by default without env/credentials); `source .venv/bin/activate && make verify` (pass); `source .venv/bin/activate && python -m mdeasm_cli discovery-groups --help >/dev/null && python -m mdeasm_cli discovery-groups list --workspace-name demo --format json --out - >/tmp/mdeasm_discovery_groups_cycle18.json 2>/tmp/mdeasm_discovery_groups_cycle18.err; rc=$?; echo discovery_groups_list_rc=$rc; test "$rc" -eq 1` (pass; expected missing env credentials locally); `gh run watch 21915314720 -R sarveshkapre/MDEASM --exit-status` (pass)
+
 - [x] **CLI line-mode contract hardening (`--format lines` consistency + structured delete output)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_tasks.py`, `tests/test_cli_saved_filters.py`, `tests/test_cli_data_connections.py`, `docs/saved_filters.md`, `docs/data_connections.md`
@@ -480,6 +485,23 @@ Priority order (cycle 17 backlog after current shipment)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 18 session):
+  - Microsoft Defender EASM preview references expose first-class discovery-group lifecycle endpoints (`list`, `create`, `remove`, `run`), so helper/CLI parity for delete/list is baseline production functionality rather than optional tooling.
+  - Peer API platforms still emphasize stable machine-readable automation flows and non-destructive health checks, which supports adding deterministic JSON/lines contracts plus opt-in live drift smoke for discovery-group list behavior.
+  - Gap map (cycle 18 session):
+    - Missing -> closed this cycle: discovery-group lifecycle parity in helper + CLI (`mdeasm discovery-groups list/delete`) with structured output.
+    - Weak -> closed this cycle: bounded post-run retry/backoff in discovery helper paths and best-effort delete verification retries.
+    - Weak -> closed this cycle: docs/smoke coverage for discovery-group workflows (`docs/discovery_groups.md`, `make docs-smoke`, integration smoke flag).
+    - Weak -> remaining: live protected-artifact URL auth-fallback smoke against a credentialed tenant.
+  - Top 5 high-impact opportunities now:
+    - 1) protected artifact fallback live smoke, 2) CLI completions + recipes, 3) preview API canary helper, 4) tracker trust-label validation automation, 5) profile-file presets for repeatable commands.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn Defender EASM discovery-groups operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/discovery-groups?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - Microsoft Learn Defender EASM discovery-groups remove operation: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/discovery-groups/remove?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - Microsoft Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - runZero API guidance: https://help.runzero.com/docs/leveraging-the-runzero-api/
+    - Shodan API overview: https://developer.shodan.io/api
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 17 session):
   - Microsoft Defender EASM preview docs still center task lifecycle APIs and saved-filter lifecycle APIs as baseline automation surfaces, while ARM tag APIs remain the control-plane standard for workspace metadata management.
   - Peer ASM/search UX continues to prioritize reusable saved queries/tags and predictable machine-readable outputs for scripting, which reinforces tabular line-mode contract quality and integration smoke coverage as immediate product-quality work.
