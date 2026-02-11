@@ -14,6 +14,16 @@
 ## Entries
 
 ### 2026-02-11
+- Trigger: Attempted scripted rewrite of `CLONE_FEATURES.md` using an invalid `awk` expression during cycle 9 tracker refresh.
+- Impact: `CLONE_FEATURES.md` was truncated to zero bytes before feature documentation updates were complete.
+- Root Cause: The script used an invalid `awk` variable name and still replaced the destination file without validating generated output.
+- Fix: Restored tracker content from `git show HEAD:CLONE_FEATURES.md`, then reapplied tracker edits with bounded `apply_patch` hunks.
+- Prevention Rule: For tracker rewrites, avoid one-shot file replacement unless the temp output is validated first (`wc -l > 0`); prefer `apply_patch` for section edits.
+- Evidence: `ls -l CLONE_FEATURES.md; wc -l CLONE_FEATURES.md` showed `0` lines before restore, then `git show HEAD:CLONE_FEATURES.md > CLONE_FEATURES.md` restored content successfully.
+- Commit: n/a
+- Confidence: high
+
+### 2026-02-11
 - Trigger: Running helper risk-observation retrieval when summarize returned zero findings.
 - Impact: `get_workspace_risk_observations()` could crash with an unbound variable instead of returning cleanly, blocking low/no-risk tenant automations.
 - Root Cause: `snapshot_assets` was created only inside the non-empty findings branch, but referenced after the branch unconditionally.
