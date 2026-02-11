@@ -7,92 +7,101 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Next Up (keep deduped)
-- [ ] **Schema utilities: compare current columns vs baseline file**
-  - Gap class: weak (DX)
-  - Scope: add `mdeasm assets schema diff --baseline <file>`.
-  - Why: detects downstream-breaking schema drift early.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 1 | Risk 1 | Confidence 3
-
-- [ ] **Reliability: retry jitter + retry-on status policy map**
-  - Gap class: weak (resilience)
-  - Scope: add jitter and configurable retry-on status list (for example 429/5xx).
-  - Why: smoother behavior under throttling and transient errors.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
-- [ ] **CI hardening: scheduled smoke lane (`doctor --probe`)**
-  - Gap class: weak (reliability)
-  - Scope: add a non-blocking scheduled workflow that runs probe checks when secrets are present.
-  - Why: catches tenant/API drift earlier than ad-hoc local runs.
-  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+Priority order (remaining backlog after cycle 4 shipments)
 
 - [ ] **Integration test: export task artifact lifecycle**
   - Gap class: weak (quality)
-  - Scope: add opt-in integration coverage for `assets:export -> tasks get -> tasks download -> fetch`.
-  - Why: closes a high-value drift gap around export payload and artifact URL shapes.
+  - Scope: opt-in integration coverage for `assets:export -> tasks get -> tasks download -> tasks fetch`.
+  - Why: closes a high-value drift gap around artifact URL payload shapes.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Data connections management (`mdeasm data-connections ...`)**
   - Gap class: missing (feature parity)
   - Scope: list/create/delete data connections (ADX/Log Analytics) with validation.
-  - Why: makes downstream SIEM export setup reproducible.
-  - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 2
+  - Why: makes SIEM export setup reproducible from CLI.
+  - Score: Impact 4 | Effort 4 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 2
 
-- [ ] **Refactor: typed exceptions for helper API failures**
+- [ ] **Typed helper exceptions**
   - Gap class: weak (maintainability)
-  - Scope: replace broad `Exception` raises with narrower, documented exception classes.
-  - Why: safer caller handling and less fragile automation.
+  - Scope: replace broad `Exception` throws with explicit exception classes.
+  - Why: safer automation handling and clearer failure semantics.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Refactor: finish remaining legacy `print()` gating for library usage**
+- [ ] **Finish legacy stdout gating in helper methods**
   - Gap class: weak (library UX)
-  - Scope: extend `noprint`/structured return behavior to remaining noisy helper functions (for example `query_facet_filter` output helpers).
-  - Why: avoids stdout side effects in scripts and pipelines.
+  - Scope: extend `noprint`/structured return support to remaining noisy paths (`query_facet_filter`, label helpers).
+  - Why: prevents accidental stdout pollution in automation contexts.
   - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Performance: stream-first JSON array mode for large client exports**
-  - Gap class: weak (parity)
-  - Scope: optional streaming JSON writer that avoids buffering all assets in memory.
-  - Why: improves memory profile and time-to-first-byte on large inventories.
+- [ ] **Stream-first JSON array export mode**
+  - Gap class: weak (performance/parity)
+  - Scope: optional streaming JSON writer to avoid full in-memory buffering.
+  - Why: better memory profile on large inventories.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **CLI completions and command recipe snippets**
+- [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
-  - Scope: generate bash/zsh completions and add concise examples.
-  - Why: improves operator onboarding and lowers command errors.
+  - Scope: generate shell completions and add usage snippets.
+  - Why: improves onboarding and reduces operator mistakes.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Developer DX: add `make` aliases for lint/test/compile/smoke**
-  - Gap class: weak (DX)
-  - Scope: standardize local maintenance commands.
-  - Why: reduces command drift and shortens maintainer loops.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
-
-- [ ] **Promote remaining upstream TODOs into scoped features**
+- [ ] **Convert upstream TODO debt to scoped backlog tickets**
   - Gap class: missing (debt retirement)
-  - Scope: resource tags CRUD, workspace deletion, discovery-group deletion retry path.
-  - Why: converts legacy TODO debt into auditable backlog work.
-  - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+  - Scope: split resource tags CRUD, workspace deletion, discovery-group delete retry into discrete backlog entries.
+  - Why: turns implicit debt into auditable deliverables.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Packaging/docs cleanup for historical script aliases**
+- [ ] **Historical script alias deprecation plan**
   - Gap class: weak (DX)
-  - Scope: document deprecation timeline for `retreive_*` typo alias while keeping compatibility.
-  - Why: reduce user confusion without breakage.
+  - Scope: document timeline for `retreive_*` typo alias while preserving compatibility.
+  - Why: reduce confusion and keep migrations predictable.
   - Score: Impact 2 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **CLI local presets for reusable filter/orderby profiles**
+- [ ] **Local export/task presets**
   - Gap class: differentiator
-  - Scope: support local profile files for recurring export/task arguments.
-  - Why: reduces repeated long command lines in scheduled jobs.
+  - Scope: support local profile files for reusable filter/orderby/output arguments.
+  - Why: reduces long repeated command lines in scheduled jobs.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
 
-- [ ] **Trust tagging automation for tracker updates**
+- [ ] **Tracker trust-label validation automation**
   - Gap class: differentiator
-  - Scope: add a lightweight check for trust labels and evidence formatting in `PROJECT_MEMORY.md`.
-  - Why: keeps autonomous maintenance logs consistent and auditable.
+  - Scope: add a lightweight check for trust labels/evidence format in `PROJECT_MEMORY.md`.
+  - Why: keeps autonomous logs auditable and consistent.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
+- [ ] **Repository hygiene sweep**
+  - Gap class: weak (maintainability)
+  - Scope: identify stale docs/examples and enforce periodic prune/update routine.
+  - Why: lowers cognitive load and prevents drift.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **CI matrix evolution**
+  - Gap class: weak (reliability)
+  - Scope: evaluate Python `3.13` lane and fail-fast strategy once dependency compatibility is verified.
+  - Why: keeps compatibility posture current.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
 ## Implemented
+- [x] **Schema drift comparator (`mdeasm assets schema diff --baseline`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_export.py`, `docs/exports.md`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && pytest -q tests/test_cli_export.py::test_cli_assets_schema_diff_json_no_drift tests/test_cli_export.py::test_cli_assets_schema_diff_lines_fail_on_drift tests/test_cli_export.py::test_cli_assets_schema_diff_requires_baseline` (pass); `source .venv/bin/activate && python -m mdeasm_cli assets schema diff --help >/dev/null` (pass)
+
+- [x] **Artifact fetch retry-on status policy (`--retry-on-statuses`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_tasks.py`, `docs/tasks.md`, `docs/exports.md`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_on_transient_status tests/test_cli_tasks.py::test_cli_tasks_fetch_does_not_retry_non_retryable_status` (pass)
+
+- [x] **CI hardening: scheduled smoke lane (`doctor --probe`)**
+  - Date: 2026-02-11
+  - Scope: `.github/workflows/smoke-doctor-probe.yml`
+  - Evidence (trusted: config + CI): workflow added with secret-gated probe execution; push CI run `21901545206` (pass)
+
+- [x] **Developer DX: canonical `make` aliases (`lint/test/compile/smoke/verify`)**
+  - Date: 2026-02-11
+  - Scope: `Makefile`, `README.md`
+  - Evidence (trusted: local smoke): `source .venv/bin/activate && make verify` (pass)
+
 - [x] **Refactor: gate legacy helper stdout paths + no-findings risk observation reliability fix**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
@@ -324,6 +333,20 @@ Next Up (keep deduped)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 4):
+  - Microsoft Defender EASM data-plane docs continue to emphasize task-driven export/download and paging controls (`skip`, `maxpagesize`, `mark`), which reinforces schema-stability and retry-policy tooling as near-term reliability priorities.
+  - Comparable ASM/search APIs emphasize robust export/download flows and pagination ergonomics; retry classification and drift detection are baseline expectations for production automation.
+  - Gap map (cycle 4):
+    - Weak -> closed this cycle: schema diff UX for drift detection (`assets schema diff`), explicit retry-on status policy for `tasks fetch`, scheduled probe smoke lane, canonical maintainer command aliases.
+    - Remaining weak: opt-in live integration for full task artifact lifecycle and residual stdout-gating cleanup in helper methods.
+    - Missing: data-connections management and scoped upstream TODO retirement.
+    - Differentiator opportunities: local reusable command presets and tracker trust-label automation.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn: tasks list (`filter`, `orderby`, `skip`, `maxpagesize`): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks/list-task?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn: `assets:export` endpoint: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API docs (export/download and automation patterns): https://www.runzero.com/docs/api/
+    - Shodan API docs (query/export ergonomics): https://developer.shodan.io/api/crawl-internet-data
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 3):
   - Defender EASM task docs explicitly include a download step (`tasks/{id}:download`), and competitor platforms consistently pair async export jobs with artifact retrieval endpoints or URLs. Artifact fetch in CLI is parity-critical for production automation.
   - Cursor/mark-style continuation and deterministic ordering patterns remain common across ASM/search APIs, reinforcing the need to keep resumable flows and stable ordering first-class.

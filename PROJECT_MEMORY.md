@@ -9,6 +9,11 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Add `mdeasm assets schema diff --baseline` with optional `--fail-on-drift` exit behavior | Production export pipelines need a first-class drift check that can be wired into CI gates without brittle shell diff logic | `source .venv/bin/activate && pytest -q tests/test_cli_export.py::test_cli_assets_schema_diff_json_no_drift tests/test_cli_export.py::test_cli_assets_schema_diff_lines_fail_on_drift tests/test_cli_export.py::test_cli_assets_schema_diff_requires_baseline` (pass); `source .venv/bin/activate && python -m mdeasm_cli assets schema diff --help >/dev/null` (pass) | 914c015 | high | trusted
+- 2026-02-11 | Add explicit `tasks fetch` retry-on status policy (`--retry-on-statuses`) while keeping jittered backoff | Retries should target transient failures only; retrying permanent statuses (for example 404) wastes time and obscures root causes | `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_on_transient_status tests/test_cli_tasks.py::test_cli_tasks_fetch_does_not_retry_non_retryable_status` (pass) | 914c015 | high | trusted
+- 2026-02-11 | Add scheduled/manual smoke workflow for `mdeasm doctor --probe` with secret-gated execution | Gives early tenant/api drift signal without blocking push-time CI when secrets are not configured | `.github/workflows/smoke-doctor-probe.yml` + `gh run watch 21901545206 -R sarveshkapre/MDEASM --exit-status` (pass for push CI after workflow addition) | 3d6dfb3 | high | trusted
+- 2026-02-11 | Standardize maintainer local loop via `make lint/test/compile/smoke/verify` | Reduces command drift across autonomous cycles and keeps verification commands concise/repeatable | `source .venv/bin/activate && make verify` (pass) | 3d6dfb3 | high | trusted
+- 2026-02-11 | Prioritize schema drift detection + retry policy + scheduled probe from cycle 4 bounded market scan | Microsoft Defender EASM and comparable ASM APIs continue to emphasize task/export reliability and pagination semantics, making drift detection/retry controls high-value parity work | Cycle 4 insights captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
 - 2026-02-11 | Refactor legacy helper stdout-heavy methods to support `noprint` + structured returns and fix no-findings risk-observation crash path | Library consumers need stdout-safe behavior for automation, and risk-observation retrieval should not fail when the summarize API returns zero findings | `source .venv/bin/activate && ruff check .` (pass); `source .venv/bin/activate && pytest` (pass); `source .venv/bin/activate && python -m compileall API` (pass) | cd9a3e3 | high | trusted
 - 2026-02-11 | Prioritize helper stdout-side-effect cleanup from bounded market scan | Production SDK/automation baselines favor explicit return values over implicit terminal output; this is a high-impact maintainability and pipeline-safety cleanup | Bounded scan notes captured in `CLONE_FEATURES.md` and implemented via `noprint` gating/coverage expansion in `API/mdeasm.py` | n/a | medium | untrusted
 - 2026-02-11 | Record cycle 3 CI verification follow-through for pushed tracker-only commit | Preserve an auditable link between the final pushed SHA and successful GitHub Actions checks | `gh run watch 21900541969 -R sarveshkapre/MDEASM --exit-status` (pass) | 546a5e5 | high | trusted
@@ -77,12 +82,23 @@
 ## Next Prioritized Tasks
 - Complete residual `noprint` gating in remaining noisy helpers (notably `query_facet_filter` print/file-output paths) while preserving default interactive behavior.
 - Add real-tenant validation for `mdeasm tasks fetch` against Defender EASM artifact URL variants (SAS vs protected URL); blocked locally because EASM credentials are not configured.
-- Add `mdeasm assets schema diff --baseline <file>` to catch downstream schema drift in CI/smoke flows.
-- Add retry jitter/status policy knobs to external artifact fetch paths for better behavior under transient storage endpoint errors.
+- Add opt-in integration coverage for full artifact lifecycle (`assets:export -> tasks get -> tasks download -> tasks fetch`) using live credentials.
+- Add `mdeasm data-connections ...` management commands for Log Analytics/ADX parity workflows.
 - Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview`.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | recent CI runs on `main` all successful before cycle 4 pushes | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_export.py::test_cli_assets_schema_diff_json_no_drift tests/test_cli_export.py::test_cli_assets_schema_diff_lines_fail_on_drift tests/test_cli_export.py::test_cli_assets_schema_diff_requires_baseline` | `...` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_on_transient_status tests/test_cli_tasks.py::test_cli_tasks_fetch_does_not_retry_non_retryable_status` | `..` | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API && make verify` | `All checks passed!`; `93 passed, 4 skipped`; compile + smoke commands pass | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli assets schema diff --help >/dev/null` | command help path exits cleanly | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli doctor --format json --out -` | expected missing-env diagnostics (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`) with exit code 1 | pass
+- 2026-02-11 | `git push origin main` | pushed commit `914c015` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21901527437 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `914c015` | pass
+- 2026-02-11 | `git push origin main` | pushed commit `3d6dfb3` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21901545206 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `3d6dfb3` | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py` | `All checks passed!` | pass
 - 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -q` | focused helper suite passed (`......................`) | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
