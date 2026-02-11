@@ -9,6 +9,10 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Add server-side export task mode (`mdeasm assets export --mode server`) with optional wait/download flow | Large inventories are better handled by async server-side exports; this reduces client memory pressure and aligns with modern ASM export UX | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli assets export --help >/dev/null` (pass) | e6fabeb | high | trusted
+- 2026-02-11 | Add task lifecycle operations in helper + CLI (`mdeasm tasks list/get/cancel/run/download`) | Long-running operations need first-class observability/control for production automation reliability | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli tasks --help >/dev/null` (pass) | e6fabeb | high | trusted
+- 2026-02-11 | Add opt-in integration smoke for task-based exports (`MDEASM_INTEGRATION_TASK_EXPORT=1`) | Provides a safe path to catch API drift in task/export endpoints without requiring credentials in CI | `source .venv/bin/activate && pytest` (pass; integration task test skipped by default) | e6fabeb | medium | trusted
+- 2026-02-11 | Prioritize task/export parity from bounded market scan | Microsoft Defender EASM and peer ASM tooling documentation indicate async export/task orchestration is baseline functionality now | Sources: Microsoft Learn task + `assets:export` references and competitor export/task docs (captured in `CLONE_FEATURES.md`) | n/a | medium | untrusted
 - 2026-02-10 | Enforce Ruff `F401` (unused imports) | Prevent dead code / unused imports from silently accumulating while keeping the lint bar small and low-churn | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 62f2817 | high | trusted
 - 2026-02-10 | Enforce Ruff `F841` (unused local assignments) | Remove dead local variables (especially in example scripts) and prevent new ones from creeping in | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass) | 0425e00 | high | trusted
 - 2026-02-10 | Add `mdeasm doctor` (env + optional control-plane probe) | Provide a standard, non-destructive "is my configuration wired correctly?" command that stays stdout-safe for automation | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli doctor --help >/dev/null` (pass) | 00ac4d0 | high | trusted
@@ -55,13 +59,18 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Consider `mdeasm workspaces list` (stdout-safe) to make multi-workspace environments easier to automate.
-- Consider a streaming asset export path for large inventories (avoid storing all rows in memory).
-- Consider server-side exports via `assets:export` task if the API contract is stable enough to support.
-- Decide whether to keep default `EASM_API_VERSION=2022-04-01-preview` or bump defaults after validating against current Microsoft Learn reference versions.
+- Add centralized secret redaction for exception/log payloads to prevent credential leakage in shared logs.
+- Add resumable paging checkpoints (`--resume-from`) for client-side exports.
+- Add task artifact downloader behavior validation with a real tenant (SAS/blob fetch shape can vary by API version/tenant).
+- Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview`.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest` | `73 passed, 4 skipped in 0.33s` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m compileall API` | compiled `API/` (including updated helper/CLI modules) | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli --version && python -m mdeasm_cli tasks --help >/dev/null && python -m mdeasm_cli assets export --help >/dev/null` | version `python -m mdeasm_cli 1.4.0`; CLI help paths ok | pass
+- 2026-02-11 | `gh run watch 21898525356 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `e6fabeb` | pass
 - 2026-02-10 | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` | `All checks passed!`; `66 passed, 3 skipped`; compile ok | pass
 - 2026-02-10 | `gh run watch 21876146038 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `99f7a01` | pass
 - 2026-02-10 | `gh run view 21876107678 -R sarveshkapre/MDEASM --json status,conclusion,displayTitle,headSha,updatedAt,url` | conclusion `success` for commit `c1a9707` | pass

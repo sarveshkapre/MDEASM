@@ -8,42 +8,82 @@
 
 ## Candidate Features To Do
 Next Up (keep deduped)
-- [ ] **Server-side export via data-plane `assets:export` task**
-  - Scope: add an opt-in CLI mode that uses the data-plane `POST /assets:export` endpoint (columns + filename) to kick off an export task, then poll until completion and download the artifact; fall back to the existing paginated GET export path.
-  - Why: paginated client-side exports can be slow and memory-heavy; a first-class export job path is a common pattern in mature ASM products.
-  - Score: Impact 4 | Effort 5 | Strategic fit 4 | Differentiation 1 | Risk 4 | Confidence 2
+- [ ] **Security hardening: centralized secret redaction in exceptions/logging**
+  - Scope: scrub bearer tokens/client secrets from raised exception text and CLI stderr output; add focused tests.
+  - Why: protects logs and terminals in automation.
+  - Score: Impact 4 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **Tasks management: list/get/cancel/download (`mdeasm tasks ...`)**
-  - Scope: surface data-plane task operations (list, get, cancel, download) with safe defaults and structured output; reuse this for server-side exports and long-running operations.
-  - Why: async tasks are core to scaling workflows; having introspection/cancel is table-stakes reliability.
-  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
+- [ ] **Export reliability: resumable paging checkpoints**
+  - Scope: add `--resume-from` and checkpoint writing for paginated export mode.
+  - Why: prevents restart-from-zero on interrupted long exports.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 2 | Confidence 3
 
 - [ ] **Data connections management (`mdeasm data-connections ...`)**
-  - Scope: list/create/delete data connections (Log Analytics / ADX) and validate parameters; document minimal happy path for exporting into Sentinel/ADX.
-  - Why: reduces manual portal steps and makes EASM data integration reproducible.
+  - Scope: list/create/delete data connections (ADX/Log Analytics) with validation.
+  - Why: makes downstream SIEM export setup reproducible.
   - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 2
 
-- [ ] **Promote remaining upstream TODOs into scoped, testable work**
-  - Scope: break `API/mdeasm.py` TODOs into small, test-backed features (asset snapshots; discovery group deletion if endpoint fixed; cancel tasks; resource tagging).
-  - Why: avoids a long-lived “TODO pile” and converts it into shippable increments.
+- [ ] **Export ordering control (`orderby`) for deterministic pages**
+  - Scope: add CLI flag for stable ordering in client-side export mode.
+  - Why: improves reproducibility and incremental sync behavior.
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **CLI completions and command examples**
+  - Scope: generate bash/zsh completions and add copy-paste recipes.
+  - Why: improves operator UX and onboarding speed.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **Refactor: typed exceptions for helper API failures**
+  - Scope: replace broad `Exception` raises with narrower error classes.
+  - Why: safer automation and cleaner failure handling in callers.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Refactor: remove or gate legacy `print()` paths for library usage**
+  - Scope: add `noprint`/structured return options for noisy helper methods.
+  - Why: avoids stdout side effects in script and pipeline usage.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Performance: backoff jitter + retry policy by status code**
+  - Scope: add jitter and configurable retry-on status map.
+  - Why: improves behavior under throttling and transient failures.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Schema utilities: compare current columns vs baseline file**
+  - Scope: add `mdeasm assets schema diff --baseline <file>`.
+  - Why: detects downstream-breaking schema drift early.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
+
+- [ ] **Developer DX: add `make`/task runner aliases for common checks**
+  - Scope: standardized commands for lint/test/compile/smoke.
+  - Why: reduces command drift and local friction.
+  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
+
+- [ ] **Promote remaining upstream TODOs into scoped features**
+  - Scope: resource tags CRUD, workspace deletion, discovery-group deletion retry path.
+  - Why: converts legacy TODO debt into tracked deliverables.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
 
-- [ ] **CLI ergonomics: shell completion + examples**
-  - Scope: ship `bash`/`zsh` completion generation and add 3-5 focused recipes for exports + saved filters + reliability flags.
-  - Why: reduces CLI friction and improves adoption for automation.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **Reliability: make paging/resume first-class for large exports**
-  - Scope: add `--resume-skip` / checkpoint file support for long exports; ensure deterministic ordering via `orderby` when available.
-  - Why: reduces wasted time on flaky long-running export jobs.
-  - Score: Impact 3 | Effort 4 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
-
-- [ ] **Security: redact secrets from exceptions/logging across helper + CLI**
-  - Scope: add a single redaction utility that scrubs `CLIENT_SECRET` and bearer tokens from any raised/printed error payloads; extend tests to lock in behavior.
-  - Why: prevents accidental secret leakage in CI logs and shared terminals.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **Packaging/docs cleanup for historical script aliases**
+  - Scope: document deprecation timeline for `retreive_*` typo alias and keep backward compatibility.
+  - Why: reduce user confusion while avoiding abrupt breakage.
+  - Score: Impact 2 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 4
 
 ## Implemented
+- [x] **Server-side asset export mode (`mdeasm assets export --mode server`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_tasks.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API` (pass); `python -m mdeasm_cli assets export --help >/dev/null` (pass)
+
+- [x] **Task lifecycle CLI (`mdeasm tasks list/get/cancel/run/download`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/tasks.md`, `README.md`, `API/README.md`, `tests/test_cli_tasks.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API` (pass); `python -m mdeasm_cli tasks --help >/dev/null` (pass)
+
+- [x] **Opt-in integration smoke for task-based export flow**
+  - Date: 2026-02-11
+  - Scope: `tests/test_integration_smoke.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q` (pass; task-export integration smoke skipped by default)
+
 - [x] **Lint: enforce unused code checks (Ruff `F401`, `F841`)**
   - Date: 2026-02-10
   - Scope: `pyproject.toml`, `API/affected_cvss_validation.py`, `API/expired_certificates_validation.py`
@@ -258,6 +298,15 @@ Next Up (keep deduped)
       - Tenable ASM: Inventory settings (export all assets as CSV/XLSX/JSON + choose columns): https://docs.tenable.com/attack-surface-management/Content/Topics/Inventory/InventorySettings.htm
       - Tenable Developer: Export assets v2 (API export job pattern): https://developer.tenable.com/reference/export-assets-v2
       - Tenable Developer: Export assets in XLSX format (token + limits): https://developer.tenable.com/reference/io-asm-exports-assets-xlsx
+  - Market scan refresh (untrusted; 2026-02-11):
+    - Microsoft Defender EASM data-plane documents explicit task lifecycle endpoints (`tasks`, `tasks/{id}`, `tasks/{id}:cancel`, `tasks/{id}:run`, `tasks/{id}:download`) and `assets:export` task kickoff, which supports a task-oriented automation model.
+    - Competitor guidance continues to emphasize async export jobs and API-first export automation for large inventories, reinforcing the priority of task introspection and polling support in this repo.
+    - Sources reviewed (untrusted):
+      - Microsoft Learn: Defender EASM `assets:export` task kickoff: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Microsoft Learn: Defender EASM tasks operation group (list/get/cancel/run/download): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+      - Tenable ASM API changelog (export/integration lifecycle): https://developer.tenable.com/changelog/asm-export-updates
+      - Censys changelog (ASM API/task-related enhancements): https://docs.censys.com/changelog/new-data-in-asm-seeds-api
+      - Censys changelog (ASM Cloud Connectors API): https://docs.censys.com/changelog/announcing-the-cloud-connectors-api
 
 ## Notes
 - This file is maintained by the autonomous clone loop.
