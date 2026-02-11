@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh cycle 11 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep backlog prioritization, market-scan gap map, mutable facts, and verification evidence synchronized with pushed `main` commits | Tracker files updated after feature commit `a4e356f`; follow-up tracker push CI run `21907801347` succeeded | 482a554 | high | trusted
 - 2026-02-11 | Ship cycle 11 reliability batch: standards-compliant `Retry-After` parsing (delay-seconds + HTTP-date) for helper retries and CLI task artifact fetch | Highest-value safe gap was retry behavior drift across gateways that emit HTTP-date `Retry-After` values, which could ignore server pacing and amplify transient failures | `source .venv/bin/activate && make verify` (pass); focused retry parser/backoff tests pass; pushed commit CI run `21907766257` succeeded | a4e356f | high | trusted
 - 2026-02-11 | Prioritize cycle 11 around retry semantics and task-export reliability from bounded market scan | Microsoft Defender EASM task/export docs plus peer API guidance and HTTP spec semantics all reinforce server-directed retry timing as baseline production behavior | Cycle 11 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, RFC 9110) | n/a | medium | untrusted
 - 2026-02-11 | Refresh cycle 10 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep backlog status, market-scan gap map, mutable facts, and verification evidence synchronized with pushed `main` commits | Tracker files updated after feature commit `93069b0`; follow-up tracker push CI run `21906910036` succeeded | d3c1519 | high | trusted
@@ -117,6 +118,8 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `git push origin main` | pushed commit `482a554` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21907801347 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `482a554` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url,event` | latest CI runs on `main` were successful before cycle 11 changes | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_mdeasm_helpers.py tests/test_cli_tasks.py` | `All checks passed!` | pass
