@@ -296,6 +296,56 @@ def test_integration_smoke_discovery_groups_list():
     assert "content" in payload or "value" in payload
 
 
+def test_integration_smoke_discovery_groups_run():
+    """
+    Optional discovery-groups run smoke.
+
+    This is opt-in because it triggers an actual discovery-group run. Use
+    `MDEASM_INTEGRATION_DISCOVERY_GROUP_NAME` to target a known safe group.
+    """
+    if os.getenv("MDEASM_INTEGRATION_DISCOVERY_GROUPS") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_DISCOVERY_GROUPS=1 to enable discovery-groups integration smoke"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip(
+            "set WORKSPACE_NAME (or ensure only one workspace exists) to run discovery-groups smoke"
+        )
+
+    group_name = str(os.getenv("MDEASM_INTEGRATION_DISCOVERY_GROUP_NAME", "")).strip()
+    if not group_name:
+        listed = ws.get_discovery_groups(max_page_size=1, noprint=True)
+        rows = listed.get("value") if isinstance(listed, dict) else None
+        if rows is None and isinstance(listed, dict):
+            rows = listed.get("content")
+        rows = rows if isinstance(rows, list) else []
+        if not rows:
+            pytest.skip(
+                "no discovery groups available to run smoke; set MDEASM_INTEGRATION_DISCOVERY_GROUP_NAME"
+            )
+        group_name = str((rows[0] or {}).get("name") or "").strip()
+        if not group_name:
+            pytest.skip(
+                "unable to infer discovery group name from list response; set MDEASM_INTEGRATION_DISCOVERY_GROUP_NAME"
+            )
+
+    payload = ws.run_discovery_group(
+        group_name,
+        disco_runs_max_retry=2,
+        disco_runs_backoff_max_s=3,
+        noprint=True,
+    )
+    assert isinstance(payload, dict)
+    assert group_name in payload
+
+
 def test_integration_smoke_saved_filters_lifecycle():
     """
     Optional saved-filters lifecycle smoke.

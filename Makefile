@@ -28,6 +28,8 @@ docs-smoke:
 	$(PYTHON) -m mdeasm_cli tasks wait --help >/dev/null
 	$(PYTHON) -m mdeasm_cli tasks fetch --help >/dev/null
 	$(PYTHON) -m mdeasm_cli discovery-groups list --help >/dev/null
+	$(PYTHON) -m mdeasm_cli discovery-groups create --help >/dev/null
+	$(PYTHON) -m mdeasm_cli discovery-groups run --help >/dev/null
 	$(PYTHON) -m mdeasm_cli discovery-groups delete --help >/dev/null
 	$(PYTHON) -m mdeasm_cli data-connections validate --help >/dev/null
 	$(PYTHON) -m mdeasm_cli saved-filters put --help >/dev/null

@@ -1065,6 +1065,62 @@ def _build_data_connection_properties(args) -> dict:
     raise ValueError("unsupported --kind (expected logAnalytics or azureDataExplorer)")
 
 
+def _build_discovery_custom_payload(args) -> dict:
+    inline_payload = str(getattr(args, "custom_json", "") or "").strip()
+    payload_path = str(getattr(args, "custom_json_file", "") or "").strip()
+    if inline_payload and payload_path:
+        raise ValueError("use only one of --custom-json or --custom-json-file")
+    if not inline_payload and not payload_path:
+        return {}
+
+    raw = inline_payload
+    source = "inline payload"
+    if payload_path:
+        path = Path(payload_path).expanduser()
+        if not path.is_file():
+            raise ValueError(f"custom payload file does not exist: {path}")
+        raw = path.read_text(encoding="utf-8")
+        source = str(path)
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"invalid discovery custom json in {source}: {e}") from e
+    if not isinstance(parsed, dict):
+        raise ValueError("discovery custom payload must be a JSON object")
+    return parsed
+
+
+def _discovery_runs_to_rows(payload) -> list[dict]:
+    rows: list[dict] = []
+    if not isinstance(payload, dict):
+        return rows
+    for name, runs in payload.items():
+        if isinstance(runs, list) and runs:
+            for run in runs:
+                run_obj = run if isinstance(run, dict) else {}
+                rows.append(
+                    {
+                        "name": name,
+                        "state": run_obj.get("state", ""),
+                        "submittedDate": run_obj.get("submittedDate", ""),
+                        "completedDate": run_obj.get("completedDate", ""),
+                        "totalAssetsFoundCount": run_obj.get("totalAssetsFoundCount", ""),
+                    }
+                )
+            continue
+        rows.append(
+            {
+                "name": name,
+                "state": "",
+                "submittedDate": "",
+                "completedDate": "",
+                "totalAssetsFoundCount": "",
+            }
+        )
+    return rows
+
+
 def _wait_for_task_state(
     ws,
     *,
@@ -1451,6 +1507,138 @@ def build_parser() -> argparse.ArgumentParser:
     dg_list.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
     dg_list.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
     dg_list.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dg_create = dg_sub.add_parser(
+        "create",
+        help="Create (or replace) a discovery group and start a run",
+    )
+    dg_create_source = dg_create.add_mutually_exclusive_group(required=True)
+    dg_create_source.add_argument(
+        "--template",
+        default="",
+        help='Discovery template in "<name>---<template_id>" form',
+    )
+    dg_create_source.add_argument(
+        "--custom-json",
+        default="",
+        help="Inline custom discovery JSON object",
+    )
+    dg_create_source.add_argument(
+        "--custom-json-file",
+        default="",
+        help="Path to custom discovery JSON object file",
+    )
+    dg_create.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    dg_create.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    dg_create.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dg_create.add_argument("--out", default="", help="Output path (default: stdout)")
+    dg_create.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dg_create.add_argument(
+        "--disco-runs-max-retry",
+        type=int,
+        default=3,
+        help="Max retries while polling run status after create (default: 3)",
+    )
+    dg_create.add_argument(
+        "--disco-runs-backoff-max-s",
+        type=float,
+        default=5.0,
+        help="Max backoff seconds while polling run status (default: 5)",
+    )
+    dg_create.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dg_create.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dg_create.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dg_create.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dg_create.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dg_create.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dg_create.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
+
+    dg_run = dg_sub.add_parser("run", help="Run an existing discovery group by name")
+    dg_run.add_argument("name", help="Discovery group name")
+    dg_run.add_argument(
+        "--format",
+        choices=["json", "lines"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    dg_run.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
+    dg_run.add_argument(
+        "--log-level",
+        default="",
+        help="Set log level (DEBUG/INFO/WARNING/ERROR/CRITICAL). Overrides -v/--verbose.",
+    )
+    dg_run.add_argument("--out", default="", help="Output path (default: stdout)")
+    dg_run.add_argument(
+        "--workspace-name",
+        default="",
+        help="Workspace name override (default: env WORKSPACE_NAME / helper default)",
+    )
+    dg_run.add_argument(
+        "--disco-runs-max-retry",
+        type=int,
+        default=3,
+        help="Max retries while polling run status (default: 3)",
+    )
+    dg_run.add_argument(
+        "--disco-runs-backoff-max-s",
+        type=float,
+        default=5.0,
+        help="Max backoff seconds while polling run status (default: 5)",
+    )
+    dg_run.add_argument(
+        "--api-version",
+        default=None,
+        help="Override EASM api-version query param (default: env EASM_API_VERSION or helper default)",
+    )
+    dg_run.add_argument(
+        "--dp-api-version",
+        default=None,
+        help="Override data-plane api-version (default: env EASM_DP_API_VERSION or --api-version)",
+    )
+    dg_run.add_argument(
+        "--cp-api-version",
+        default=None,
+        help="Override control-plane api-version (default: env EASM_CP_API_VERSION or --api-version)",
+    )
+    dg_run.add_argument(
+        "--http-timeout",
+        type=_parse_http_timeout,
+        default=None,
+        help="HTTP timeouts in seconds: 'read' or 'connect,read' (default: helper default)",
+    )
+    dg_run.add_argument("--no-retry", action="store_true", help="Disable HTTP retry/backoff")
+    dg_run.add_argument("--max-retry", type=int, default=None, help="Max retry attempts")
+    dg_run.add_argument("--backoff-max-s", type=float, default=None, help="Max backoff seconds")
 
     dg_delete = dg_sub.add_parser("delete", help="Delete a discovery group by name")
     dg_delete.add_argument("name", help="Discovery group name")
@@ -3276,6 +3464,72 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             except Exception as e:
                 return _emit_cli_error("discovery-groups list", e, mdeasm_module=mdeasm)
+
+        if args.discovery_groups_cmd == "create":
+            try:
+                disco_custom = _build_discovery_custom_payload(args)
+            except ValueError as e:
+                sys.stderr.write(f"invalid discovery group arguments: {e}\n")
+                return 2
+            try:
+                payload = ws.create_discovery_group(
+                    disco_template=args.template,
+                    disco_custom=disco_custom,
+                    workspace_name=args.workspace_name,
+                    disco_runs_max_retry=args.disco_runs_max_retry,
+                    disco_runs_backoff_max_s=args.disco_runs_backoff_max_s,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    rows = _discovery_runs_to_rows(payload)
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            rows,
+                            [
+                                "name",
+                                "state",
+                                "submittedDate",
+                                "completedDate",
+                                "totalAssetsFoundCount",
+                            ],
+                        ),
+                    )
+                return 0
+            except Exception as e:
+                return _emit_cli_error("discovery-groups create", e, mdeasm_module=mdeasm)
+
+        if args.discovery_groups_cmd == "run":
+            try:
+                payload = ws.run_discovery_group(
+                    args.name,
+                    workspace_name=args.workspace_name,
+                    disco_runs_max_retry=args.disco_runs_max_retry,
+                    disco_runs_backoff_max_s=args.disco_runs_backoff_max_s,
+                    noprint=True,
+                )
+                if args.format == "json":
+                    _write_json(out_path, payload, pretty=True)
+                else:
+                    rows = _discovery_runs_to_rows(payload)
+                    _write_lines(
+                        out_path,
+                        _rows_to_tab_lines(
+                            rows,
+                            [
+                                "name",
+                                "state",
+                                "submittedDate",
+                                "completedDate",
+                                "totalAssetsFoundCount",
+                            ],
+                        ),
+                    )
+                return 0
+            except Exception as e:
+                return _emit_cli_error("discovery-groups run", e, mdeasm_module=mdeasm)
 
         if args.discovery_groups_cmd == "delete":
             try:

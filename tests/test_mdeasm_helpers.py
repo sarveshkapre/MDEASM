@@ -944,6 +944,113 @@ def test_discovery_helpers_raise_typed_validation_and_workspace_errors():
         )
 
 
+def test_create_discovery_group_template_requires_name_and_id_separator():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_discovery_group(
+            disco_template="TemplateOnly",
+            disco_custom={},
+            workspace_name="ws1",
+        )
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_discovery_group(
+            disco_template="---tmpl-123",
+            disco_custom={},
+            workspace_name="ws1",
+        )
+
+
+def test_create_discovery_group_template_calls_put_then_run_helper():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    captured = {}
+
+    class Resp:
+        status_code = 204
+
+    def fake_query_helper(*_args, **kwargs):
+        captured["put_kwargs"] = dict(kwargs)
+        return Resp()
+
+    def fake_run_discovery_group(name, **kwargs):
+        captured["run_kwargs"] = {"name": name, **kwargs}
+        return {name: [{"state": "complete"}]}
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+    ws.run_discovery_group = fake_run_discovery_group  # type: ignore[attr-defined]
+
+    payload = ws.create_discovery_group(
+        disco_template="Contoso---tmpl-123",
+        disco_custom={},
+        workspace_name="ws1",
+        disco_runs_max_retry=4,
+        disco_runs_backoff_max_s=9,
+        noprint=True,
+    )
+
+    assert captured["put_kwargs"]["method"] == "put"
+    assert captured["put_kwargs"]["endpoint"] == "discoGroups/Contoso"
+    assert captured["put_kwargs"]["payload"] == {"templateId": "tmpl-123"}
+    assert captured["run_kwargs"] == {
+        "name": "Contoso",
+        "workspace_name": "ws1",
+        "disco_runs_max_retry": 4,
+        "disco_runs_backoff_max_s": 9,
+        "noprint": True,
+    }
+    assert payload == {"Contoso": [{"state": "complete"}]}
+
+
+def test_run_discovery_group_calls_run_endpoint_and_returns_runs(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    captured = {}
+
+    class Resp:
+        status_code = 204
+
+    def fake_query_helper(*_args, **kwargs):
+        captured["query_kwargs"] = dict(kwargs)
+        return Resp()
+
+    def fake_get_runs_with_retry(disco_name, workspace_name="", max_attempts=3, backoff_max_s=5):
+        captured["runs_kwargs"] = {
+            "disco_name": disco_name,
+            "workspace_name": workspace_name,
+            "max_attempts": max_attempts,
+            "backoff_max_s": backoff_max_s,
+        }
+        return {disco_name: [{"state": "complete", "totalAssetsFoundCount": 10}]}
+
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+    ws.__get_discovery_group_runs_with_retry__ = fake_get_runs_with_retry  # type: ignore[attr-defined]
+
+    payload = ws.run_discovery_group(
+        "Contoso Group",
+        workspace_name="ws1",
+        disco_runs_max_retry=4,
+        disco_runs_backoff_max_s=7,
+        noprint=True,
+    )
+    assert payload == {"Contoso Group": [{"state": "complete", "totalAssetsFoundCount": 10}]}
+    assert captured["query_kwargs"]["method"] == "post"
+    assert captured["query_kwargs"]["endpoint"] == "discoGroups/Contoso Group:run"
+    assert captured["query_kwargs"]["payload"] == {}
+    assert captured["runs_kwargs"] == {
+        "disco_name": "Contoso Group",
+        "workspace_name": "ws1",
+        "max_attempts": 4,
+        "backoff_max_s": 7,
+    }
+    assert capsys.readouterr().out == ""
+
+
 def test_get_discovery_groups_supports_filter_and_paging_params():
     ws = _new_ws()
     ws._default_workspace_name = "ws1"

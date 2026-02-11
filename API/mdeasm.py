@@ -254,6 +254,16 @@ def _normalize_data_connection_frequency(frequency: str) -> str:
     raise ValidationError("unsupported data connection frequency; use one of: daily, weekly, monthly")
 
 
+def _parse_discovery_template(value: str) -> tuple[str, str]:
+    raw = str(value or "").strip()
+    name, sep, template_id = raw.partition("---")
+    name = name.strip()
+    template_id = template_id.strip()
+    if not sep or not name or not template_id:
+        raise ValidationError('disco_template must be in "<name>---<template_id>" format')
+    return (name, template_id)
+
+
 def _validate_data_connection_properties(kind: str, properties: dict) -> dict:
     if not isinstance(properties, dict):
         raise ValidationError("properties must be a dict")
@@ -1529,13 +1539,38 @@ class Workspaces:
                 workspace_name = self._default_workspace_name
             if self.__verify_workspace__(workspace_name):
                 if disco_custom:
+                    if not isinstance(disco_custom, dict):
+                        raise ValidationError("disco_custom must be a dict")
                     try:
-                        disco_name = f"{disco_custom['name']} seeds"
+                        raw_name = str(disco_custom["name"]).strip()
+                        if not raw_name:
+                            raise ValidationError("disco_custom.name is required")
+                        disco_name = (
+                            raw_name if raw_name.lower().endswith(" seeds") else f"{raw_name} seeds"
+                        )
+
+                        seeds_map = disco_custom["seeds"]
+                        if not isinstance(seeds_map, dict) or not seeds_map:
+                            raise ValidationError("disco_custom.seeds must be a non-empty dict")
+
                         seeds = []
-                        for key, val in disco_custom["seeds"].items():
+                        for key, val in seeds_map.items():
+                            kind = str(key or "").strip()
+                            if not kind:
+                                raise ValidationError("disco_custom.seeds keys must be non-empty")
+                            if not isinstance(val, list) or not val:
+                                raise ValidationError(
+                                    "disco_custom.seeds values must be non-empty lists"
+                                )
                             for seed in val:
-                                custom_seed = {"kind": key, "name": seed}
+                                seed_name = str(seed or "").strip()
+                                if not seed_name:
+                                    raise ValidationError(
+                                        "disco_custom seed entries must be non-empty strings"
+                                    )
+                                custom_seed = {"kind": kind, "name": seed_name}
                                 seeds.append(custom_seed)
+
                         names = disco_custom.get("names") or []
                         if not isinstance(names, list):
                             raise ValidationError("disco_custom.names must be a list")
@@ -1550,7 +1585,7 @@ class Workspaces:
                         logging.error("invalid format and/or values for disco_custom")
                         raise ValidationError("invalid format and/or values for disco_custom") from e
                 else:
-                    disco_name, disco_id = disco_template.split("---")
+                    disco_name, disco_id = _parse_discovery_template(disco_template)
                     payload = {"templateId": disco_id}
                 self.__workspace_query_helper__(
                     "create_discovery_group",
@@ -1559,26 +1594,52 @@ class Workspaces:
                     payload=payload,
                     workspace_name=workspace_name,
                 )
-                r_run_disco = self.__workspace_query_helper__(
-                    "create_discovery_group",
-                    method="post",
-                    endpoint=f"discoGroups/{disco_name}:run",
-                    payload={"what": "ever"},
+                return self.run_discovery_group(
+                    disco_name,
                     workspace_name=workspace_name,
+                    disco_runs_max_retry=kwargs.get("disco_runs_max_retry", 3),
+                    disco_runs_backoff_max_s=kwargs.get("disco_runs_backoff_max_s", 5),
+                    noprint=kwargs.get("noprint", False),
                 )
-                if r_run_disco.status_code == 204:
-                    disco_runs = self.__get_discovery_group_runs_with_retry__(
-                        disco_name=disco_name,
-                        workspace_name=workspace_name,
-                        max_attempts=kwargs.get("disco_runs_max_retry", 3),
-                        backoff_max_s=kwargs.get("disco_runs_backoff_max_s", 5),
-                    )
-                    return disco_runs
             else:
                 self.__raise_workspace_not_found__(workspace_name)
         else:
             logging.critical("unknown error")
             raise ValidationError("unknown discovery group input state")
+
+    def run_discovery_group(self, name, workspace_name="", **kwargs):
+        if not workspace_name:
+            workspace_name = self._default_workspace_name
+        if not self.__verify_workspace__(workspace_name):
+            self.__raise_workspace_not_found__(workspace_name)
+
+        disco_name = str(name or "").strip()
+        if not disco_name:
+            raise ValidationError("discovery group name is required")
+
+        run_payload = kwargs.get("run_payload")
+        if run_payload is None:
+            run_payload = {}
+        if not isinstance(run_payload, dict):
+            raise ValidationError("run_payload must be a dict")
+
+        self.__workspace_query_helper__(
+            "run_discovery_group",
+            method="post",
+            endpoint=f"discoGroups/{disco_name}:run",
+            payload=run_payload,
+            workspace_name=workspace_name,
+        )
+        disco_runs = self.__get_discovery_group_runs_with_retry__(
+            disco_name=disco_name,
+            workspace_name=workspace_name,
+            max_attempts=kwargs.get("disco_runs_max_retry", 3),
+            backoff_max_s=kwargs.get("disco_runs_backoff_max_s", 5),
+        )
+        if kwargs.get("noprint"):
+            return disco_runs
+        print(json.dumps(disco_runs, indent=2))
+        return disco_runs
 
     def get_discovery_groups(
         self, workspace_name="", filter_expr="", skip=0, max_page_size=0, **kwargs

@@ -97,6 +97,165 @@ def test_cli_discovery_groups_list_lines(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "Contoso Seeds\tadvanced\tactive\t1"
 
 
+def test_cli_discovery_groups_create_template_lines(monkeypatch, capsys):
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def create_discovery_group(self, **kwargs):
+            captured["create"] = dict(kwargs)
+            return {
+                "Contoso": [
+                    {
+                        "state": "complete",
+                        "submittedDate": "2026-02-11T00:00:00Z",
+                        "completedDate": "2026-02-11T00:10:00Z",
+                        "totalAssetsFoundCount": 12,
+                    }
+                ]
+            }
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "discovery-groups",
+            "create",
+            "--template",
+            "Contoso---tmpl-123",
+            "--workspace-name",
+            "ws1",
+            "--format",
+            "lines",
+            "--disco-runs-max-retry",
+            "5",
+            "--disco-runs-backoff-max-s",
+            "9",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    assert captured["create"] == {
+        "disco_template": "Contoso---tmpl-123",
+        "disco_custom": {},
+        "workspace_name": "ws1",
+        "disco_runs_max_retry": 5,
+        "disco_runs_backoff_max_s": 9.0,
+        "noprint": True,
+    }
+    assert (
+        capsys.readouterr().out.strip()
+        == "Contoso\tcomplete\t2026-02-11T00:00:00Z\t2026-02-11T00:10:00Z\t12"
+    )
+
+
+def test_cli_discovery_groups_create_custom_json_file(monkeypatch, capsys, tmp_path):
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def create_discovery_group(self, **kwargs):
+            captured["create"] = dict(kwargs)
+            return {"Contoso seeds": []}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    payload_path = tmp_path / "discovery_custom.json"
+    payload_path.write_text(
+        json.dumps({"name": "Contoso", "seeds": {"domain": ["contoso.com"]}}),
+        encoding="utf-8",
+    )
+
+    rc = mdeasm_cli.main(
+        [
+            "discovery-groups",
+            "create",
+            "--custom-json-file",
+            str(payload_path),
+            "--workspace-name",
+            "ws1",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    assert captured["create"]["disco_template"] == ""
+    assert captured["create"]["workspace_name"] == "ws1"
+    assert captured["create"]["noprint"] is True
+    assert captured["create"]["disco_custom"] == {
+        "name": "Contoso",
+        "seeds": {"domain": ["contoso.com"]},
+    }
+    assert json.loads(capsys.readouterr().out) == {"Contoso seeds": []}
+
+
+def test_cli_discovery_groups_run_json(monkeypatch, capsys):
+    captured = {}
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run_discovery_group(self, name, **kwargs):
+            captured["run"] = {"name": name, **kwargs}
+            return {"Contoso": [{"state": "running"}]}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "discovery-groups",
+            "run",
+            "Contoso",
+            "--workspace-name",
+            "ws1",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 0
+    assert captured["run"] == {
+        "name": "Contoso",
+        "workspace_name": "ws1",
+        "disco_runs_max_retry": 3,
+        "disco_runs_backoff_max_s": 5.0,
+        "noprint": True,
+    }
+    assert json.loads(capsys.readouterr().out) == {"Contoso": [{"state": "running"}]}
+
+
+def test_cli_discovery_groups_create_rejects_invalid_custom_json(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(
+        [
+            "discovery-groups",
+            "create",
+            "--custom-json",
+            "{broken",
+            "--workspace-name",
+            "ws1",
+            "--out",
+            "-",
+        ]
+    )
+    assert rc == 2
+    assert "invalid discovery group arguments" in capsys.readouterr().err
+
+
 def test_cli_discovery_groups_delete_lines(monkeypatch, capsys):
     captured = {}
 
