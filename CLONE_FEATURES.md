@@ -9,13 +9,13 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 9 planning; remaining backlog after selected shipments)
+Priority order (cycle 10 planning; remaining backlog after selected shipments)
 
-- [ ] **Stream-first JSON array export mode**
-  - Gap class: weak (performance/parity)
-  - Scope: add optional streaming JSON array output to avoid full buffering for `--format json`.
-  - Why: lowers peak memory on very large inventories.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+- [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
+  - Gap class: weak (quality)
+  - Scope: add optional live smoke path confirming protected URL bearer fallback in `tasks fetch`.
+  - Why: closes a remaining real-tenant confidence gap beyond unit tests.
+  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **End-to-end command presets (`--profile @file`)**
   - Gap class: differentiator
@@ -23,11 +23,11 @@ Priority order (cycle 9 planning; remaining backlog after selected shipments)
   - Why: reduces repeated long commands and operator error in scheduled jobs.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 2 | Risk 2 | Confidence 2
 
-- [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
-  - Gap class: weak (quality)
-  - Scope: add optional live tenant smoke path that confirms auth fallback with a protected artifact URL.
-  - Why: closes the remaining confidence gap beyond unit coverage.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
+- [ ] **Resource tags CRUD parity**
+  - Gap class: missing (feature parity)
+  - Scope: add helper + CLI list/get/put/delete operations for resource tags.
+  - Why: enables governance metadata automation.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
 - [ ] **CLI completions + concise recipes**
   - Gap class: weak (DX)
@@ -41,21 +41,15 @@ Priority order (cycle 9 planning; remaining backlog after selected shipments)
   - Why: keeps runtime compatibility current.
   - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
 
-- [ ] **Resource tags CRUD parity**
-  - Gap class: missing (feature parity)
-  - Scope: add helper + CLI list/get/put/delete operations for resource tags.
-  - Why: improves governance automation and downstream enrichment.
-  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
-
-- [ ] **Workspace delete CLI/helper (`mdeasm workspaces delete`)**
-  - Gap class: missing (operability)
-  - Scope: add explicit workspace deletion with confirmation and `--yes` non-interactive mode.
-  - Why: completes workspace lifecycle parity for test/ephemeral environments.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+- [ ] **List/get parity for API error payload surfacing in CLI**
+  - Gap class: weak (operability)
+  - Scope: standardize CLI error output to include status + redacted error code/message for all commands.
+  - Why: improves incident triage while protecting sensitive values.
+  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
 - [ ] **Tracker trust-label validation automation**
   - Gap class: differentiator
-  - Scope: add a lightweight check for decision/evidence/trust-label shape in `PROJECT_MEMORY.md`.
+  - Scope: add a lightweight check for decision/evidence/trust-label schema in `PROJECT_MEMORY.md`.
   - Why: keeps autonomous memory auditable and consistent.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
@@ -65,25 +59,70 @@ Priority order (cycle 9 planning; remaining backlog after selected shipments)
   - Why: reduces flaky cleanup in batch automation.
   - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
 
-- [ ] **List/get parity for API error payload surfacing in CLI**
-  - Gap class: weak (operability)
-  - Scope: standardize CLI error output to include status + redacted error code/message for all commands.
-  - Why: improves incident triage without leaking sensitive fields.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
-- [ ] **CLI error-code contract tests**
-  - Gap class: weak (quality)
-  - Scope: add focused tests asserting non-zero exit code behavior across common failure classes.
-  - Why: keeps automation contracts stable over refactors.
-  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
-
 - [ ] **Request telemetry hooks (opt-in)**
   - Gap class: differentiator
   - Scope: provide optional per-request timing/status counters for long automation runs.
   - Why: improves diagnosability of tenant/API drift and throttling patterns.
   - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 2 | Risk 2 | Confidence 2
 
+- [ ] **Legacy helper typed-exception migration (phase 2)**
+  - Gap class: weak (reliability)
+  - Scope: replace remaining broad `Exception` raises in high-use helper paths with typed exceptions.
+  - Why: improves error handling in automation and avoids catch-all ambiguity.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Legacy stdout side-effect cleanup (phase 2)**
+  - Gap class: weak (quality)
+  - Scope: continue migrating helper methods to `noprint`-safe structured returns.
+  - Why: preserves machine-readable CLI/library behavior.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Retry-After date parsing support**
+  - Gap class: weak (reliability)
+  - Scope: handle HTTP-date `Retry-After` headers in addition to integer seconds.
+  - Why: improves backoff correctness with standards-compliant gateways.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Data-connections live smoke expansion**
+  - Gap class: weak (quality)
+  - Scope: add opt-in integration smoke for `get` and `validate` in addition to `list`.
+  - Why: catches tenant/API drift across more endpoint shapes.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Workflow-level docs smoke checks**
+  - Gap class: weak (DX)
+  - Scope: add CI step that executes `--help` paths referenced in top-level docs.
+  - Why: prevents docs drift and broken command examples.
+  - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Export throughput benchmarking harness (local)**
+  - Gap class: differentiator
+  - Scope: add repeatable local benchmark script for streamed ndjson/csv/json paths.
+  - Why: informs safe defaults using measured cost rather than intuition.
+  - Score: Impact 2 | Effort 3 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 2
+
+- [ ] **CLI UX consistency sweep for `--format lines` outputs**
+  - Gap class: weak (DX)
+  - Scope: standardize tabular field order and include stable identifiers first across commands.
+  - Why: improves grep/awk compatibility and script portability.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+
 ## Implemented
+- [x] **Workspace lifecycle parity: `mdeasm workspaces delete` helper + CLI**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/workspaces.md`, `README.md`, `API/README.md`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_export.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_delete_workspace_uses_workspace_resource_group_metadata_and_clears_default tests/test_mdeasm_helpers.py::test_delete_workspace_requires_workspace_name tests/test_cli_export.py::test_cli_workspaces_delete_json_with_yes tests/test_cli_export.py::test_cli_workspaces_delete_requires_yes_in_noninteractive_mode tests/test_cli_export.py::test_cli_workspaces_delete_aborts_when_confirmation_mismatch` (pass); `source .venv/bin/activate && python -m mdeasm_cli workspaces delete cycle10-demo --yes --format json --out - >/tmp/mdeasm_ws_delete_cycle10.json 2>/tmp/mdeasm_ws_delete_cycle10.err; rc=$?; echo ws_delete_rc=$rc; test \"$rc\" -eq 1` (pass; expected missing env credentials locally)
+
+- [x] **Stream-first JSON array export mode (`--stream-json-array`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && pytest -q tests/test_cli_export.py::test_cli_assets_export_json_stream_array_when_enabled tests/test_cli_export.py::test_cli_assets_export_json_stream_array_requires_no_facet_filters tests/test_cli_export.py::test_cli_assets_export_stream_array_requires_json_format` (pass); `source .venv/bin/activate && python -m mdeasm_cli assets export --help | rg -- \"--stream-json-array\"` (pass)
+
+- [x] **CLI contract tests for new delete/stream guardrails**
+  - Date: 2026-02-11
+  - Scope: `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_delete_workspace_uses_workspace_resource_group_metadata_and_clears_default tests/test_mdeasm_helpers.py::test_delete_workspace_requires_workspace_name tests/test_cli_export.py::test_cli_assets_export_json_stream_array_when_enabled tests/test_cli_export.py::test_cli_assets_export_json_stream_array_requires_no_facet_filters tests/test_cli_export.py::test_cli_assets_export_stream_array_requires_json_format tests/test_cli_export.py::test_cli_workspaces_delete_json_with_yes tests/test_cli_export.py::test_cli_workspaces_delete_requires_yes_in_noninteractive_mode tests/test_cli_export.py::test_cli_workspaces_delete_aborts_when_confirmation_mismatch` (pass)
+
 - [x] **Doctor probe target matrix (`mdeasm doctor --probe --probe-targets ...`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm_cli.py`, `tests/test_cli_doctor.py`
@@ -390,6 +429,21 @@ Priority order (cycle 9 planning; remaining backlog after selected shipments)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 10):
+  - Microsoft Defender EASM REST references expose workspace lifecycle operation groups (list/get/create/delete) and continue to position task-oriented export + paging as baseline operational capability.
+  - Peer ASM/search APIs continue to optimize for automation-friendly export and cursor-style retrieval, reinforcing low-memory streaming output and safe destructive-operation UX as core operator expectations.
+  - Gap map (cycle 10):
+    - Missing -> closed this cycle: workspace delete lifecycle parity in helper + CLI with non-interactive safety controls.
+    - Weak -> closed this cycle: streamed JSON array export path (`--stream-json-array`) for large client-mode exports.
+    - Weak -> closed this cycle: contract tests for delete confirmation and stream guardrails.
+    - Remaining high-priority weak gaps: live protected-artifact fallback smoke and broad list/get CLI error payload parity.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn Defender EASM REST API overview: https://learn.microsoft.com/en-us/azure/external-attack-surface-management/rest-api-overview
+    - Microsoft Learn workspace operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/controlplanepreview/workspaces?view=rest-defenderforeasm-controlplanepreview-2024-10-01-preview
+    - Microsoft Learn tasks operation group: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero platform API docs: https://help.runzero.com/docs/platform-api/
+    - Shodan API crawl/export guidance: https://developer.shodan.io/api/crawl-internet-data
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 9):
   - Microsoft Defender External Attack Surface Management docs continue to frame task/data-connection endpoint coverage as baseline automation capability, so expanding `doctor` from a control-plane-only check to a selectable endpoint matrix is high-value parity work.
   - Peer ASM/search platforms continue to emphasize API-first export and paging workflows, reinforcing the need for operator-visible diagnostics that quickly isolate endpoint drift per surface.
