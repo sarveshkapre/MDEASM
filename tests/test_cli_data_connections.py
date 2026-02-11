@@ -55,6 +55,23 @@ def test_cli_data_connections_list_lines(monkeypatch, capsys):
     assert out_lines == ["dc1\tlogAnalytics\tassets\tweekly\t1\tSucceeded"]
 
 
+def test_cli_data_connections_list_content_fallback(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def list_data_connections(self, **kwargs):
+            return {"content": [{"name": "dc-content", "kind": "azureDataExplorer"}]}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["data-connections", "list", "--format", "json", "--out", "-"])
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out == [{"name": "dc-content", "kind": "azureDataExplorer"}]
+
+
 def test_cli_data_connections_get_surfaces_api_error_payload(monkeypatch, capsys):
     class ApiRequestError(Exception):
         pass

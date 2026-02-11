@@ -12,6 +12,17 @@ sys.path.insert(0, str(REPO_ROOT / "API"))
 import mdeasm_cli  # noqa: E402
 
 
+def test_resolve_cli_log_level_prefers_explicit_over_verbose():
+    args = types.SimpleNamespace(log_level="WARNING", verbose=2)
+    assert mdeasm_cli._resolve_cli_log_level(args) == "WARNING"
+
+
+def test_resolve_out_path_treats_dash_as_stdout():
+    assert mdeasm_cli._resolve_out_path("-") is None
+    assert mdeasm_cli._resolve_out_path("") is None
+    assert mdeasm_cli._resolve_out_path("result.json") == Path("result.json")
+
+
 def test_parse_retry_after_seconds_supports_delay_and_http_date():
     now = datetime(2026, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
 
@@ -46,6 +57,23 @@ def test_cli_tasks_list_json(monkeypatch, capsys):
     assert captured["list_kwargs"]["get_all"] is True
     payload = json.loads(capsys.readouterr().out)
     assert payload == [{"id": "t1", "state": "running"}]
+
+
+def test_cli_tasks_list_content_fallback(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def list_tasks(self, **kwargs):
+            return {"content": [{"id": "t-content", "state": "queued"}]}
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["tasks", "list", "--format", "json", "--out", "-"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == [{"id": "t-content", "state": "queued"}]
 
 
 def test_cli_tasks_list_surfaces_api_error_payload(monkeypatch, capsys):

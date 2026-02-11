@@ -886,6 +886,35 @@ def _build_ws_kwargs(args) -> dict:
     return ws_kwargs
 
 
+def _resolve_cli_log_level(args) -> str | None:
+    level = str(getattr(args, "log_level", "") or "").strip()
+    if level:
+        return level
+    verbose = int(getattr(args, "verbose", 0) or 0)
+    if verbose >= 2:
+        return "DEBUG"
+    if verbose == 1:
+        return "INFO"
+    return None
+
+
+def _configure_cli_logging(mdeasm_module, args) -> None:
+    level = _resolve_cli_log_level(args)
+    if level and hasattr(mdeasm_module, "configure_logging"):
+        mdeasm_module.configure_logging(level)
+
+
+def _resolve_out_path(value: str) -> Path | None:
+    raw = str(value or "").strip()
+    if not raw or raw == "-":
+        return None
+    return Path(raw)
+
+
+def _rows_to_tab_lines(rows: list[dict], fields: list[str]) -> list[str]:
+    return ["\t".join(str(row.get(field, "")) for field in fields) for row in rows]
+
+
 def _build_data_connection_properties(args) -> dict:
     kind = str(getattr(args, "kind", "") or "")
     if kind == "logAnalytics":
@@ -2609,7 +2638,7 @@ def main(argv: list[str] | None = None) -> int:
                     "error": str(e),
                 }
 
-        out_path = None if (not args.out or args.out == "-") else Path(args.out)
+        out_path = _resolve_out_path(args.out)
         if args.format == "json":
             _write_json(out_path, payload, pretty=True)
         else:
@@ -2663,15 +2692,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "workspaces":
         import mdeasm
 
-        level = None
-        if args.log_level:
-            level = args.log_level
-        elif args.verbose >= 2:
-            level = "DEBUG"
-        elif args.verbose == 1:
-            level = "INFO"
-        if level and hasattr(mdeasm, "configure_logging"):
-            mdeasm.configure_logging(level)
+        _configure_cli_logging(mdeasm, args)
 
         ws_kwargs = _build_ws_kwargs(args)
         # For listing, we want *all* workspaces regardless of WORKSPACE_NAME in the env.
@@ -2696,11 +2717,11 @@ def main(argv: list[str] | None = None) -> int:
                 items.append({"name": name, "dataPlane": dp, "controlPlane": cp})
             items.sort(key=lambda d: str(d.get("name", "")).lower())
 
-            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            out_path = _resolve_out_path(args.out)
             if args.format == "json":
                 _write_json(out_path, items, pretty=True)
             else:
-                lines = [f"{d['name']}\t{d['dataPlane']}\t{d['controlPlane']}" for d in items]
+                lines = _rows_to_tab_lines(items, ["name", "dataPlane", "controlPlane"])
                 _write_lines(out_path, lines)
             return 0
 
@@ -2739,21 +2760,16 @@ def main(argv: list[str] | None = None) -> int:
                 sys.stderr.write(f"failed to delete workspace: {msg}\n")
                 return 1
 
-            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            out_path = _resolve_out_path(args.out)
             if args.format == "json":
                 _write_json(out_path, payload, pretty=True)
             else:
                 _write_lines(
                     out_path,
-                    [
-                        "\t".join(
-                            [
-                                str(payload.get("deleted", "")),
-                                str(payload.get("resourceGroup", "")),
-                                str(payload.get("statusCode", "")),
-                            ]
-                        )
-                    ],
+                    _rows_to_tab_lines(
+                        [payload],
+                        ["deleted", "resourceGroup", "statusCode"],
+                    ),
                 )
             return 0
 
@@ -2763,15 +2779,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "saved-filters":
         import mdeasm
 
-        level = None
-        if getattr(args, "log_level", ""):
-            level = args.log_level
-        elif getattr(args, "verbose", 0) >= 2:
-            level = "DEBUG"
-        elif getattr(args, "verbose", 0) == 1:
-            level = "INFO"
-        if level and hasattr(mdeasm, "configure_logging"):
-            mdeasm.configure_logging(level)
+        _configure_cli_logging(mdeasm, args)
 
         ws_kwargs = _build_ws_kwargs(args)
         try:
@@ -2779,7 +2787,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             return _emit_cli_error("saved-filters client initialization", e, mdeasm_module=mdeasm)
 
-        out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
+        out_path = _resolve_out_path(getattr(args, "out", ""))
 
         if args.saved_filters_cmd == "list":
             try:
@@ -2867,15 +2875,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "data-connections":
         import mdeasm
 
-        level = None
-        if getattr(args, "log_level", ""):
-            level = args.log_level
-        elif getattr(args, "verbose", 0) >= 2:
-            level = "DEBUG"
-        elif getattr(args, "verbose", 0) == 1:
-            level = "INFO"
-        if level and hasattr(mdeasm, "configure_logging"):
-            mdeasm.configure_logging(level)
+        _configure_cli_logging(mdeasm, args)
 
         ws_kwargs = _build_ws_kwargs(args)
         try:
@@ -2884,7 +2884,7 @@ def main(argv: list[str] | None = None) -> int:
             return _emit_cli_error(
                 "data-connections client initialization", e, mdeasm_module=mdeasm
             )
-        out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
+        out_path = _resolve_out_path(getattr(args, "out", ""))
 
         if args.data_connections_cmd == "list":
             try:
@@ -2895,29 +2895,22 @@ def main(argv: list[str] | None = None) -> int:
                     get_all=args.get_all,
                     noprint=True,
                 )
-                values = payload.get("value") if isinstance(payload, dict) else None
-                if values is None:
-                    values = payload.get("content") if isinstance(payload, dict) else []
-                if not isinstance(values, list):
-                    values = []
+                values = _payload_items(payload)
 
                 if args.format == "json":
                     _write_json(out_path, values, pretty=True)
                 else:
-                    lines = []
-                    for item in values:
-                        lines.append(
-                            "\t".join(
-                                [
-                                    str(item.get("name", "")),
-                                    str(item.get("kind", "")),
-                                    str(item.get("content", "")),
-                                    str(item.get("frequency", "")),
-                                    str(item.get("frequencyOffset", "")),
-                                    str(item.get("provisioningState", "")),
-                                ]
-                            )
-                        )
+                    lines = _rows_to_tab_lines(
+                        values,
+                        [
+                            "name",
+                            "kind",
+                            "content",
+                            "frequency",
+                            "frequencyOffset",
+                            "provisioningState",
+                        ],
+                    )
                     _write_lines(out_path, lines)
                 return 0
             except Exception as e:
@@ -2998,22 +2991,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "tasks":
         import mdeasm
 
-        level = None
-        if getattr(args, "log_level", ""):
-            level = args.log_level
-        elif getattr(args, "verbose", 0) >= 2:
-            level = "DEBUG"
-        elif getattr(args, "verbose", 0) == 1:
-            level = "INFO"
-        if level and hasattr(mdeasm, "configure_logging"):
-            mdeasm.configure_logging(level)
+        _configure_cli_logging(mdeasm, args)
 
         ws_kwargs = _build_ws_kwargs(args)
         try:
             ws = mdeasm.Workspaces(**ws_kwargs)
         except Exception as e:
             return _emit_cli_error("tasks client initialization", e, mdeasm_module=mdeasm)
-        out_path = None if (not getattr(args, "out", "") or args.out == "-") else Path(args.out)
+        out_path = _resolve_out_path(getattr(args, "out", ""))
 
         if args.tasks_cmd == "list":
             try:
@@ -3026,27 +3011,15 @@ def main(argv: list[str] | None = None) -> int:
                     get_all=args.get_all,
                     noprint=True,
                 )
-                values = payload.get("value") if isinstance(payload, dict) else None
-                if values is None:
-                    values = payload.get("content") if isinstance(payload, dict) else []
-                if not isinstance(values, list):
-                    values = []
+                values = _payload_items(payload)
 
                 if args.format == "json":
                     _write_json(out_path, values, pretty=True)
                 else:
-                    lines = []
-                    for item in values:
-                        lines.append(
-                            "\t".join(
-                                [
-                                    str(item.get("id", "")),
-                                    str(item.get("state", "")),
-                                    str(item.get("startedAt", "")),
-                                    str(item.get("completedAt", "")),
-                                ]
-                            )
-                        )
+                    lines = _rows_to_tab_lines(
+                        values,
+                        ["id", "state", "startedAt", "completedAt"],
+                    )
                     _write_lines(out_path, lines)
                 return 0
             except Exception as e:
@@ -3141,10 +3114,10 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
 
             if args.reference_out:
-                ref_out = None if args.reference_out == "-" else Path(args.reference_out)
+                ref_out = _resolve_out_path(args.reference_out)
                 _write_json(ref_out, payload, pretty=True)
 
-            summary_out = None if (not args.out or args.out == "-") else Path(args.out)
+            summary_out = _resolve_out_path(args.out)
             artifact_path = Path(args.artifact_out)
             timeout = args.http_timeout or getattr(ws, "_http_timeout", (10.0, 60.0))
             retry = not bool(args.no_retry)
@@ -3216,15 +3189,7 @@ def main(argv: list[str] | None = None) -> int:
         # Import inside the command so `--help` works without requiring env/config.
         import mdeasm
 
-        level = None
-        if args.log_level:
-            level = args.log_level
-        elif args.verbose >= 2:
-            level = "DEBUG"
-        elif args.verbose == 1:
-            level = "INFO"
-        if level and hasattr(mdeasm, "configure_logging"):
-            mdeasm.configure_logging(level)
+        _configure_cli_logging(mdeasm, args)
         ws_kwargs = _build_ws_kwargs(args)
 
         try:
@@ -3238,7 +3203,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             return _emit_cli_error("assets client initialization", e, mdeasm_module=mdeasm)
         if args.assets_cmd == "export":
-            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            out_path = _resolve_out_path(args.out)
 
             columns: list[str] = _parse_columns_arg(args.columns)
             if args.columns_from:
@@ -3451,7 +3416,7 @@ def main(argv: list[str] | None = None) -> int:
             rows = asset_list.as_dicts() if asset_list and hasattr(asset_list, "as_dicts") else []
 
             cols = sorted({k for r in rows for k in r.keys()})
-            out_path = None if (not args.out or args.out == "-") else Path(args.out)
+            out_path = _resolve_out_path(args.out)
             if args.schema_action == "diff":
                 if not args.baseline:
                     sys.stderr.write("schema diff mode requires --baseline <path>\n")
