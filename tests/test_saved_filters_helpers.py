@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "API"))
@@ -83,3 +85,58 @@ def test_delete_saved_filter_uses_delete_method():
     assert captured["method"] == "delete"
     assert captured["endpoint"] == "savedFilters/sfA"
 
+
+def test_saved_filter_methods_encode_name_for_path_segment():
+    ws = _ws_stub()
+    captured = {"endpoints": []}
+
+    def qh(calling_func, method, endpoint, **kwargs):
+        captured["endpoints"].append(endpoint)
+        return _DummyResp({"name": "sf with space"})
+
+    ws.__workspace_query_helper__ = qh  # type: ignore[attr-defined]
+
+    ws.get_saved_filter("sf with space", workspace_name="w", noprint=True)
+    ws.create_or_replace_saved_filter(
+        "sf with space",
+        query_filter='kind = "domain"',
+        description="desc",
+        workspace_name="w",
+        noprint=True,
+    )
+    ws.delete_saved_filter("sf with space", workspace_name="w", noprint=True)
+
+    assert captured["endpoints"] == [
+        "savedFilters/sf%20with%20space",
+        "savedFilters/sf%20with%20space",
+        "savedFilters/sf%20with%20space",
+    ]
+
+
+def test_saved_filter_methods_raise_typed_workspace_and_validation_errors():
+    ws = _ws_stub()
+    ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_saved_filters(workspace_name="missing", noprint=True)
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    with pytest.raises(mdeasm.ValidationError):
+        ws.get_saved_filter("", workspace_name="w", noprint=True)
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_or_replace_saved_filter(
+            "sfA",
+            query_filter="",
+            description="desc",
+            workspace_name="w",
+            noprint=True,
+        )
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_or_replace_saved_filter(
+            "sfA",
+            query_filter='kind = "domain"',
+            description="",
+            workspace_name="w",
+            noprint=True,
+        )
+    with pytest.raises(mdeasm.ValidationError):
+        ws.delete_saved_filter("bad/name", workspace_name="w", noprint=True)

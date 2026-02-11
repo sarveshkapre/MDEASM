@@ -856,6 +856,16 @@ def test_label_helpers_print_mode_still_returns_payload(capsys):
     assert "no labels exist for ws1" in out
 
 
+def test_label_helpers_raise_workspace_not_found():
+    ws = _new_ws()
+    ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.create_or_update_label("owned", workspace_name="missing", noprint=True)
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_labels(workspace_name="missing", noprint=True)
+
+
 def test_get_workspace_risk_observations_handles_empty_findings_with_noprint(capsys):
     ws = _new_ws()
     ws._default_workspace_name = "ws1"

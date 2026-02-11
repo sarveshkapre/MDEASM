@@ -42,3 +42,6 @@ mdeasm saved-filters get owned_domains
 mdeasm saved-filters delete owned_domains
 ```
 
+Notes:
+- `saved-filters put` validates payload shape locally before API submit (`name`, `filter`, `description` must be non-empty after trimming).
+- Saved filter names are treated as path segments and cannot include `/`.

@@ -282,6 +282,25 @@ def _validate_data_connection_properties(kind: str, properties: dict) -> dict:
     raise ValidationError(f"unsupported data connection kind: {kind}")
 
 
+def _normalize_saved_filter_name(name: str) -> str:
+    normalized = str(name or "").strip()
+    if not normalized:
+        raise ValidationError("saved filter name is required")
+    if "/" in normalized:
+        raise ValidationError("saved filter name cannot contain '/'")
+    return normalized
+
+
+def _normalize_saved_filter_payload(query_filter: str, description: str) -> dict:
+    normalized_filter = str(query_filter or "").strip()
+    if not normalized_filter:
+        raise ValidationError("saved filter query_filter is required")
+    normalized_description = str(description or "").strip()
+    if not normalized_description:
+        raise ValidationError("saved filter description is required")
+    return {"filter": normalized_filter, "description": normalized_description}
+
+
 class Workspaces:
     _state_map = requests.structures.CaseInsensitiveDict(
         {
@@ -606,8 +625,7 @@ class Workspaces:
                         )
             return disco_results
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def __asset_content_helper__(
         self,
@@ -1274,8 +1292,7 @@ class Workspaces:
                     print(template)
             return templates
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def get_discovery_template_by_id(self, template_id, workspace_name="", **kwargs):
         if not workspace_name:
@@ -1292,8 +1309,7 @@ class Workspaces:
                 print(json.dumps(payload, indent=2))
             return payload
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def create_discovery_group(self, disco_template="", disco_custom={}, workspace_name=""):
         """Requires **one of** disco_template or disco_custom to be passed to function.
@@ -1388,8 +1404,7 @@ class Workspaces:
             )
             return r.json()
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def get_workspace_assets(
         self,
@@ -2224,9 +2239,7 @@ class Workspaces:
                 print(f"created new label '{name}' in {workspace_name}\n")
                 print(json.dumps(label_properties, indent=2))
             return label_properties
-        else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+        self.__raise_workspace_not_found__(workspace_name)
 
     def get_labels(self, workspace_name="", **kwargs):
         noprint = bool(kwargs.get("noprint"))
@@ -2255,9 +2268,7 @@ class Workspaces:
                 else:
                     print(f"no labels exist for {workspace_name}")
             return label_properties
-        else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+        self.__raise_workspace_not_found__(workspace_name)
 
     def get_saved_filters(self, workspace_name="", filter_expr="", skip=0, max_page_size=25, **kwargs):
         """
@@ -2268,8 +2279,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         params = {}
         if filter_expr:
@@ -2296,13 +2306,15 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
+
+        saved_filter_name = _normalize_saved_filter_name(name)
+        endpoint_name = urllib.parse.quote(saved_filter_name, safe="")
 
         r = self.__workspace_query_helper__(
             "get_saved_filter",
             method="get",
-            endpoint=f"savedFilters/{name}",
+            endpoint=f"savedFilters/{endpoint_name}",
             workspace_name=workspace_name,
         )
         payload = r.json()
@@ -2320,14 +2332,15 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
-        payload = {"filter": query_filter, "description": description}
+        saved_filter_name = _normalize_saved_filter_name(name)
+        endpoint_name = urllib.parse.quote(saved_filter_name, safe="")
+        payload = _normalize_saved_filter_payload(query_filter, description)
         r = self.__workspace_query_helper__(
             "create_or_replace_saved_filter",
             method="put",
-            endpoint=f"savedFilters/{name}",
+            endpoint=f"savedFilters/{endpoint_name}",
             payload=payload,
             workspace_name=workspace_name,
         )
@@ -2341,21 +2354,23 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
+
+        saved_filter_name = _normalize_saved_filter_name(name)
+        endpoint_name = urllib.parse.quote(saved_filter_name, safe="")
 
         r = self.__workspace_query_helper__(
             "delete_saved_filter",
             method="delete",
-            endpoint=f"savedFilters/{name}",
+            endpoint=f"savedFilters/{endpoint_name}",
             workspace_name=workspace_name,
         )
         if kwargs.get("noprint"):
             return None
         if r.status_code == 204:
-            print(f"deleted saved filter '{name}'")
+            print(f"deleted saved filter '{saved_filter_name}'")
         else:
-            print(json.dumps({"status": r.status_code, "name": name}, indent=2))
+            print(json.dumps({"status": r.status_code, "name": saved_filter_name}, indent=2))
         return None
 
     def list_data_connections(
