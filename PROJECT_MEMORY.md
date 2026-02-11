@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Ship `data-connections` helper/CLI coverage plus `tasks wait` polling ergonomics in one production-safe feature batch | This was the highest-impact remaining parity gap and removed shell polling boilerplate while adding redaction for secret-bearing data-connection fields | `source .venv/bin/activate && make verify` (pass); focused helper/CLI tests for new commands pass | ab02b3f | high | trusted
+- 2026-02-11 | Keep real-tenant integration checks as explicit follow-up backlog for new data-connections endpoints | Local environment has no EASM credentials; forcing live calls would be flaky and non-reproducible in this session | `python -m mdeasm_cli doctor --format json --out -` reports missing required env vars and expected exit code 1 | ab02b3f | high | trusted
+- 2026-02-11 | Prioritize cycle 6 around Microsoft-documented data-connections lifecycle parity and task wait UX | Bounded market scan and official Defender EASM docs showed complete data-connections operation surface and task-driven automation as baseline expectations | Cycle 6 scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
 - 2026-02-11 | Refresh autonomous trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after label-helper cleanup shipment | Keep backlog status, verification evidence, and mutable repo facts synchronized with pushed `main` commits | Tracker files updated with delivered-item closure and CI evidence links for both pushes in this cleanup pass | 6522ee0 | high | trusted
 - 2026-02-11 | Complete residual label helper stdout gating by making `create_or_update_label`/`get_labels` return structured payloads in both print and `noprint` modes | This was the highest-impact remaining low-risk cleanup from the backlog and removes another automation footgun without changing default interactive output | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_label_helpers_support_noprint_and_consistent_returns tests/test_mdeasm_helpers.py::test_label_helpers_print_mode_still_returns_payload` (pass) | a953e43 | high | trusted
 - 2026-02-11 | Prioritize label helper cleanup for this targeted refactor pass | Bounded backlog scan kept data-connections and typed exceptions as larger follow-ups; label helper output consistency was the smallest high-value production-safe improvement | `CLONE_FEATURES.md` candidate/implemented updates for this pass | a953e43 | high | trusted
@@ -87,13 +90,23 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`); blocked locally because EASM credentials are not configured.
-- Add `mdeasm data-connections ...` management commands for Log Analytics/ADX parity workflows.
+- Add opt-in real-tenant smoke for `mdeasm data-connections list` (`MDEASM_INTEGRATION_DATA_CONNECTIONS=1`) to validate endpoint/API-version behavior against live tenants.
+- Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`); still blocked locally because EASM credentials are not configured.
 - Start typed helper exception migration for validation/workspace-not-found/auth paths to reduce broad `Exception` handling.
-- Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview`.
+- Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview` for data-connections and task endpoints.
+- Implement stream-first JSON array export mode to avoid in-memory buffering for large `--format json` exports.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `source .venv/bin/activate && gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `source .venv/bin/activate && gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | recent runs on `main` were successful before cycle 6 push | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_data_connections_helpers.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_data_connections_helpers.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `...................` | pass
+- 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `109 passed, 5 skipped`; compile/help smoke commands passed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli data-connections --help >/dev/null && python -m mdeasm_cli data-connections list --help >/dev/null && python -m mdeasm_cli tasks wait --help >/dev/null` | help paths for new commands exit cleanly | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli doctor --format json --out - >/tmp/mdeasm_doctor_cycle6.json 2>/tmp/mdeasm_doctor_cycle6.err; rc=$?; echo doctor_rc=$rc; test \"$rc\" -eq 1` | `doctor_rc=1` with expected missing required env vars | pass
+- 2026-02-11 | `git push origin main` | pushed commit `ab02b3f` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21903432828 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `ab02b3f` | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py` | `All checks passed!` | pass
 - 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_label_helpers_support_noprint_and_consistent_returns tests/test_mdeasm_helpers.py::test_label_helpers_print_mode_still_returns_payload` | `..` | pass
 - 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `98 passed, 5 skipped`; compile + smoke commands passed | pass
