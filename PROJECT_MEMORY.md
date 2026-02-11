@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh cycle 9 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `INCIDENTS.md`, `AGENTS.md`) after feature push and CI verification | Keep mutable facts, backlog state, incident learnings, and verification evidence synchronized with pushed `main` commits | Tracker files updated after feature commit `af3dcc5`; follow-up tracker push CI run `21905958652` succeeded | 1329352 | high | trusted
 - 2026-02-11 | Ship cycle 9 doctor probe matrix (`--probe-targets`, `--probe-max-page-size`, `--workspace-name`) with per-target results and backward-compatible workspace probe shape | Highest-impact safe backlog item was expanding early drift detection beyond control-plane-only checks without breaking existing doctor automation contracts | `source .venv/bin/activate && pytest -q tests/test_cli_doctor.py` (pass); `source .venv/bin/activate && make verify` (pass); `gh run watch 21905893624 -R sarveshkapre/MDEASM --exit-status` (pass) | af3dcc5 | high | trusted
 - 2026-02-11 | Keep live data-plane matrix validation optional in this session while enforcing deterministic unit coverage | Local environment does not include Defender EASM credentials, so required-env gating prevents reproducible live calls; matrix behavior is still validated through CLI contracts and CI | `python -m mdeasm_cli doctor --probe --probe-targets all --format json --out -` exits 1 with expected missing-env diagnostics; full doctor test suite passes | af3dcc5 | high | trusted
 - 2026-02-11 | Prioritize cycle 9 around endpoint-health diagnostics from bounded market scan | Official Defender EASM docs and peer ASM platforms keep API-first endpoint reliability and export/paging checks as baseline operator expectations | Cycle 9 market scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Censys, Shodan) | n/a | medium | untrusted
@@ -118,6 +119,8 @@
 - 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `119 passed, 6 skipped`; compile + CLI smoke commands passed | pass
 - 2026-02-11 | `git push origin main` | pushed commit `af3dcc5` to `origin/main` | pass
 - 2026-02-11 | `gh run watch 21905893624 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `af3dcc5` | pass
+- 2026-02-11 | `git push origin main` | pushed commit `1329352` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21905958652 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `1329352` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt || true` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest pre-cycle-8 runs on `main` were successful before this push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_data_connections_helpers.py tests/test_cli_tasks.py API/README.md CLONE_FEATURES.md PROJECT_MEMORY.md AGENTS.md` | `All checks passed!` | pass
