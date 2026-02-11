@@ -37,6 +37,9 @@ jobs:
           python -m mdeasm_cli --help >/dev/null
           python -m mdeasm_cli --version >/dev/null
 
+      - name: Docs workflow smoke
+        run: make docs-smoke
+
       - name: Tests
         run: pytest
 

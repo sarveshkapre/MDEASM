@@ -64,6 +64,7 @@ Notes:
 - `--workspace-name` can override `WORKSPACE_NAME`.
 - Reliability and API version flags are available on all task commands (`--http-timeout`, `--no-retry`, `--max-retry`, `--backoff-max-s`, `--api-version`, `--dp-api-version`, `--cp-api-version`).
 - `tasks wait` exits with a non-zero status on timeout and prints the timeout reason to stderr.
+- For terminal failure states (`failed`/`incomplete`/`cancelled`), `tasks wait` includes normalized `terminalErrorCode` and `terminalErrorMessage` fields in JSON output. In `--format lines`, these are appended as the 5th and 6th tab-separated columns.
 - `tasks fetch` supports `--retry-on-statuses` (default `408,425,429,500,502,503,504`) to tune which HTTP responses are treated as transient during artifact download.
 - `tasks fetch` respects `Retry-After` response headers in either delay-seconds or HTTP-date format for retryable download responses.
 - `tasks fetch` supports `--sha256` to verify artifact integrity before moving the download into place.

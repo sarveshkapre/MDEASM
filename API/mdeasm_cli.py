@@ -19,6 +19,8 @@ from pathlib import Path
 import requests
 
 _TASK_TERMINAL_STATES = {"complete", "completed", "failed", "incomplete", "cancelled", "canceled"}
+_TASK_SUCCESS_TERMINAL_STATES = {"complete", "completed"}
+_TASK_FAILURE_TERMINAL_STATES = _TASK_TERMINAL_STATES.difference(_TASK_SUCCESS_TERMINAL_STATES)
 _DOWNLOAD_URL_PRIORITY_KEYS = (
     "downloadurl",
     "downloaduri",
@@ -356,6 +358,41 @@ def _extract_error_code_message(payload: dict) -> tuple[str, str]:
         or ""
     ).strip()
     return (code, message)
+
+
+def _extract_task_terminal_error(payload) -> tuple[str, str]:
+    """
+    Best-effort extraction of terminal task failure metadata.
+
+    Task payloads can nest error details under keys like `error`, `result`, or `details`.
+    This helper normalizes those shapes into a `(code, message)` tuple.
+    """
+    if not isinstance(payload, dict):
+        return ("", "")
+
+    queue: list[dict] = [payload]
+    seen: set[int] = set()
+
+    while queue:
+        node = queue.pop(0)
+        node_id = id(node)
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+
+        code, message = _extract_error_code_message(node)
+        if code or message:
+            return (code, message)
+
+        for value in node.values():
+            if isinstance(value, dict):
+                queue.append(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        queue.append(item)
+
+    return ("", "")
 
 
 def _extract_api_error_details(message: str) -> tuple[int | None, str, str]:
@@ -2959,15 +2996,30 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             except Exception as e:
                 return _emit_cli_error("tasks wait", e, mdeasm_module=mdeasm)
+
+            state = str((payload or {}).get("state", "")).strip().lower()
+            if state in _TASK_FAILURE_TERMINAL_STATES:
+                err_code, err_message = _extract_task_terminal_error(payload)
+                if err_code or err_message:
+                    payload = dict(payload or {})
+                    payload["terminalErrorCode"] = err_code
+                    payload["terminalErrorMessage"] = err_message
+
             if args.format == "json":
                 _write_json(out_path, payload, pretty=True)
             else:
+                terminal_error_code = str((payload or {}).get("terminalErrorCode", ""))
+                terminal_error_message = " ".join(
+                    str((payload or {}).get("terminalErrorMessage", "")).split()
+                )
                 line = "\t".join(
                     [
                         str(payload.get("id", "")),
                         str(payload.get("state", "")),
                         str(payload.get("startedAt", "")),
                         str(payload.get("completedAt", "")),
+                        terminal_error_code,
+                        terminal_error_message,
                     ]
                 )
                 _write_lines(out_path, [line])

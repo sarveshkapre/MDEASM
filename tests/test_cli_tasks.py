@@ -172,6 +172,62 @@ def test_cli_tasks_wait_times_out(monkeypatch, capsys):
     assert "timed out waiting for task abc" in capsys.readouterr().err
 
 
+def test_cli_tasks_wait_json_surfaces_terminal_failure_details(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_task(self, task_id, **kwargs):
+            return {
+                "id": task_id,
+                "state": "failed",
+                "error": {
+                    "code": "ExportFailed",
+                    "message": "artifact generation failed for workspace demo",
+                },
+            }
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["tasks", "wait", "abc", "--format", "json", "--out", "-"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["state"] == "failed"
+    assert payload["terminalErrorCode"] == "ExportFailed"
+    assert payload["terminalErrorMessage"] == "artifact generation failed for workspace demo"
+
+
+def test_cli_tasks_wait_lines_surfaces_terminal_failure_details(monkeypatch, capsys):
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_task(self, task_id, **kwargs):
+            return {
+                "id": task_id,
+                "state": "incomplete",
+                "result": {
+                    "error": {
+                        "code": "DownloadUnavailable",
+                        "message": "download URL not ready",
+                    }
+                },
+            }
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+
+    rc = mdeasm_cli.main(["tasks", "wait", "abc", "--format", "lines", "--out", "-"])
+    assert rc == 0
+    line = capsys.readouterr().out.strip()
+    fields = line.split("\t")
+    assert fields[0] == "abc"
+    assert fields[1] == "incomplete"
+    assert fields[4] == "DownloadUnavailable"
+    assert fields[5] == "download URL not ready"
+
+
 def test_cli_tasks_fetch_downloads_artifact(monkeypatch, capsys, tmp_path):
     artifact = tmp_path / "artifact.csv"
 

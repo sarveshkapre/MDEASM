@@ -61,3 +61,14 @@ Notes:
 - Reliability and API version flags are available on all commands (`--http-timeout`, `--no-retry`, `--max-retry`, `--backoff-max-s`, `--api-version`, `--dp-api-version`, `--cp-api-version`).
 - Secret-bearing fields such as `apiKey` are redacted in helper/CLI output.
 - If your tenant requires newer preview endpoints, pass `--dp-api-version 2024-10-01-preview`.
+
+## Optional Integration Smoke (Maintainers)
+```bash
+source .venv/bin/activate
+MDEASM_INTEGRATION_DATA_CONNECTIONS=1 pytest -q tests/test_integration_smoke.py -k data_connections
+```
+
+Optional env knobs:
+- `MDEASM_INTEGRATION_DATA_CONNECTION_NAME`: explicit connection name for `get` smoke.
+- `MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_KIND`: `logAnalytics` (default) or `azureDataExplorer`.
+- `MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_*`: optional validate payload overrides used by the smoke test.

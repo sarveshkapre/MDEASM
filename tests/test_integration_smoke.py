@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -144,6 +145,121 @@ def test_integration_smoke_data_connections_list():
     payload = ws.list_data_connections(max_page_size=1, get_all=False, noprint=True)
     assert isinstance(payload, dict)
     assert "value" in payload or "content" in payload
+
+
+def test_integration_smoke_data_connections_get():
+    """
+    Optional data-connections get smoke.
+
+    Uses `MDEASM_INTEGRATION_DATA_CONNECTION_NAME` when provided; otherwise it attempts to
+    discover one from a tiny list call and skips if none exist.
+    """
+    if os.getenv("MDEASM_INTEGRATION_DATA_CONNECTIONS") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_DATA_CONNECTIONS=1 to enable data-connections integration smoke"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip(
+            "set WORKSPACE_NAME (or ensure only one workspace exists) to run data-connections smoke"
+        )
+
+    name = str(os.getenv("MDEASM_INTEGRATION_DATA_CONNECTION_NAME", "")).strip()
+    if not name:
+        listed = ws.list_data_connections(max_page_size=1, get_all=False, noprint=True)
+        rows = listed.get("value") if isinstance(listed, dict) else None
+        if rows is None and isinstance(listed, dict):
+            rows = listed.get("content")
+        rows = rows if isinstance(rows, list) else []
+        if not rows:
+            pytest.skip(
+                "no data connections available to run get smoke; set MDEASM_INTEGRATION_DATA_CONNECTION_NAME"
+            )
+        name = str((rows[0] or {}).get("name") or "").strip()
+        if not name:
+            pytest.skip(
+                "unable to infer data connection name from list response; set MDEASM_INTEGRATION_DATA_CONNECTION_NAME"
+            )
+
+    payload = ws.get_data_connection(name, noprint=True)
+    assert isinstance(payload, dict)
+    returned_name = str(payload.get("name") or payload.get("id") or "").strip()
+    assert returned_name
+
+
+def test_integration_smoke_data_connections_validate():
+    """
+    Optional data-connections validate smoke.
+
+    This probes endpoint reachability using non-destructive validation payloads. Validation
+    rejections (for example 400/409/422) are treated as success because they still prove the
+    endpoint shape is reachable and responsive.
+    """
+    if os.getenv("MDEASM_INTEGRATION_DATA_CONNECTIONS") != "1":
+        pytest.skip(
+            "set MDEASM_INTEGRATION_DATA_CONNECTIONS=1 to enable data-connections integration smoke"
+        )
+
+    required = ["TENANT_ID", "SUBSCRIPTION_ID", "CLIENT_ID", "CLIENT_SECRET"]
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        pytest.skip(f"missing required env vars: {', '.join(missing)}")
+
+    ws = mdeasm.Workspaces(http_timeout=(5, 30), retry=True, max_retry=2, backoff_max_s=5)
+    if not getattr(ws, "_default_workspace_name", ""):
+        pytest.skip(
+            "set WORKSPACE_NAME (or ensure only one workspace exists) to run data-connections smoke"
+        )
+
+    kind = str(os.getenv("MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_KIND", "logAnalytics")).strip()
+    if kind == "logAnalytics":
+        workspace_id = str(
+            os.getenv(
+                "MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_WORKSPACE_ID",
+                f"/subscriptions/{os.getenv('SUBSCRIPTION_ID', '00000000-0000-0000-0000-000000000000')}/"
+                "resourcegroups/placeholder/providers/microsoft.operationalinsights/workspaces/placeholder",
+            )
+        ).strip()
+        api_key = str(
+            os.getenv(
+                "MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_API_KEY",
+                "mdeasm-integration-smoke-placeholder-key",
+            )
+        ).strip()
+        properties = {"workspaceId": workspace_id, "apiKey": api_key}
+    elif kind == "azureDataExplorer":
+        properties = {
+            "clusterName": str(
+                os.getenv("MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_CLUSTER_NAME", "placeholder-cluster")
+            ).strip(),
+            "databaseName": str(
+                os.getenv("MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_DATABASE_NAME", "placeholder-db")
+            ).strip(),
+            "region": str(
+                os.getenv("MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_REGION", "eastus")
+            ).strip(),
+        }
+    else:
+        pytest.skip(
+            "unsupported MDEASM_INTEGRATION_DATA_CONNECTION_VALIDATE_KIND; use logAnalytics or azureDataExplorer"
+        )
+
+    try:
+        payload = ws.validate_data_connection(kind=kind, properties=properties, noprint=True)
+    except Exception as exc:
+        status_match = re.search(r"last_status:\s*([0-9]{3})", str(exc), flags=re.IGNORECASE)
+        status = int(status_match.group(1)) if status_match else None
+        if status in {400, 409, 422}:
+            return
+        pytest.fail(f"unexpected validate_data_connection failure: {exc}")
+    else:
+        assert isinstance(payload, dict)
 
 
 def test_integration_smoke_server_export_task():
