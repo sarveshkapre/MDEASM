@@ -9,6 +9,8 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refactor legacy helper stdout-heavy methods to support `noprint` + structured returns and fix no-findings risk-observation crash path | Library consumers need stdout-safe behavior for automation, and risk-observation retrieval should not fail when the summarize API returns zero findings | `source .venv/bin/activate && ruff check .` (pass); `source .venv/bin/activate && pytest` (pass); `source .venv/bin/activate && python -m compileall API` (pass) | cd9a3e3 | high | trusted
+- 2026-02-11 | Prioritize helper stdout-side-effect cleanup from bounded market scan | Production SDK/automation baselines favor explicit return values over implicit terminal output; this is a high-impact maintainability and pipeline-safety cleanup | Bounded scan notes captured in `CLONE_FEATURES.md` and implemented via `noprint` gating/coverage expansion in `API/mdeasm.py` | n/a | medium | untrusted
 - 2026-02-11 | Record cycle 3 CI verification follow-through for pushed tracker-only commit | Preserve an auditable link between the final pushed SHA and successful GitHub Actions checks | `gh run watch 21900541969 -R sarveshkapre/MDEASM --exit-status` (pass) | 546a5e5 | high | trusted
 - 2026-02-11 | Refresh autonomous trackers for cycle 3 (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `INCIDENTS.md`, `AGENTS.md`) | Keep backlog, memory, incident prevention, and mutable repo facts aligned with shipped code and CI evidence | Tracker files updated with selected-task closure, cycle 3 market/gap insights, and verification records | c418d9a | high | trusted
 - 2026-02-11 | Add `mdeasm tasks fetch` to download task artifacts atomically with retry/backoff controls | Defender EASM automation was missing the final artifact retrieval step; existing `tasks download` only returned reference payloads | `source .venv/bin/activate && pytest -q` (pass); `source .venv/bin/activate && python -m mdeasm_cli tasks fetch --help >/dev/null` (pass) | e955667 | high | trusted
@@ -60,6 +62,7 @@
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
+- 2026-02-11 | `get_workspace_risk_observations()` could raise when no findings were returned | `snapshot_assets` was only initialized in the non-empty metrics branch, but later referenced unconditionally | Initialize `snapshot_assets` before branch evaluation, gate completion messaging, and return structured payload with `noprint` option; add regression test | For any branch-dependent accumulator/collection, initialize before branching and add at least one regression test for the empty-result path | cd9a3e3 | high
 - 2026-02-11 | Initial redaction regex missed JSON token fields like `"access_token":"..."` | First-pass sanitization pattern handled `key=value` but not quoted JSON key/value formatting | Added dedicated JSON-field redaction regex and regression tests for bearer + JSON + query-string secret patterns | Add explicit regression cases for every secret shape (header, JSON, key/value, signed URL query) before merging logging/error changes | e955667 | high
 - 2026-02-11 | `create_workspace()` could raise `no region` even when `EASM_REGION` was set to a valid value | Region validation mixed fallback and validation in a single `if/else`, causing the valid fallback path to still raise | Split fallback (`if not region`) from validation (`if region not in _easm_regions`) and add regression coverage | Keep env fallback + validation checks separated in control flow and cover both with tests | 97be9c2 | high
 - 2026-02-11 | `create_facet_filter(asset_id=...)` could raise before reaching the `asset_id` path | Function always validated `asset_list_name` first, even when only `asset_id` was supplied | Branch validation by mode (`asset_list_name` vs `asset_id`) and add regression coverage | Add tests for every mutually-exclusive argument path before refactoring validation blocks | 97be9c2 | high
@@ -72,6 +75,7 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
+- Complete residual `noprint` gating in remaining noisy helpers (notably `query_facet_filter` print/file-output paths) while preserving default interactive behavior.
 - Add real-tenant validation for `mdeasm tasks fetch` against Defender EASM artifact URL variants (SAS vs protected URL); blocked locally because EASM credentials are not configured.
 - Add `mdeasm assets schema diff --baseline <file>` to catch downstream schema drift in CI/smoke flows.
 - Add retry jitter/status policy knobs to external artifact fetch paths for better behavior under transient storage endpoint errors.
@@ -79,6 +83,12 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py -q` | focused helper suite passed (`......................`) | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest` | `88 passed, 4 skipped in 0.35s` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m compileall API` | compiled `API/` successfully | pass
+- 2026-02-11 | `git push origin main` | pushed commit `cd9a3e3` to `origin/main` | pass
 - 2026-02-11 | `gh run watch 21900541969 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `546a5e5` | pass
 - 2026-02-11 | `gh run watch 21900519064 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `c418d9a` | pass
 - 2026-02-11 | `gh run watch 21900485772 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `e955667` | pass

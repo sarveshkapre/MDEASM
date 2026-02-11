@@ -44,11 +44,11 @@ Next Up (keep deduped)
   - Why: safer caller handling and less fragile automation.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Refactor: gate legacy `print()` paths for library usage**
+- [ ] **Refactor: finish remaining legacy `print()` gating for library usage**
   - Gap class: weak (library UX)
-  - Scope: add `noprint`/structured return behavior across remaining noisy helper functions.
+  - Scope: extend `noprint`/structured return behavior to remaining noisy helper functions (for example `query_facet_filter` output helpers).
   - Why: avoids stdout side effects in scripts and pipelines.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
 - [ ] **Performance: stream-first JSON array mode for large client exports**
   - Gap class: weak (parity)
@@ -93,6 +93,11 @@ Next Up (keep deduped)
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Refactor: gate legacy helper stdout paths + no-findings risk observation reliability fix**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && ruff check .` (pass); `source .venv/bin/activate && pytest` (pass); `source .venv/bin/activate && python -m compileall API` (pass)
+
 - [x] **Task artifact downloader (`mdeasm tasks fetch`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm_cli.py`, `docs/tasks.md`, `docs/exports.md`, `tests/test_cli_tasks.py`

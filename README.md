@@ -18,6 +18,7 @@ $EDITOR .env
 
 python3 API/retrieve_risk_observations.py
 ```
+For programmatic use of helper methods, prefer `noprint=True` where supported to keep stdout clean.
 
 ## Optional: Install + CLI
 ```bash

@@ -14,6 +14,16 @@
 ## Entries
 
 ### 2026-02-11
+- Trigger: Running helper risk-observation retrieval when summarize returned zero findings.
+- Impact: `get_workspace_risk_observations()` could crash with an unbound variable instead of returning cleanly, blocking low/no-risk tenant automations.
+- Root Cause: `snapshot_assets` was created only inside the non-empty findings branch, but referenced after the branch unconditionally.
+- Fix: Initialize `snapshot_assets` before branch logic, gate completion output on non-empty results, and add regression coverage for empty-findings + `noprint` behavior.
+- Prevention Rule: Initialize accumulators before conditional branches and add explicit tests for empty-result paths in any method that consumes paged API summaries.
+- Evidence: `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_get_workspace_risk_observations_handles_empty_findings_with_noprint` -> pass.
+- Commit: cd9a3e3
+- Confidence: high
+
+### 2026-02-11
 - Trigger: New secret-redaction tests introduced during cycle 3 failed on first pass.
 - Impact: JSON token fields (`"access_token":"..."`) could have remained visible in raised helper exception text, risking credential leakage in logs.
 - Root Cause: Initial regex only covered bearer and `key=value` patterns, not quoted JSON key/value payloads.
