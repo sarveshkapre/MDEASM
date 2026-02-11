@@ -2430,7 +2430,12 @@ def main(argv: list[str] | None = None) -> int:
                 results = probe.get("results") or {}
 
                 if "workspaces" in probe_targets:
+                    workspaces_probe_started = time.perf_counter()
                     workspaces_probe = {"ok": True, "count": len(names), "names": names}
+                    workspaces_probe["elapsedMs"] = max(
+                        int(round((time.perf_counter() - workspaces_probe_started) * 1000.0)),
+                        0,
+                    )
                     results["workspaces"] = workspaces_probe
                     # Keep backwards compatibility with the previous doctor payload shape.
                     probe["workspaces"] = {"count": len(names), "names": names}
@@ -2450,10 +2455,20 @@ def main(argv: list[str] | None = None) -> int:
                         "workspace": probe_workspace,
                     }
 
+                def _set_probe_result(target: str, target_payload: dict, started: float) -> None:
+                    elapsed_ms = max(int(round((time.perf_counter() - started) * 1000.0)), 0)
+                    target_payload["elapsedMs"] = elapsed_ms
+                    results[target] = target_payload
+
                 if "assets" in probe_targets:
+                    assets_started = time.perf_counter()
                     if not probe_workspace:
-                        results["assets"] = _probe_error(
-                            "no workspace available for assets probe; set WORKSPACE_NAME or --workspace-name"
+                        _set_probe_result(
+                            "assets",
+                            _probe_error(
+                                "no workspace available for assets probe; set WORKSPACE_NAME or --workspace-name"
+                            ),
+                            assets_started,
                         )
                     else:
                         try:
@@ -2472,18 +2487,27 @@ def main(argv: list[str] | None = None) -> int:
                             )
                             asset_list = getattr(ws, list_name, None)
                             rows = getattr(asset_list, "assets", []) if asset_list else []
-                            results["assets"] = {
-                                "ok": True,
-                                "workspace": probe_workspace,
-                                "count": len(rows) if isinstance(rows, list) else 0,
-                            }
+                            _set_probe_result(
+                                "assets",
+                                {
+                                    "ok": True,
+                                    "workspace": probe_workspace,
+                                    "count": len(rows) if isinstance(rows, list) else 0,
+                                },
+                                assets_started,
+                            )
                         except Exception as e:
-                            results["assets"] = _probe_error(str(e))
+                            _set_probe_result("assets", _probe_error(str(e)), assets_started)
 
                 if "tasks" in probe_targets:
+                    tasks_started = time.perf_counter()
                     if not probe_workspace:
-                        results["tasks"] = _probe_error(
-                            "no workspace available for tasks probe; set WORKSPACE_NAME or --workspace-name"
+                        _set_probe_result(
+                            "tasks",
+                            _probe_error(
+                                "no workspace available for tasks probe; set WORKSPACE_NAME or --workspace-name"
+                            ),
+                            tasks_started,
                         )
                     else:
                         try:
@@ -2494,18 +2518,27 @@ def main(argv: list[str] | None = None) -> int:
                                 get_all=False,
                                 noprint=True,
                             )
-                            results["tasks"] = {
-                                "ok": True,
-                                "workspace": probe_workspace,
-                                "count": len(_payload_items(tasks_payload)),
-                            }
+                            _set_probe_result(
+                                "tasks",
+                                {
+                                    "ok": True,
+                                    "workspace": probe_workspace,
+                                    "count": len(_payload_items(tasks_payload)),
+                                },
+                                tasks_started,
+                            )
                         except Exception as e:
-                            results["tasks"] = _probe_error(str(e))
+                            _set_probe_result("tasks", _probe_error(str(e)), tasks_started)
 
                 if "data-connections" in probe_targets:
+                    data_connections_started = time.perf_counter()
                     if not probe_workspace:
-                        results["data-connections"] = _probe_error(
-                            "no workspace available for data-connections probe; set WORKSPACE_NAME or --workspace-name"
+                        _set_probe_result(
+                            "data-connections",
+                            _probe_error(
+                                "no workspace available for data-connections probe; set WORKSPACE_NAME or --workspace-name"
+                            ),
+                            data_connections_started,
                         )
                     else:
                         try:
@@ -2516,22 +2549,54 @@ def main(argv: list[str] | None = None) -> int:
                                 get_all=False,
                                 noprint=True,
                             )
-                            results["data-connections"] = {
-                                "ok": True,
-                                "workspace": probe_workspace,
-                                "count": len(_payload_items(dc_payload)),
-                            }
+                            _set_probe_result(
+                                "data-connections",
+                                {
+                                    "ok": True,
+                                    "workspace": probe_workspace,
+                                    "count": len(_payload_items(dc_payload)),
+                                },
+                                data_connections_started,
+                            )
                         except Exception as e:
-                            results["data-connections"] = _probe_error(str(e))
+                            _set_probe_result(
+                                "data-connections",
+                                _probe_error(str(e)),
+                                data_connections_started,
+                            )
 
                 probe_ok = True
+                probe_total_elapsed_ms = 0
+                probe_ok_count = 0
+                slowest_target = ""
+                slowest_elapsed_ms = -1
                 for target in probe_targets:
                     target_payload = results.get(target)
+                    elapsed_ms = int((target_payload or {}).get("elapsedMs") or 0)
+                    probe_total_elapsed_ms += elapsed_ms
+                    if elapsed_ms > slowest_elapsed_ms:
+                        slowest_elapsed_ms = elapsed_ms
+                        slowest_target = target
                     if not target_payload or not bool(target_payload.get("ok")):
                         probe_ok = False
-                        break
+                    else:
+                        probe_ok_count += 1
+                probe_target_count = len(probe_targets)
                 probe["results"] = results
                 probe["ok"] = probe_ok
+                probe["summary"] = {
+                    "targetCount": probe_target_count,
+                    "okCount": probe_ok_count,
+                    "failedCount": max(probe_target_count - probe_ok_count, 0),
+                    "totalElapsedMs": probe_total_elapsed_ms,
+                    "averageElapsedMs": (
+                        int(round(probe_total_elapsed_ms / probe_target_count))
+                        if probe_target_count
+                        else 0
+                    ),
+                    "slowestTarget": slowest_target,
+                    "slowestElapsedMs": max(slowest_elapsed_ms, 0),
+                }
                 payload["checks"]["probe"] = probe
                 if not probe_ok:
                     payload["ok"] = False
@@ -2565,19 +2630,32 @@ def main(argv: list[str] | None = None) -> int:
                     lines.append(f"probe: failed ({probe.get('error', '')})")
                 for target in probe.get("targets") or []:
                     target_payload = (probe.get("results") or {}).get(target) or {}
+                    elapsed_ms = target_payload.get("elapsedMs")
+                    elapsed_label = (
+                        f", elapsedMs={elapsed_ms}" if isinstance(elapsed_ms, (int, float)) else ""
+                    )
                     if target_payload.get("ok"):
                         count = target_payload.get("count")
                         workspace = target_payload.get("workspace") or ""
                         if workspace:
                             lines.append(
-                                f"probe.{target}: ok (workspace={workspace}, count={count})"
+                                f"probe.{target}: ok (workspace={workspace}, count={count}{elapsed_label})"
                             )
                         else:
-                            lines.append(f"probe.{target}: ok (count={count})")
+                            lines.append(f"probe.{target}: ok (count={count}{elapsed_label})")
                     else:
                         lines.append(
-                            f"probe.{target}: failed ({target_payload.get('error', '')})"
+                            f"probe.{target}: failed ({target_payload.get('error', '')}{elapsed_label})"
                         )
+                summary = probe.get("summary") or {}
+                if summary:
+                    lines.append(
+                        "probe.summary: "
+                        f"ok={summary.get('okCount', 0)}/{summary.get('targetCount', 0)} "
+                        f"failed={summary.get('failedCount', 0)} "
+                        f"totalElapsedMs={summary.get('totalElapsedMs', 0)} "
+                        f"slowest={summary.get('slowestTarget', '')}:{summary.get('slowestElapsedMs', 0)}"
+                    )
             _write_lines(out_path, lines)
 
         return 0 if payload["ok"] else 1

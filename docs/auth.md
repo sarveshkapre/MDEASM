@@ -80,6 +80,7 @@ Notes:
 - `CLIENT_SECRET` is never printed; only presence is reported.
 - `--probe-targets` supports `workspaces`, `assets`, `tasks`, `data-connections`, or `all`.
 - Data-plane probe targets require a resolvable workspace (`WORKSPACE_NAME` or `--workspace-name`).
+- Probe output now includes per-target `elapsedMs` plus a `summary` block (`targetCount`, `okCount`, `failedCount`, `totalElapsedMs`, `slowestTarget`) for quick latency triage.
 
 `401` (Unauthorized)
 - Bad client id/secret, wrong tenant, or token scope mismatch.

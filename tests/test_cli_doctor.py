@@ -66,6 +66,9 @@ def test_cli_doctor_probe_uses_control_plane_only(monkeypatch, capsys):
     assert out["checks"]["probe"]["ok"] is True
     assert out["checks"]["probe"]["workspaces"]["count"] == 2
     assert out["checks"]["probe"]["workspaces"]["names"] == ["wsA", "wsB"]
+    assert out["checks"]["probe"]["results"]["workspaces"]["elapsedMs"] >= 0
+    assert out["checks"]["probe"]["summary"]["targetCount"] == 1
+    assert out["checks"]["probe"]["summary"]["okCount"] == 1
 
     # Probe should not require data-plane token.
     assert captured["init_kwargs"]["init_data_plane_token"] is False
@@ -129,6 +132,20 @@ def test_cli_doctor_probe_matrix_all_targets(monkeypatch, capsys):
     assert probe["results"]["assets"]["count"] == 1
     assert probe["results"]["tasks"]["count"] == 2
     assert probe["results"]["data-connections"]["count"] == 1
+    assert probe["results"]["workspaces"]["elapsedMs"] >= 0
+    assert probe["results"]["assets"]["elapsedMs"] >= 0
+    assert probe["results"]["tasks"]["elapsedMs"] >= 0
+    assert probe["results"]["data-connections"]["elapsedMs"] >= 0
+    assert probe["summary"]["targetCount"] == 4
+    assert probe["summary"]["okCount"] == 4
+    assert probe["summary"]["failedCount"] == 0
+    assert probe["summary"]["totalElapsedMs"] >= 0
+    assert probe["summary"]["slowestTarget"] in {
+        "workspaces",
+        "assets",
+        "tasks",
+        "data-connections",
+    }
 
     assert captured["init_kwargs"]["emit_workspace_guidance"] is False
     assert captured["init_kwargs"].get("workspace_name", "") == ""

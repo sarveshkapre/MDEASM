@@ -659,7 +659,7 @@ class Workspaces:
             )
         else:
             logging.error("no asset_list_name or asset_id")
-            raise Exception("no asset_list_name or asset_id")
+            raise ValidationError("asset_list_name or asset_id is required")
         return self
 
     def __facet_filter_helper__(self, asset_list_name="", asset_id="", attribute_name=""):
@@ -1151,24 +1151,26 @@ class Workspaces:
                 logging.error(
                     "a RESOURCE_GROUP_NAME must be set in ENVIRONMENT .env file, or passed during Workspaces() initialization, or in this function via resource_group_name=='<easm_rg_name>'"
                 )
-                raise Exception("no resource_group_name")
+                raise ValidationError("resource_group_name is required")
         if not region:
             region = self._region
         if not region:
             logging.error(
                 "an EASM_REGION must be set in ENVIRONMENT .env file, or passed during Workspaces() initialization, or in this function via region=='<easm_region_name>'"
             )
-            raise Exception("no region")
+            raise ValidationError("region is required")
         if region not in self._easm_regions:
             logging.error(f"region {region} must be one of {', '.join(self._easm_regions)}")
-            raise Exception(region)
+            raise ValidationError(
+                f"invalid region '{region}'; must be one of {', '.join(self._easm_regions)}"
+            )
         if not workspace_name:
             workspace_name = self._default_workspace_name
             if not workspace_name:
                 logging.error(
                     "a WORKSPACE_NAME must be set in ENVIRONMENT .env file, or passed during Workspaces() initialization, or in this function via workspace_name='<easm_workspace_name>'"
                 )
-                raise Exception("no workspace_name")
+                raise ValidationError("workspace_name is required")
         if self.__verify_workspace__(workspace_name):
             return {workspace_name: self._workspaces[workspace_name]}
         else:
@@ -1333,10 +1335,10 @@ class Workspaces:
         """
         if not disco_template and not disco_custom:
             logging.error('One of "disco_template" or "disco_custom" is required')
-            raise Exception('One of "disco_template" or "disco_custom" is required')
+            raise ValidationError('One of "disco_template" or "disco_custom" is required')
         elif disco_template and disco_custom:
             logging.error('Only one of "disco_template" or "disco_custom" is allowed')
-            raise Exception('Only one of "disco_template" or "disco_custom" is allowed')
+            raise ValidationError('Only one of "disco_template" or "disco_custom" is allowed')
         elif disco_template or disco_custom:
             if not workspace_name:
                 workspace_name = self._default_workspace_name
@@ -1360,9 +1362,9 @@ class Workspaces:
                             "names": names,
                             "excludes": [],
                         }
-                    except KeyError:
+                    except KeyError as e:
                         logging.error("invalid format and/or values for disco_custom")
-                        raise KeyError(str(disco_custom))
+                        raise ValidationError("invalid format and/or values for disco_custom") from e
                 else:
                     disco_name, disco_id = disco_template.split("---")
                     payload = {"templateId": disco_id}
@@ -1386,11 +1388,10 @@ class Workspaces:
                     )
                     return disco_runs
             else:
-                logging.error(f"{workspace_name} not found")
-                raise Exception(workspace_name)
+                self.__raise_workspace_not_found__(workspace_name)
         else:
             logging.critical("unknown error")
-            raise Exception("unknown error")
+            raise ValidationError("unknown discovery group input state")
 
     def get_discovery_groups(self, workspace_name=""):
         if not workspace_name:
@@ -1623,8 +1624,7 @@ class Workspaces:
                 )
 
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def stream_workspace_assets(
         self,
@@ -1870,8 +1870,7 @@ class Workspaces:
             # print(f"query complete, asset available via getattr(<mdeasm.Workspaces object>, '{orig_asset_id}')")
             # return(getattr(self, orig_asset_id))
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def get_workspace_risk_observations(
         self,
@@ -1997,8 +1996,7 @@ class Workspaces:
                 "snapshot_assets": snapshot_assets,
             }
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def create_facet_filter(self, asset_list_name="", asset_id="", attribute_name="", **kwargs):
         """Expects an asset_list_name created by get_workspace_assets() or an asset_id created by get_workspace_asset_by_id().
@@ -2013,24 +2011,24 @@ class Workspaces:
             logging.error(
                 "one of either asset_list_name or asset_id must be passed to this function"
             )
-            raise Exception("no asset_list_name and no asset_id")
+            raise ValidationError("one of asset_list_name or asset_id is required")
 
         if asset_list_name:
             if not isinstance(getattr(self, asset_list_name), AssetList):
                 logging.error(
                     f"{asset_list_name} is of type {type(asset_list_name)}; must be AssetList object"
                 )
-                raise Exception(type(asset_list_name))
+                raise ValidationError(f"{asset_list_name} must be an AssetList object")
             if not len(getattr(self, asset_list_name).assets) > 0:
                 logging.error(f"{asset_list_name} has no items")
-                raise Exception(asset_list_name)
+                raise ValidationError(f"{asset_list_name} has no items")
             self.__facet_filter_helper__(
                 asset_list_name=asset_list_name, attribute_name=attribute_name
             )
         elif asset_id:
             if not hasattr(self, asset_id):
                 logging.error(f"{asset_id} not found")
-                raise Exception(asset_id)
+                raise ValidationError(f"{asset_id} not found")
             self.__facet_filter_helper__(asset_id=asset_id, attribute_name=attribute_name)
 
         # print(f"facet filter created, available at <mdeasm.Workspaces object>.filters.<attribute_name>")
@@ -2077,22 +2075,28 @@ class Workspaces:
         search = str(search)
         if not hasattr(self, "filters"):
             logging.error("no facet filters found; run create_facet_filter() first")
-            raise Exception("no facet filters found")
+            raise ValidationError("no facet filters found; run create_facet_filter() first")
         if search_type.lower() not in ("contains", "starts", "ends"):
             logging.error(
                 f"{search_type} must be one of 'contains', 'starts', or 'ends' (case-insensitive)"
             )
-            raise Exception(search_type)
+            raise ValidationError(
+                f"{search_type} must be one of 'contains', 'starts', or 'ends' (case-insensitive)"
+            )
         if sort_order.lower() not in ("descending", "ascending"):
             logging.error(
                 f"{sort_order} must be one of 'descending' or 'ascending' (case-insensitive)"
             )
-            raise Exception(sort_order)
+            raise ValidationError(
+                f"{sort_order} must be one of 'descending' or 'ascending' (case-insensitive)"
+            )
         if facet_filter and not hasattr(self.filters, facet_filter):
             logging.error(
                 f"facet_filter {facet_filter} submitted but no <mdeasm.Workspaces object>.filter.{facet_filter} attribute exists; this means it was either never created or it was empty and thus deleted"
             )
-            raise Exception(f"{facet_filter} not exists")
+            raise ValidationError(
+                f"facet_filter {facet_filter} not found; run create_facet_filter() for that attribute"
+            )
 
         def __nested_output_formatter__(current_facet_filter, facet_key, facet_val):
             out_dict.setdefault(current_facet_filter, {}).update({facet_key: facet_val})
@@ -2389,8 +2393,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         page = max(int(skip or 0), 0)
         page_size = max(int(max_page_size or 25), 1)
@@ -2616,8 +2619,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         page = max(int(skip or 0), 0)
         page_size = max(int(max_page_size or 25), 1)
@@ -2678,8 +2680,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         r = self.__workspace_query_helper__(
             "get_task",
@@ -2697,8 +2698,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         r = self.__workspace_query_helper__(
             "cancel_task",
@@ -2716,8 +2716,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         r = self.__workspace_query_helper__(
             "run_task",
@@ -2735,8 +2734,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         r = self.__workspace_query_helper__(
             "download_task",
@@ -2767,16 +2765,15 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         if not isinstance(columns, list):
             logging.error("columns must be a list of strings")
-            raise Exception(type(columns))
+            raise ValidationError("columns must be a list of strings")
         columns = [str(c).strip() for c in columns if str(c).strip()]
         if not columns:
             logging.error("columns cannot be empty")
-            raise Exception("columns cannot be empty")
+            raise ValidationError("columns cannot be empty")
 
         if not file_name:
             file_name = (
@@ -2827,14 +2824,16 @@ class Workspaces:
         """
         if not new_state and not labels:
             logging.error("must submit one of 'new_state' and/or 'labels'")
-            raise Exception("must submit one of 'new_state' and/or 'labels'")
+            raise ValidationError("must submit one of 'new_state' and/or 'labels'")
         if new_state and new_state in self._state_map:
             new_state = self._state_map[new_state]
         if new_state and new_state not in self._state_map.values():
             logging.error(
                 f"new_state not a valid value: {new_state}; must be one of {', '.join([v for v in self._state_map.values()])}"
             )
-            raise Exception(f"new_state: {new_state}")
+            raise ValidationError(
+                f"new_state not a valid value: {new_state}; must be one of {', '.join([v for v in self._state_map.values()])}"
+            )
         if remove_labels or not apply_labels:
             label_action = False
         else:
@@ -2874,10 +2873,12 @@ class Workspaces:
                     logging.error(
                         f"asset count for query_filter {query_filter} returned {asset_count} assets; unable to process asset changes for > 100000 assets for a single query"
                     )
-                    raise Exception(f"asset_count >= 100000: {asset_count}")
+                    raise ValidationError(f"asset_count >= 100000: {asset_count}")
                 else:
                     logging.info(f"asset count < 100000: {asset_count}, continuing")
                     pass
+            except ValidationError:
+                raise
             except:
                 logging.warning(
                     f"unable to retrieve asset count for update_asset_state...will try anyways"
@@ -2900,8 +2901,7 @@ class Workspaces:
             self.task_ids.append(task_id)
             return task_id
         else:
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
     def poll_asset_state_change(self, task_id="", workspace_name="", **kwargs):
         noprint = bool(kwargs.get("noprint"))
@@ -3025,7 +3025,7 @@ class Workspaces:
             logging.error(
                 "must submit one and only one of: query_filters, metric_categories, metrics"
             )
-            raise Exception(
+            raise ValidationError(
                 f"query_filters: {query_filters}; metric_categories: {metric_categories}; metrics: {metrics}"
             )
 
@@ -3034,7 +3034,7 @@ class Workspaces:
             logging.debug(query_filters)
         if query_filters and not isinstance(query_filters, list):
             logging.error(f"invalid query_filters; must be a list of valid EASM queries")
-            raise Exception(type(query_filters), query_filters)
+            raise ValidationError("invalid query_filters; must be a list of valid EASM queries")
 
         if metric_categories and isinstance(metric_categories, str):
             metric_categories = [metric_categories]
@@ -3046,7 +3046,9 @@ class Workspaces:
             logging.error(
                 f"invalid metric_categories; must be a list and items be one of {self._metric_categories}"
             )
-            raise Exception(metric_categories)
+            raise ValidationError(
+                f"invalid metric_categories; must be a list and items be one of {self._metric_categories}"
+            )
 
         if metrics and isinstance(metrics, str):
             metrics = [metrics]
@@ -3055,7 +3057,9 @@ class Workspaces:
             not isinstance(metrics, list) or not all(met in self._metrics for met in metrics)
         ):
             logging.error(f"invalid metrics; must be a list and items be one of {self._metrics}")
-            raise Exception(metrics)
+            raise ValidationError(
+                f"invalid metrics; must be a list and items be one of {self._metrics}"
+            )
 
         if not workspace_name:
             workspace_name = self._default_workspace_name
@@ -3095,6 +3099,8 @@ class Workspaces:
             if not kwargs.get("noprint"):
                 print(json.dumps(self.asset_summaries, indent=2))
             return self.asset_summaries
+        else:
+            self.__raise_workspace_not_found__(workspace_name)
 
 
 class Asset:
@@ -3155,7 +3161,7 @@ class Asset:
                 logging.error(
                     f"date_range_start {date_range_start} cannot be a later date than date_range_end {date_range_end}"
                 )
-                raise Exception(
+                raise ValidationError(
                     f"date_range_start: {date_range_start}, date_range_end: {date_range_end}"
                 )
         datetime_offset = datetime.timedelta(days=+last_seen_days_back)

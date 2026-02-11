@@ -169,6 +169,8 @@ def test_data_connection_methods_raise_typed_workspace_and_validation_errors():
     ws = _ws_stub()
     ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
     with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.list_data_connections(workspace_name="missing", noprint=True)
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
         ws.get_data_connection("dc1", workspace_name="missing", noprint=True)
 
     ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]

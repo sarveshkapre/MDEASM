@@ -549,6 +549,34 @@ def test_task_endpoints_use_expected_routes():
     ]
 
 
+def test_task_helpers_raise_workspace_not_found():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.list_tasks(workspace_name="missing", noprint=True)
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_task("task-123", workspace_name="missing", noprint=True)
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.cancel_task("task-123", workspace_name="missing", noprint=True)
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.run_task("task-123", workspace_name="missing", noprint=True)
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.download_task("task-123", workspace_name="missing", noprint=True)
+
+
+def test_create_assets_export_task_raises_typed_validation_errors():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_assets_export_task(columns="id", noprint=True)
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_assets_export_task(columns=[], noprint=True)
+
+
 def test_get_workspace_assets_supports_value_payload_orderby_mark_and_progress():
     ws = _new_ws()
     ws._default_workspace_name = "ws1"
@@ -636,6 +664,27 @@ def test_create_workspace_uses_default_region_when_argument_missing():
     out = ws.create_workspace(resource_group_name="rg0", region=None, workspace_name="ws0")
     assert "ws0" in out
     assert captured["payload"]["location"] == "eastus"
+
+
+def test_create_workspace_raises_typed_validation_errors():
+    ws = _new_ws()
+    ws._subscription_id = "sub0"
+    ws._resource_group = ""
+    ws._region = ""
+    ws._easm_regions = ["eastus", "westus2"]
+    ws._default_workspace_name = ""
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_workspace(resource_group_name=None, region=None, workspace_name="ws0")
+
+    ws._resource_group = "rg0"
+    ws._region = "northpole"
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_workspace(resource_group_name=None, region=None, workspace_name="ws0")
+
+    ws._region = "eastus"
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_workspace(resource_group_name=None, region=None, workspace_name="")
 
 
 def test_delete_workspace_uses_workspace_resource_group_metadata_and_clears_default():
@@ -775,6 +824,31 @@ def test_get_discovery_templates_supports_noprint_and_returns_rows(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_discovery_helpers_raise_typed_validation_and_workspace_errors():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_discovery_group(disco_template="", disco_custom={}, workspace_name="ws1")
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_discovery_group(
+            disco_template="Template---123",
+            disco_custom={"name": "x", "seeds": {"domain": ["example.com"]}},
+            workspace_name="ws1",
+        )
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_discovery_group(disco_custom={"name": "x"}, workspace_name="ws1")
+
+    ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.create_discovery_group(
+            disco_template="Template---123",
+            disco_custom={},
+            workspace_name="missing",
+        )
+
+
 def test_label_helpers_support_noprint_and_consistent_returns(capsys):
     ws = _new_ws()
     ws._default_workspace_name = "ws1"
@@ -894,6 +968,23 @@ def test_get_workspace_risk_observations_handles_empty_findings_with_noprint(cap
     assert capsys.readouterr().out == ""
 
 
+def test_workspace_data_helpers_raise_workspace_not_found():
+    ws = _new_ws()
+    ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_workspace_assets(
+            query_filter='kind = "domain"',
+            asset_list_name="assetList",
+            workspace_name="missing",
+            auto_create_facet_filters=False,
+        )
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_workspace_asset_by_id("domain$$example.com", workspace_name="missing")
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_workspace_risk_observations(workspace_name="missing", noprint=True)
+
+
 def test_update_assets_and_poll_task_support_noprint(capsys):
     ws = _new_ws()
     ws._default_workspace_name = "ws1"
@@ -958,6 +1049,30 @@ def test_asset_lists_and_facet_filters_support_noprint(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_update_assets_asset_count_guardrail_raises_validation_error():
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    ws._state_map = {"Approved": "confirmed"}
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_query_helper(*_args, **kwargs):
+        if kwargs["endpoint"] == "reports/assets:summarize":
+            return Resp({"assetSummaries": [{"count": 100000}]})
+        raise AssertionError(f"unexpected endpoint: {kwargs['endpoint']}")
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.update_assets(query_filter='kind = "domain"', new_state="Approved", noprint=True)
+
+
 def test_query_facet_filter_supports_noprint_and_structured_return(capsys):
     ws = _new_ws()
     ws.filters = mdeasm.FacetFilter()
@@ -1011,8 +1126,27 @@ def test_query_facet_filter_csv_json_outputs_and_return_payload(tmp_path, capsys
 
 def test_query_facet_filter_requires_precomputed_filters():
     ws = _new_ws()
-    try:
+    with pytest.raises(mdeasm.ValidationError):
         ws.query_facet_filter("nginx")
-        assert False, "expected exception"
-    except Exception as e:
-        assert "no facet filters found" in str(e)
+
+
+def test_create_facet_filter_and_asset_summary_raise_typed_validation_errors():
+    ws = _new_ws()
+
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_facet_filter()
+
+    ws._metric_categories = ["mc1"]
+    ws._metrics = ["m1"]
+    with pytest.raises(mdeasm.ValidationError):
+        ws.get_workspace_asset_summaries(query_filters=[], metric_categories=[], metrics=[])
+
+
+def test_asset_parser_raises_validation_error_for_inverted_date_range():
+    asset = mdeasm.Asset()
+    with pytest.raises(mdeasm.ValidationError):
+        asset.__parse_workspace_assets__(
+            {"id": "domain$$example.com", "kind": "domain"},
+            date_range_start="2026-02-12",
+            date_range_end="2026-02-11",
+        )
