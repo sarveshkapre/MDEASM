@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh autonomous trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after delivery | Keep backlog, decisions, and mutable repo facts aligned with shipped behavior and verification evidence | Tracker files updated with delivered items, remaining backlog, CI evidence, and mutable fact timestamp | 4f6db34 | high | trusted
 - 2026-02-11 | Add server-side export task mode (`mdeasm assets export --mode server`) with optional wait/download flow | Large inventories are better handled by async server-side exports; this reduces client memory pressure and aligns with modern ASM export UX | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli assets export --help >/dev/null` (pass) | e6fabeb | high | trusted
 - 2026-02-11 | Add task lifecycle operations in helper + CLI (`mdeasm tasks list/get/cancel/run/download`) | Long-running operations need first-class observability/control for production automation reliability | `source .venv/bin/activate && ruff check . && pytest && python -m compileall API` (pass); `python -m mdeasm_cli tasks --help >/dev/null` (pass) | e6fabeb | high | trusted
 - 2026-02-11 | Add opt-in integration smoke for task-based exports (`MDEASM_INTEGRATION_TASK_EXPORT=1`) | Provides a safe path to catch API drift in task/export endpoints without requiring credentials in CI | `source .venv/bin/activate && pytest` (pass; integration task test skipped by default) | e6fabeb | medium | trusted
@@ -66,6 +67,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh run watch 21898556772 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `4f6db34` | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
 - 2026-02-11 | `source .venv/bin/activate && pytest` | `73 passed, 4 skipped in 0.33s` | pass
 - 2026-02-11 | `source .venv/bin/activate && python -m compileall API` | compiled `API/` (including updated helper/CLI modules) | pass
