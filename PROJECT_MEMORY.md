@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh autonomous trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after label-helper cleanup shipment | Keep backlog status, verification evidence, and mutable repo facts synchronized with pushed `main` commits | Tracker files updated with delivered-item closure and CI evidence links for both pushes in this cleanup pass | 6522ee0 | high | trusted
 - 2026-02-11 | Complete residual label helper stdout gating by making `create_or_update_label`/`get_labels` return structured payloads in both print and `noprint` modes | This was the highest-impact remaining low-risk cleanup from the backlog and removes another automation footgun without changing default interactive output | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_label_helpers_support_noprint_and_consistent_returns tests/test_mdeasm_helpers.py::test_label_helpers_print_mode_still_returns_payload` (pass) | a953e43 | high | trusted
 - 2026-02-11 | Prioritize label helper cleanup for this targeted refactor pass | Bounded backlog scan kept data-connections and typed exceptions as larger follow-ups; label helper output consistency was the smallest high-value production-safe improvement | `CLONE_FEATURES.md` candidate/implemented updates for this pass | a953e43 | high | trusted
 - 2026-02-11 | Refresh autonomous trackers for cycle 5 (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature shipment | Keep backlog scoring, evidence logs, market-scan gap map, and mutable repo facts aligned with shipped code and CI state | Tracker files updated with cycle 5 selected/delivered work, remaining priorities, and verification records | 096eb53 | high | trusted
@@ -98,6 +99,8 @@
 - 2026-02-11 | `source .venv/bin/activate && make verify` | `All checks passed!`; `98 passed, 5 skipped`; compile + smoke commands passed | pass
 - 2026-02-11 | `git push origin main` | pushed commit `a953e43` to `origin/main` | pass
 - 2026-02-11 | `gh run watch 21902563313 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `a953e43` | pass
+- 2026-02-11 | `git push origin main` | pushed commit `6522ee0` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21902588739 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `6522ee0` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest CI runs on `main` were successful before cycle 5 push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py tests/test_integration_smoke.py` | `All checks passed!` | pass
