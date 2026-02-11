@@ -9,7 +9,7 @@
 
 ## Mutable Repo Facts
 - Objective: Keep MDEASM production-ready. Current focus: MDEASM. Find the highest-impact pending work, implement it, test it, and push to main.
-- Last updated: 2026-02-11T11:34:21Z
+- Last updated: 2026-02-11T11:35:26Z
 
 ## Verification Policy
 - Record exact verification commands and pass/fail outcomes in PROJECT_MEMORY.md.

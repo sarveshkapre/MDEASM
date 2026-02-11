@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh cycle 6 trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `AGENTS.md`) after feature push and CI verification | Keep mutable facts, backlog state, and verification evidence synchronized with the latest pushed SHA | Tracker files updated after CI success for feature commit `ab02b3f`; follow-up tracker push and CI run succeeded | 35debaa | high | trusted
 - 2026-02-11 | Ship `data-connections` helper/CLI coverage plus `tasks wait` polling ergonomics in one production-safe feature batch | This was the highest-impact remaining parity gap and removed shell polling boilerplate while adding redaction for secret-bearing data-connection fields | `source .venv/bin/activate && make verify` (pass); focused helper/CLI tests for new commands pass | ab02b3f | high | trusted
 - 2026-02-11 | Keep real-tenant integration checks as explicit follow-up backlog for new data-connections endpoints | Local environment has no EASM credentials; forcing live calls would be flaky and non-reproducible in this session | `python -m mdeasm_cli doctor --format json --out -` reports missing required env vars and expected exit code 1 | ab02b3f | high | trusted
 - 2026-02-11 | Prioritize cycle 6 around Microsoft-documented data-connections lifecycle parity and task wait UX | Bounded market scan and official Defender EASM docs showed complete data-connections operation surface and task-driven automation as baseline expectations | Cycle 6 scan + gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
@@ -98,6 +99,8 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `git push origin main` | pushed commit `35debaa` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21903475449 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `35debaa` | pass
 - 2026-02-11 | `source .venv/bin/activate && gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `source .venv/bin/activate && gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | recent runs on `main` were successful before cycle 6 push | pass
 - 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py API/mdeasm_cli.py tests/test_data_connections_helpers.py tests/test_cli_data_connections.py tests/test_cli_tasks.py` | `All checks passed!` | pass
