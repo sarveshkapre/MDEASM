@@ -14,6 +14,16 @@
 ## Entries
 
 ### 2026-02-11
+- Trigger: New secret-redaction tests introduced during cycle 3 failed on first pass.
+- Impact: JSON token fields (`"access_token":"..."`) could have remained visible in raised helper exception text, risking credential leakage in logs.
+- Root Cause: Initial regex only covered bearer and `key=value` patterns, not quoted JSON key/value payloads.
+- Fix: Added explicit JSON token-field redaction and regression tests covering bearer headers, key/value pairs, JSON fields, and signed URL query params.
+- Prevention Rule: For any security-redaction change, require a matrix test that includes header, JSON, key/value, and URL query-string token shapes.
+- Evidence: `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_redact_sensitive_text_masks_bearer_tokens_fields_and_query_params tests/test_mdeasm_helpers.py::test_workspace_query_helper_redacts_failure_exception_text` -> pass.
+- Commit: e955667
+- Confidence: high
+
+### 2026-02-11
 - Trigger: Code-review sweep of control-plane helper paths during autonomous maintenance cycle 2.
 - Impact: `create_workspace()` could fail with `no region` even when `EASM_REGION` was valid, blocking workspace provisioning automation.
 - Root Cause: Region fallback and region validation logic were combined in a way that always raised after fallback assignment.

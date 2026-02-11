@@ -8,11 +8,29 @@
 
 ## Candidate Features To Do
 Next Up (keep deduped)
-- [ ] **Security hardening: centralized secret redaction in exceptions/logging**
+- [ ] **Schema utilities: compare current columns vs baseline file**
+  - Gap class: weak (DX)
+  - Scope: add `mdeasm assets schema diff --baseline <file>`.
+  - Why: detects downstream-breaking schema drift early.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 1 | Risk 1 | Confidence 3
+
+- [ ] **Reliability: retry jitter + retry-on status policy map**
+  - Gap class: weak (resilience)
+  - Scope: add jitter and configurable retry-on status list (for example 429/5xx).
+  - Why: smoother behavior under throttling and transient errors.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **CI hardening: scheduled smoke lane (`doctor --probe`)**
+  - Gap class: weak (reliability)
+  - Scope: add a non-blocking scheduled workflow that runs probe checks when secrets are present.
+  - Why: catches tenant/API drift earlier than ad-hoc local runs.
+  - Score: Impact 4 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
+
+- [ ] **Integration test: export task artifact lifecycle**
   - Gap class: weak (quality)
-  - Scope: scrub bearer tokens/client secrets from raised exception text and CLI stderr output; add focused tests.
-  - Why: protects logs and terminals in automation.
-  - Score: Impact 4 | Effort 2 | Strategic fit 5 | Differentiation 0 | Risk 1 | Confidence 3
+  - Scope: add opt-in integration coverage for `assets:export -> tasks get -> tasks download -> fetch`.
+  - Why: closes a high-value drift gap around export payload and artifact URL shapes.
+  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Data connections management (`mdeasm data-connections ...`)**
   - Gap class: missing (feature parity)
@@ -20,97 +38,71 @@ Next Up (keep deduped)
   - Why: makes downstream SIEM export setup reproducible.
   - Score: Impact 3 | Effort 4 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 2
 
-- [ ] **Task artifact retrieval helper (`tasks fetch`)**
-  - Gap class: weak (parity)
-  - Scope: follow task download references and fetch artifact bytes to a local file path with retries/timeouts.
-  - Why: current `tasks download` only returns references; operators still need manual fetch logic.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 1 | Risk 3 | Confidence 3
-
-- [ ] **Schema utilities: compare current columns vs baseline file**
-  - Gap class: weak (DX)
-  - Scope: add `mdeasm assets schema diff --baseline <file>`.
-  - Why: detects downstream-breaking schema drift early.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 1 | Risk 1 | Confidence 3
-
 - [ ] **Refactor: typed exceptions for helper API failures**
   - Gap class: weak (maintainability)
-  - Scope: replace broad `Exception` raises with narrower error classes.
-  - Why: safer automation and cleaner failure handling in callers.
+  - Scope: replace broad `Exception` raises with narrower, documented exception classes.
+  - Why: safer caller handling and less fragile automation.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Refactor: remove or gate legacy `print()` paths for library usage**
+- [ ] **Refactor: gate legacy `print()` paths for library usage**
   - Gap class: weak (library UX)
-  - Scope: add `noprint`/structured return options for noisy helper methods.
-  - Why: avoids stdout side effects in script and pipeline usage.
+  - Scope: add `noprint`/structured return behavior across remaining noisy helper functions.
+  - Why: avoids stdout side effects in scripts and pipelines.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **Performance: backoff jitter + retry policy by status code**
-  - Gap class: weak (resilience)
-  - Scope: add jitter and configurable retry-on status map.
-  - Why: improves behavior under throttling and transient failures.
+- [ ] **Performance: stream-first JSON array mode for large client exports**
+  - Gap class: weak (parity)
+  - Scope: optional streaming JSON writer that avoids buffering all assets in memory.
+  - Why: improves memory profile and time-to-first-byte on large inventories.
   - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
 
-- [ ] **CLI completions and command examples**
+- [ ] **CLI completions and command recipe snippets**
   - Gap class: weak (DX)
-  - Scope: generate bash/zsh completions and add copy-paste recipes.
-  - Why: improves operator UX and onboarding speed.
+  - Scope: generate bash/zsh completions and add concise examples.
+  - Why: improves operator onboarding and lowers command errors.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **Developer DX: add `make`/task runner aliases for common checks**
+- [ ] **Developer DX: add `make` aliases for lint/test/compile/smoke**
   - Gap class: weak (DX)
-  - Scope: standardized commands for lint/test/compile/smoke.
-  - Why: reduces command drift and local friction.
+  - Scope: standardize local maintenance commands.
+  - Why: reduces command drift and shortens maintainer loops.
   - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **Promote remaining upstream TODOs into scoped features**
   - Gap class: missing (debt retirement)
   - Scope: resource tags CRUD, workspace deletion, discovery-group deletion retry path.
-  - Why: converts legacy TODO debt into tracked deliverables.
+  - Why: converts legacy TODO debt into auditable backlog work.
   - Score: Impact 2 | Effort 4 | Strategic fit 3 | Differentiation 0 | Risk 3 | Confidence 2
-
-- [ ] **CI hardening: add scheduled smoke lane with optional integration credentials**
-  - Gap class: weak (reliability)
-  - Scope: schedule a non-blocking smoke workflow, run `mdeasm doctor --probe` with secrets when available.
-  - Why: catches auth/version drift earlier than ad-hoc manual checks.
-  - Score: Impact 3 | Effort 2 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
-- [ ] **Integration test: task export artifact lifecycle**
-  - Gap class: weak (quality)
-  - Scope: add opt-in integration test covering `assets:export -> tasks get -> tasks download`.
-  - Why: closes a production risk around task payload shape drift.
-  - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
 
 - [ ] **Packaging/docs cleanup for historical script aliases**
   - Gap class: weak (DX)
-  - Scope: document deprecation timeline for `retreive_*` typo alias and keep backward compatibility.
-  - Why: reduce user confusion while avoiding abrupt breakage.
+  - Scope: document deprecation timeline for `retreive_*` typo alias while keeping compatibility.
+  - Why: reduce user confusion without breakage.
   - Score: Impact 2 | Effort 1 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 4
 
-- [ ] **CLI: filter/orderby presets via named local profiles**
+- [ ] **CLI local presets for reusable filter/orderby profiles**
   - Gap class: differentiator
-  - Scope: local profile file for reusable export/task command presets.
+  - Scope: support local profile files for recurring export/task arguments.
   - Why: reduces repeated long command lines in scheduled jobs.
   - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 2 | Risk 2 | Confidence 2
 
-- [ ] **Performance: stream-first JSON output mode for large client exports**
-  - Gap class: weak (parity)
-  - Scope: optional JSON array streaming writer to avoid holding all rows in memory.
-  - Why: improves memory profile for large inventory snapshots.
-  - Score: Impact 3 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 3
-
-- [ ] **Docs split: keep README within 1-2 screens and move deep recipes under `docs/`**
-  - Gap class: weak (DX)
-  - Scope: tighten README and link richer operational playbooks.
-  - Why: improves first-run comprehension while keeping docs maintainable.
-  - Score: Impact 2 | Effort 1 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 5
-
 - [ ] **Trust tagging automation for tracker updates**
   - Gap class: differentiator
-  - Scope: lightweight script/check to validate trust labels and evidence formatting in `PROJECT_MEMORY.md`.
+  - Scope: add a lightweight check for trust labels and evidence formatting in `PROJECT_MEMORY.md`.
   - Why: keeps autonomous maintenance logs consistent and auditable.
   - Score: Impact 2 | Effort 2 | Strategic fit 3 | Differentiation 2 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **Task artifact downloader (`mdeasm tasks fetch`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `docs/tasks.md`, `docs/exports.md`, `tests/test_cli_tasks.py`
+  - Evidence (trusted: local tests + smoke): `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py` (pass); `source .venv/bin/activate && python -m mdeasm_cli tasks fetch --help >/dev/null` (pass)
+
+- [x] **Security hardening: centralized secret redaction in helper errors/logs**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm.py`, `tests/test_mdeasm_helpers.py`
+  - Evidence (trusted: local tests): `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_redact_sensitive_text_masks_bearer_tokens_fields_and_query_params tests/test_mdeasm_helpers.py::test_workspace_query_helper_redacts_failure_exception_text` (pass)
+
 - [x] **Client export resume checkpoints (`--resume-from`, `--checkpoint-out`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `docs/exports.md`, `tests/test_cli_export.py`, `tests/test_mdeasm_helpers.py`
@@ -327,6 +319,21 @@ Next Up (keep deduped)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 3):
+  - Defender EASM task docs explicitly include a download step (`tasks/{id}:download`), and competitor platforms consistently pair async export jobs with artifact retrieval endpoints or URLs. Artifact fetch in CLI is parity-critical for production automation.
+  - Cursor/mark-style continuation and deterministic ordering patterns remain common across ASM/search APIs, reinforcing the need to keep resumable flows and stable ordering first-class.
+  - Gap map (cycle 3):
+    - Missing (closed this session): task artifact fetch command in CLI.
+    - Weak (closed this session): centralized redaction for secrets in raised helper error strings.
+    - Remaining weak: schema diff UX, retry jitter policy, and deeper integration smoke coverage for task artifact lifecycle.
+  - Sources reviewed (untrusted):
+    - Microsoft Learn: Defender EASM tasks operation group (includes download action): https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn: `tasks/{id}:download` reference: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/tasks/download?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - Microsoft Learn: `assets:export` reference: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/dataplanepreview/assets/get-assets-export?view=rest-defenderforeasm-dataplanepreview-2024-10-01-preview
+    - runZero API docs (export job/status/download lifecycle): https://www.runzero.com/docs/api/
+    - Censys Search API v2 (`cursor` continuation): https://docs.censys.com/reference/v2-globaldata-search-query
+    - Shodan API usage and cursor guidance: https://developer.shodan.io/api
+
 - Market scan (untrusted: external web sources; links captured during session):
   - Microsoft Defender EASM exposes both control-plane (ARM) and data-plane endpoints and uses OAuth2 client credentials. This repo’s `Workspaces` helper aligns with that model.
   - Microsoft’s REST API docs emphasize previewed API versions via the `api-version` query param for data-plane/control-plane operations; making `api-version` configurable reduces breakage as preview versions evolve.

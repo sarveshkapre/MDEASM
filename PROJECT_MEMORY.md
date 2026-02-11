@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Add `mdeasm tasks fetch` to download task artifacts atomically with retry/backoff controls | Defender EASM automation was missing the final artifact retrieval step; existing `tasks download` only returned reference payloads | `source .venv/bin/activate && pytest -q` (pass); `source .venv/bin/activate && python -m mdeasm_cli tasks fetch --help >/dev/null` (pass) | e955667 | high | trusted
+- 2026-02-11 | Centralize secret redaction in helper error/log strings (`redact_sensitive_text`) | Protect bearer tokens/client secrets/SAS signatures from leaking into CI logs and automation diagnostics | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_redact_sensitive_text_masks_bearer_tokens_fields_and_query_params tests/test_mdeasm_helpers.py::test_workspace_query_helper_redacts_failure_exception_text` (pass) | e955667 | high | trusted
+- 2026-02-11 | Prioritize artifact retrieval parity + redaction from bounded cycle 3 market scan | Microsoft Defender EASM and peer platforms document task/export flows that include retrieval endpoints and secure automation expectations | Sources captured in `CLONE_FEATURES.md` cycle 3 insight refresh | n/a | medium | untrusted
 - 2026-02-11 | Refresh autonomous trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `INCIDENTS.md`, `AGENTS.md`) for cycle 2 closeout | Keep backlog, implemented items, incident learnings, and mutable facts aligned with shipped behavior and CI evidence | Tracker files updated with scored backlog, implemented entries, market-scan gap map, and verification evidence | b4ad16f | high | trusted
 - 2026-02-11 | Add client export resume checkpoints (`--resume-from`, `--checkpoint-out`) and deterministic ordering (`--orderby`) | Long-running ASM exports need reliable continuation semantics and stable ordering to be automation-safe | `source .venv/bin/activate && ruff check .` (pass); `source .venv/bin/activate && pytest -q` (pass); `source .venv/bin/activate && python -m compileall API` (pass) | 97be9c2 | high | trusted
 - 2026-02-11 | Harden asset list compatibility for preview payload drift (`content` vs `value`) and fix `create_workspace` + `create_facet_filter(asset_id=...)` reliability bugs | Preview APIs can drift and helper reliability bugs can block core workflows despite valid configuration | Added regression tests in `tests/test_mdeasm_helpers.py`; full lint/test/compile pass | 97be9c2 | high | trusted
@@ -55,6 +58,7 @@
 
 ## Mistakes And Fixes
 - Template: YYYY-MM-DD | Issue | Root cause | Fix | Prevention rule | Commit | Confidence
+- 2026-02-11 | Initial redaction regex missed JSON token fields like `"access_token":"..."` | First-pass sanitization pattern handled `key=value` but not quoted JSON key/value formatting | Added dedicated JSON-field redaction regex and regression tests for bearer + JSON + query-string secret patterns | Add explicit regression cases for every secret shape (header, JSON, key/value, signed URL query) before merging logging/error changes | e955667 | high
 - 2026-02-11 | `create_workspace()` could raise `no region` even when `EASM_REGION` was set to a valid value | Region validation mixed fallback and validation in a single `if/else`, causing the valid fallback path to still raise | Split fallback (`if not region`) from validation (`if region not in _easm_regions`) and add regression coverage | Keep env fallback + validation checks separated in control flow and cover both with tests | 97be9c2 | high
 - 2026-02-11 | `create_facet_filter(asset_id=...)` could raise before reaching the `asset_id` path | Function always validated `asset_list_name` first, even when only `asset_id` was supplied | Branch validation by mode (`asset_list_name` vs `asset_id`) and add regression coverage | Add tests for every mutually-exclusive argument path before refactoring validation blocks | 97be9c2 | high
 - 2026-02-10 | Facet filters for certain list attributes could collapse into `(None, None, ...)` keys | Single-element facet specs in `_facet_filters` were written as `(\"cookieName\")` which is a string in Python, not a tuple, so code iterated characters instead of facet paths | Add trailing commas for single-element tuples and add a focused unit test that asserts the expected tuple keys | Add regression tests for any special-case parsing table (facet specs, schema maps) and ensure single-element tuples use trailing commas | 45c272d | high
@@ -66,13 +70,22 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Add centralized secret redaction for exception/log payloads to prevent credential leakage in shared logs.
-- Add task artifact downloader behavior validation with a real tenant (SAS/blob fetch shape can vary by API version/tenant); blocked locally because no EASM credentials are configured.
-- Add first-class task artifact fetch command (`mdeasm tasks fetch`) that follows the download reference and writes bytes to disk.
+- Add real-tenant validation for `mdeasm tasks fetch` against Defender EASM artifact URL variants (SAS vs protected URL); blocked locally because EASM credentials are not configured.
+- Add `mdeasm assets schema diff --baseline <file>` to catch downstream schema drift in CI/smoke flows.
+- Add retry jitter/status policy knobs to external artifact fetch paths for better behavior under transient storage endpoint errors.
 - Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview`.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh run watch 21900485772 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `e955667` | pass
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 50 --json number,title,author,state,url` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 10 --json databaseId,headSha,status,conclusion,name,workflowName,createdAt,updatedAt,url` | recent CI runs show `success` on `main` | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check .` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q` | `84 passed, 4 skipped` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m compileall API` | compiled `API/mdeasm.py` and `API/mdeasm_cli.py` | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli --version && python -m mdeasm_cli tasks --help >/dev/null && python -m mdeasm_cli tasks fetch --help >/dev/null` | version `1.4.0`; tasks help and fetch help paths succeed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli doctor --format json --out -` | expected missing-env diagnostics for required credentials; exit code 1 | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_server_export_task` | skipped (no live EASM credentials configured) | pass
 - 2026-02-11 | `gh run watch 21899625738 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `b4ad16f` | pass
 - 2026-02-11 | `gh run watch 21899599038 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `97be9c2` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 30 --json number,title,author,state,url` | repository has issues disabled | pass
