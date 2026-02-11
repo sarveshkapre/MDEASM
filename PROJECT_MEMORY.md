@@ -9,6 +9,7 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Refresh autonomous trackers (`CLONE_FEATURES.md`, `PROJECT_MEMORY.md`, `INCIDENTS.md`, `AGENTS.md`) for cycle 2 closeout | Keep backlog, implemented items, incident learnings, and mutable facts aligned with shipped behavior and CI evidence | Tracker files updated with scored backlog, implemented entries, market-scan gap map, and verification evidence | b4ad16f | high | trusted
 - 2026-02-11 | Add client export resume checkpoints (`--resume-from`, `--checkpoint-out`) and deterministic ordering (`--orderby`) | Long-running ASM exports need reliable continuation semantics and stable ordering to be automation-safe | `source .venv/bin/activate && ruff check .` (pass); `source .venv/bin/activate && pytest -q` (pass); `source .venv/bin/activate && python -m compileall API` (pass) | 97be9c2 | high | trusted
 - 2026-02-11 | Harden asset list compatibility for preview payload drift (`content` vs `value`) and fix `create_workspace` + `create_facet_filter(asset_id=...)` reliability bugs | Preview APIs can drift and helper reliability bugs can block core workflows despite valid configuration | Added regression tests in `tests/test_mdeasm_helpers.py`; full lint/test/compile pass | 97be9c2 | high | trusted
 - 2026-02-11 | Prioritize resume/orderby parity from bounded market scan | Microsoft Defender EASM plus peer ASM APIs document cursor/mark + ordering semantics, making resumable deterministic exports baseline expectation | Microsoft Learn assets/tasks references and Censys/Shodan pagination docs captured in `CLONE_FEATURES.md` | n/a | medium | untrusted
@@ -72,6 +73,7 @@
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh run watch 21899625738 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `b4ad16f` | pass
 - 2026-02-11 | `gh run watch 21899599038 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `97be9c2` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 30 --json number,title,author,state,url` | repository has issues disabled | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 10 --json databaseId,headSha,status,conclusion,name,workflowName,createdAt,updatedAt,url` | recent CI runs all `success` on `main` | pass
