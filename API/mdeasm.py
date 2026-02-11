@@ -138,6 +138,30 @@ def redact_sensitive_object(value):
     return value
 
 
+class MDEASMError(Exception):
+    """Base exception for this helper module."""
+
+
+class ConfigurationError(MDEASMError):
+    """Raised when required environment/configuration is missing."""
+
+
+class ValidationError(MDEASMError):
+    """Raised when user input fails helper-side validation."""
+
+
+class WorkspaceNotFoundError(MDEASMError):
+    """Raised when a requested workspace cannot be found/resolved."""
+
+
+class AuthenticationError(MDEASMError):
+    """Raised when token retrieval/authentication fails."""
+
+
+class ApiRequestError(MDEASMError):
+    """Raised when a helper API request exhausts retries."""
+
+
 def _normalize_data_connection_kind(kind: str) -> str:
     raw = str(kind or "").strip().lower().replace("_", "-")
     aliases = {
@@ -154,7 +178,7 @@ def _normalize_data_connection_kind(kind: str) -> str:
         return aliases[raw]
     if raw_no_space in aliases:
         return aliases[raw_no_space]
-    raise Exception(
+    raise ValidationError(
         "unsupported data connection kind; use one of: logAnalytics, azureDataExplorer"
     )
 
@@ -167,7 +191,9 @@ def _normalize_data_connection_content(content: str) -> str:
     }
     if raw in aliases:
         return aliases[raw]
-    raise Exception("unsupported data connection content; use one of: assets, attackSurfaceInsights")
+    raise ValidationError(
+        "unsupported data connection content; use one of: assets, attackSurfaceInsights"
+    )
 
 
 def _normalize_data_connection_frequency(frequency: str) -> str:
@@ -179,12 +205,12 @@ def _normalize_data_connection_frequency(frequency: str) -> str:
     }
     if raw in aliases:
         return aliases[raw]
-    raise Exception("unsupported data connection frequency; use one of: daily, weekly, monthly")
+    raise ValidationError("unsupported data connection frequency; use one of: daily, weekly, monthly")
 
 
 def _validate_data_connection_properties(kind: str, properties: dict) -> dict:
     if not isinstance(properties, dict):
-        raise Exception("properties must be a dict")
+        raise ValidationError("properties must be a dict")
 
     if kind == "logAnalytics":
         workspace_id = str(
@@ -197,9 +223,9 @@ def _validate_data_connection_properties(kind: str, properties: dict) -> dict:
             properties.get("apiKey") or properties.get("api_key") or properties.get("key") or ""
         ).strip()
         if not workspace_id:
-            raise Exception("logAnalytics properties require workspaceId")
+            raise ValidationError("logAnalytics properties require workspaceId")
         if not api_key:
-            raise Exception("logAnalytics properties require apiKey")
+            raise ValidationError("logAnalytics properties require apiKey")
         return {"workspaceId": workspace_id, "apiKey": api_key}
 
     if kind == "azureDataExplorer":
@@ -211,18 +237,18 @@ def _validate_data_connection_properties(kind: str, properties: dict) -> dict:
         ).strip()
         region = str(properties.get("region") or "").strip()
         if not cluster_name:
-            raise Exception("azureDataExplorer properties require clusterName")
+            raise ValidationError("azureDataExplorer properties require clusterName")
         if not database_name:
-            raise Exception("azureDataExplorer properties require databaseName")
+            raise ValidationError("azureDataExplorer properties require databaseName")
         if not region:
-            raise Exception("azureDataExplorer properties require region")
+            raise ValidationError("azureDataExplorer properties require region")
         return {
             "clusterName": cluster_name,
             "databaseName": database_name,
             "region": region,
         }
 
-    raise Exception(f"unsupported data connection kind: {kind}")
+    raise ValidationError(f"unsupported data connection kind: {kind}")
 
 
 class Workspaces:
@@ -386,7 +412,7 @@ class Workspaces:
                 ", ".join(missing),
             )
             # Never include secrets in exceptions/logs (even partial prefixes).
-            raise Exception(f"missing required configuration: {', '.join(missing)}")
+            raise ConfigurationError(f"missing required configuration: {', '.join(missing)}")
         self._tenant_id = tenant_id
         self._subscription_id = subscription_id
         self._client_id = client_id
@@ -426,7 +452,7 @@ class Workspaces:
         r = post_fn(url, headers=headers, data=data, timeout=self._http_timeout)
         if r.status_code != 200:
             logging.error(r.status_code)
-            raise Exception(redact_sensitive_text(r.text))
+            raise AuthenticationError(redact_sensitive_text(r.text))
         else:
             return r.json()["access_token"]
 
@@ -467,18 +493,22 @@ class Workspaces:
                         verified_asset_id = asset_id
                     else:
                         logging.error("invalid base64")
-                        raise Exception(asset_id)
+                        raise ValidationError(asset_id)
                 except binascii.Error:
                     logging.error("invalid base64")
-                    raise Exception(asset_id)
+                    raise ValidationError(asset_id)
             except Exception:
                 logging.error("invalid uuid")
-                raise Exception(asset_id)
+                raise ValidationError(asset_id)
         return (asset_id, verified_asset_id)
 
     def __set_default_workspace_name__(self, workspace_name):
         self._default_workspace_name = workspace_name
         logging.info(f"default workspace name set: {workspace_name}")
+
+    def __raise_workspace_not_found__(self, workspace_name):
+        logging.error(f"{workspace_name} not found")
+        raise WorkspaceNotFoundError(workspace_name)
 
     def __verify_workspace__(self, workspace_name):
         if workspace_name not in self._workspaces:
@@ -1015,7 +1045,7 @@ class Workspaces:
             last_status,
             last_err,
         )
-        raise Exception(
+        raise ApiRequestError(
             f"called by: {calling_func} -- endpoint: {endpoint} -- page: {helper_params.get('skip')} -- "
             f"max attempts: {attempts} -- last_status: {last_status} -- last_error: {last_err} -- "
             f"last_text: {redact_sensitive_text(last_text)}"
@@ -1510,8 +1540,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         if max_page_size > 100:
             logging.warning("max_page_size cannot be greater than 100, setting max_page_size=100")
@@ -2289,12 +2318,11 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         connection_name = str(name or "").strip()
         if not connection_name:
-            raise Exception("data connection name is required")
+            raise ValidationError("data connection name is required")
 
         r = self.__workspace_query_helper__(
             "get_data_connection",
@@ -2323,12 +2351,11 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         connection_name = str(name or "").strip()
         if not connection_name:
-            raise Exception("data connection name is required")
+            raise ValidationError("data connection name is required")
 
         normalized_kind = _normalize_data_connection_kind(kind)
         normalized_content = _normalize_data_connection_content(content)
@@ -2336,9 +2363,9 @@ class Workspaces:
         try:
             frequency_offset = int(frequency_offset)
         except Exception as e:
-            raise Exception(f"frequency_offset must be an integer: {e}") from e
+            raise ValidationError(f"frequency_offset must be an integer: {e}") from e
         if frequency_offset < 0:
-            raise Exception("frequency_offset must be >= 0")
+            raise ValidationError("frequency_offset must be >= 0")
         normalized_properties = _validate_data_connection_properties(normalized_kind, properties)
 
         payload = {
@@ -2377,8 +2404,7 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         normalized_kind = _normalize_data_connection_kind(kind)
         normalized_content = _normalize_data_connection_content(content)
@@ -2386,9 +2412,9 @@ class Workspaces:
         try:
             frequency_offset = int(frequency_offset)
         except Exception as e:
-            raise Exception(f"frequency_offset must be an integer: {e}") from e
+            raise ValidationError(f"frequency_offset must be an integer: {e}") from e
         if frequency_offset < 0:
-            raise Exception("frequency_offset must be >= 0")
+            raise ValidationError("frequency_offset must be >= 0")
         normalized_properties = _validate_data_connection_properties(normalized_kind, properties)
 
         payload = {
@@ -2424,12 +2450,11 @@ class Workspaces:
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if not self.__verify_workspace__(workspace_name):
-            logging.error(f"{workspace_name} not found")
-            raise Exception(workspace_name)
+            self.__raise_workspace_not_found__(workspace_name)
 
         connection_name = str(name or "").strip()
         if not connection_name:
-            raise Exception("data connection name is required")
+            raise ValidationError("data connection name is required")
 
         r = self.__workspace_query_helper__(
             "delete_data_connection",

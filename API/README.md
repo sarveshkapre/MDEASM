@@ -46,6 +46,13 @@ CLI usage: `mdeasm saved-filters ...` (docs: `docs/saved_filters.md`).
 - `ModuleNotFoundError: No module named 'jwt'`: install `PyJWT` (import name is `jwt`).
 - `missing required configuration: ...`: ensure `.env` has `TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`.
 - `401`/`403` responses: credentials or access are incorrect. Re-check the app registration/service principal and its permissions for Defender EASM + ARM.
+
+## Programmatic Error Handling
+For automation paths, helper methods now expose typed exceptions in addition to readable messages:
+- `mdeasm.ConfigurationError` for missing required config/env.
+- `mdeasm.ValidationError` for invalid inputs (for example unsupported data-connection args).
+- `mdeasm.WorkspaceNotFoundError` when a workspace name cannot be resolved.
+- `mdeasm.AuthenticationError` for token retrieval/auth failures.
 ### Initialize your mdeasm.Workspaces object:
 ```
 import mdeasm

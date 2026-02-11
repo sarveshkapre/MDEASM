@@ -186,6 +186,60 @@ def test_cli_tasks_fetch_downloads_artifact(monkeypatch, capsys, tmp_path):
     assert payload["download_url"].endswith("sig=[REDACTED]")
 
 
+def test_cli_tasks_fetch_retries_with_bearer_for_protected_url(monkeypatch, capsys, tmp_path):
+    artifact = tmp_path / "artifact.csv"
+    calls = []
+
+    class DummyWS:
+        def __init__(self, *args, **kwargs):
+            self._http_timeout = (1.0, 5.0)
+            self._default_max_retry = 1
+            self._backoff_max_s = 0.01
+            self._dp_token = "token-abc"
+
+        def download_task(self, task_id, **kwargs):
+            return {"id": task_id, "downloadUrl": "https://files.example.test/protected.csv"}
+
+    class ForbiddenResp:
+        status_code = 403
+        text = "forbidden"
+
+        def iter_content(self, chunk_size=65536):
+            return iter([])
+
+        def close(self):
+            return None
+
+    class OkResp:
+        status_code = 200
+        text = ""
+
+        def iter_content(self, chunk_size=65536):
+            yield b"col1\n"
+            yield b"ok\n"
+
+        def close(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls.append(kwargs.get("headers"))
+        if kwargs.get("headers") is None:
+            return ForbiddenResp()
+        assert kwargs["headers"]["Authorization"] == "Bearer token-abc"
+        return OkResp()
+
+    fake_mdeasm = types.SimpleNamespace(Workspaces=DummyWS, redact_sensitive_text=lambda s: s)
+    monkeypatch.setitem(sys.modules, "mdeasm", fake_mdeasm)
+    monkeypatch.setattr(mdeasm_cli.requests, "get", fake_get)
+
+    rc = mdeasm_cli.main(["tasks", "fetch", "abc", "--artifact-out", str(artifact), "--out", "-"])
+    assert rc == 0
+    assert calls == [None, {"Authorization": "Bearer token-abc"}]
+    assert artifact.read_bytes() == b"col1\nok\n"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["used_bearer_auth"] is True
+
+
 def test_cli_tasks_fetch_verifies_sha256(monkeypatch, capsys, tmp_path):
     artifact = tmp_path / "artifact.csv"
     expected_sha = hashlib.sha256(b"col1,col2\na,b\n").hexdigest()

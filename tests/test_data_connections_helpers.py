@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "API"))
@@ -151,3 +153,46 @@ def test_delete_data_connection_returns_deleted_payload():
     assert captured["endpoint"] == "dataConnections/dc1"
     assert out == {"deleted": "dc1", "status": 204}
 
+
+def test_data_connection_helpers_raise_typed_validation_errors():
+    with pytest.raises(mdeasm.ValidationError):
+        mdeasm._normalize_data_connection_kind("not-supported")
+    with pytest.raises(mdeasm.ValidationError):
+        mdeasm._normalize_data_connection_content("not-supported")
+    with pytest.raises(mdeasm.ValidationError):
+        mdeasm._normalize_data_connection_frequency("hourly")
+    with pytest.raises(mdeasm.ValidationError):
+        mdeasm._validate_data_connection_properties("logAnalytics", {"workspaceId": "w"})
+
+
+def test_data_connection_methods_raise_typed_workspace_and_validation_errors():
+    ws = _ws_stub()
+    ws.__verify_workspace__ = lambda _workspace_name: False  # type: ignore[attr-defined]
+    with pytest.raises(mdeasm.WorkspaceNotFoundError):
+        ws.get_data_connection("dc1", workspace_name="missing", noprint=True)
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    with pytest.raises(mdeasm.ValidationError):
+        ws.get_data_connection("", workspace_name="w", noprint=True)
+    with pytest.raises(mdeasm.ValidationError):
+        ws.create_or_replace_data_connection(
+            "dc1",
+            kind="logAnalytics",
+            properties={"workspaceId": "w", "apiKey": "k"},
+            frequency_offset="bad",
+            workspace_name="w",
+            noprint=True,
+        )
+
+
+def test_workspaces_init_missing_config_raises_configuration_error():
+    with pytest.raises(mdeasm.ConfigurationError):
+        mdeasm.Workspaces(
+            tenant_id="",
+            subscription_id="",
+            client_id="",
+            client_secret="",
+            workspace_name="",
+            emit_workspace_guidance=False,
+            init_data_plane_token=False,
+        )
