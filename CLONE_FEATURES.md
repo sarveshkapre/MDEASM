@@ -9,19 +9,13 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-Priority order (cycle 18 backlog after current shipment)
+Priority order (cycle 19 backlog after current shipment)
 
 - [ ] **Task artifact integration smoke: protected URL auth fallback (live tenant)**
   - Gap class: weak (quality)
   - Scope: execute and record a credentialed smoke for protected artifact URL fallback in `tasks fetch`.
   - Why: closes remaining confidence gap between unit coverage and tenant behavior.
   - Score: Impact 4 | Effort 3 | Strategic fit 4 | Differentiation 0 | Risk 2 | Confidence 2
-
-- [ ] **CLI completions + concise recipes**
-  - Gap class: weak (DX)
-  - Scope: ship bash/zsh completion scripts and focused workflow snippets.
-  - Why: lowers onboarding friction and command syntax errors.
-  - Score: Impact 3 | Effort 2 | Strategic fit 3 | Differentiation 0 | Risk 1 | Confidence 4
 
 - [ ] **Legacy stdout side-effect cleanup (phase 2)**
   - Gap class: weak (quality)
@@ -33,6 +27,18 @@ Priority order (cycle 18 backlog after current shipment)
   - Gap class: weak (reliability)
   - Scope: add lightweight probe script against configurable preview API versions.
   - Why: early warning for preview endpoint drift.
+  - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
+
+- [ ] **API changelog modernization for post-2023 releases**
+  - Gap class: weak (maintainability)
+  - Scope: align `API/changelog.md` with shipped 2026 features and move verbose history to tracker/docs.
+  - Why: reduces operator confusion caused by stale release notes.
+  - Score: Impact 3 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+
+- [ ] **Discovery-groups CLI parity expansion (`create/run`)**
+  - Gap class: missing
+  - Scope: expose discovery-group create/run flows in CLI with JSON/lines contracts.
+  - Why: closes lifecycle parity gaps for operator automation.
   - Score: Impact 3 | Effort 3 | Strategic fit 3 | Differentiation 1 | Risk 2 | Confidence 2
 
 - [ ] **Checkpoint/profile file schema docs + fixtures**
@@ -77,13 +83,24 @@ Priority order (cycle 18 backlog after current shipment)
   - Why: speeds cycle execution and reduces operator variance.
   - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
 
-- [ ] **API changelog modernization for post-2023 releases**
-  - Gap class: weak (maintainability)
-  - Scope: align `API/changelog.md` with shipped 2026 features and move verbose history to tracker/docs.
-  - Why: reduces operator confusion caused by stale release notes.
-  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 0 | Risk 1 | Confidence 3
+- [ ] **Data-connections live smoke expansion (`put/delete` guarded lifecycle)**
+  - Gap class: weak (quality)
+  - Scope: extend integration smoke to optionally create/delete an isolated test data connection with cleanup.
+  - Why: catches payload drift earlier than list/get-only checks.
+  - Score: Impact 2 | Effort 3 | Strategic fit 3 | Differentiation 0 | Risk 2 | Confidence 2
+
+- [ ] **Doctor probe JSON contract snapshot fixture**
+  - Gap class: weak (reliability)
+  - Scope: add golden-file contract validation for doctor probe output shape.
+  - Why: prevents accidental response-shape drift for automation consumers.
+  - Score: Impact 2 | Effort 2 | Strategic fit 2 | Differentiation 1 | Risk 1 | Confidence 3
 
 ## Implemented
+- [x] **CLI shell completions + concise recipes (`mdeasm completions bash|zsh`)**
+  - Date: 2026-02-11
+  - Scope: `API/mdeasm_cli.py`, `tests/test_cli_completions.py`, `docs/completions.md`, `README.md`, `API/README.md`, `Makefile`
+  - Evidence (trusted: local tests + smoke + CI): `source .venv/bin/activate && ruff check API/mdeasm_cli.py tests/test_cli_completions.py tests/test_cli_doctor.py tests/test_cli_export.py` (pass); `source .venv/bin/activate && pytest -q tests/test_cli_completions.py tests/test_cli_doctor.py tests/test_cli_export.py -k "completions or doctor"` (pass); `source .venv/bin/activate && make verify` (pass); `source .venv/bin/activate && python -m mdeasm_cli completions bash | sed -n '1,30p'` (pass); `gh run watch 21916300539 -R sarveshkapre/MDEASM --exit-status` (pass)
+
 - [x] **Discovery-group lifecycle parity + reliability hardening (`mdeasm discovery-groups list/delete`)**
   - Date: 2026-02-11
   - Scope: `API/mdeasm.py`, `API/mdeasm_cli.py`, `tests/test_mdeasm_helpers.py`, `tests/test_cli_discovery_groups.py`, `tests/test_integration_smoke.py`, `docs/discovery_groups.md`, `README.md`, `API/README.md`, `Makefile`
@@ -485,6 +502,23 @@ Priority order (cycle 18 backlog after current shipment)
   - Evidence (trusted: local tests; local git history): `pytest` (pass); commit `c41f004`
 
 ## Insights
+- Market scan refresh (untrusted; 2026-02-11 cycle 19 session):
+  - Defender EASM remains API-first and preview-version heavy, which keeps CLI reliability and operator ergonomics (discoverability, low-friction command usage) as a near-term PMF lever for this repo.
+  - Adjacent CLI ecosystems treat shell completion as baseline UX (`kubectl completion`, Azure CLI tab completion), reinforcing completions as a parity-quality improvement rather than optional polish.
+  - Gap map (cycle 19 session):
+    - Weak -> closed this cycle: shell completion discoverability with generated `bash`/`zsh` scripts plus docs-smoke coverage.
+    - Weak -> remaining: protected artifact URL auth-fallback live smoke in a credentialed tenant.
+    - Missing -> remaining: discovery-groups CLI create/run parity.
+    - Differentiator -> remaining: tracker trust-label validation automation and profile-based command presets.
+  - Top 5 high-impact opportunities now:
+    - 1) protected artifact fallback live smoke, 2) discovery-groups create/run CLI parity, 3) preview API canary helper, 4) tracker trust-label validator, 5) profile-based command presets.
+  - Sources reviewed (untrusted):
+    - Microsoft Defender EASM REST API overview: https://learn.microsoft.com/en-us/defender-easm/rest-api
+    - Microsoft Defender EASM REST API reference root: https://learn.microsoft.com/en-us/rest/api/defenderforeasm/
+    - Azure CLI tab completion: https://learn.microsoft.com/en-us/cli/azure/azure-cli-tab-completion
+    - Kubernetes shell completion: https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#enable-shell-autocompletion
+    - runZero API guidance: https://help.runzero.com/docs/leveraging-the-runzero-api/
+
 - Market scan refresh (untrusted; 2026-02-11 cycle 18 session):
   - Microsoft Defender EASM preview references expose first-class discovery-group lifecycle endpoints (`list`, `create`, `remove`, `run`), so helper/CLI parity for delete/list is baseline production functionality rather than optional tooling.
   - Peer API platforms still emphasize stable machine-readable automation flows and non-destructive health checks, which supports adding deterministic JSON/lines contracts plus opt-in live drift smoke for discovery-group list behavior.
