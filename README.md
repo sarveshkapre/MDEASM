@@ -37,6 +37,7 @@ More details: `API/README.md`
 
 Auth/setup details (env vars, permissions, common 401/403 troubleshooting): `docs/auth.md`
 Export recipes (client + server task mode): `docs/exports.md`
+Shell completion setup (bash/zsh): `docs/completions.md`
 Task operations (`mdeasm tasks ...`): `docs/tasks.md`
 Data connections (`mdeasm data-connections ...`): `docs/data_connections.md`
 Discovery groups (`mdeasm discovery-groups ...`): `docs/discovery_groups.md`
