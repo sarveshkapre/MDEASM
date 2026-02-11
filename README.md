@@ -18,7 +18,7 @@ $EDITOR .env
 
 python3 API/retrieve_risk_observations.py
 ```
-For programmatic use of helper methods, prefer `noprint=True` where supported to keep stdout clean.
+For programmatic use of helper methods, prefer `noprint=True` where supported to keep stdout clean; label helpers now also return structured payloads in either mode.
 
 ## Optional: Install + CLI
 ```bash

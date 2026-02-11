@@ -1936,6 +1936,7 @@ class Workspaces:
 
         if optional arg 'display_name' is not submitted, it will default to the same as 'name'
         """
+        noprint = bool(kwargs.get("noprint"))
         if color and color not in self._label_colors:
             logging.warning(
                 f"{color} not one of {','.join(self._label_colors)}; setting to default"
@@ -1963,16 +1964,16 @@ class Workspaces:
                 "color": r.json()["properties"].get("color"),
                 "displayName": r.json()["properties"].get("displayName"),
             }
-            if kwargs.get("noprint"):
-                return label_properties
-            else:
+            if not noprint:
                 print(f"created new label '{name}' in {workspace_name}\n")
                 print(json.dumps(label_properties, indent=2))
+            return label_properties
         else:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)
 
     def get_labels(self, workspace_name="", **kwargs):
+        noprint = bool(kwargs.get("noprint"))
         if not workspace_name:
             workspace_name = self._default_workspace_name
         if self.__verify_workspace__(workspace_name):
@@ -1986,19 +1987,18 @@ class Workspaces:
             )
 
             label_properties = {}
-            for label in r.json()["value"]:
+            for label in _response_items(r.json()):
                 label_properties[label["name"]] = {
                     "color": label["properties"].get("color"),
                     "displayName": label["properties"].get("displayName"),
                 }
-            if kwargs.get("noprint"):
-                return label_properties
-            else:
+            if not noprint:
                 if label_properties:
                     print(f"current labels in {workspace_name}\n")
                     print(json.dumps(label_properties, indent=2))
                 else:
                     print(f"no labels exist for {workspace_name}")
+            return label_properties
         else:
             logging.error(f"{workspace_name} not found")
             raise Exception(workspace_name)

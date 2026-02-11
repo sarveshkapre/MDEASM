@@ -711,6 +711,87 @@ def test_get_discovery_templates_supports_noprint_and_returns_rows(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_label_helpers_support_noprint_and_consistent_returns(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+    calls = []
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_query_helper(*_args, **kwargs):
+        calls.append((kwargs["method"], kwargs["endpoint"], kwargs.get("payload")))
+        if kwargs["endpoint"] == "/labels/owned":
+            return Resp({"properties": {"color": "green", "displayName": "Owned"}})
+        if kwargs["endpoint"] == "/labels":
+            return Resp(
+                {
+                    "value": [
+                        {
+                            "name": "owned",
+                            "properties": {"color": "green", "displayName": "Owned"},
+                        }
+                    ]
+                }
+            )
+        raise AssertionError(f"unexpected endpoint: {kwargs['endpoint']}")
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    created = ws.create_or_update_label(
+        "owned", color="green", display_name="Owned", workspace_name="ws1", noprint=True
+    )
+    labels = ws.get_labels(workspace_name="ws1", noprint=True)
+
+    assert created == {"color": "green", "displayName": "Owned"}
+    assert labels == {"owned": {"color": "green", "displayName": "Owned"}}
+    assert calls == [
+        (
+            "put",
+            "/labels/owned",
+            {"properties": {"color": "green", "displayName": "Owned"}},
+        ),
+        ("get", "/labels", None),
+    ]
+    assert capsys.readouterr().out == ""
+
+
+def test_label_helpers_print_mode_still_returns_payload(capsys):
+    ws = _new_ws()
+    ws._default_workspace_name = "ws1"
+
+    class Resp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_query_helper(*_args, **kwargs):
+        if kwargs["endpoint"] == "/labels/owned":
+            return Resp({"properties": {"color": "blue", "displayName": "Owned"}})
+        if kwargs["endpoint"] == "/labels":
+            return Resp({"value": []})
+        raise AssertionError(f"unexpected endpoint: {kwargs['endpoint']}")
+
+    ws.__verify_workspace__ = lambda _workspace_name: True  # type: ignore[attr-defined]
+    ws.__workspace_query_helper__ = fake_query_helper  # type: ignore[attr-defined]
+
+    created = ws.create_or_update_label("owned", workspace_name="ws1")
+    labels = ws.get_labels(workspace_name="ws1")
+
+    out = capsys.readouterr().out
+    assert created == {"color": "blue", "displayName": "Owned"}
+    assert labels == {}
+    assert "created new label 'owned' in ws1" in out
+    assert "no labels exist for ws1" in out
+
+
 def test_get_workspace_risk_observations_handles_empty_findings_with_noprint(capsys):
     ws = _new_ws()
     ws._default_workspace_name = "ws1"
