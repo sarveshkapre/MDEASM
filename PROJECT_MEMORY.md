@@ -9,6 +9,9 @@
 
 ## Recent Decisions
 - Template: YYYY-MM-DD | Decision | Why | Evidence (tests/logs) | Commit | Confidence (high/medium/low) | Trust (trusted/untrusted)
+- 2026-02-11 | Add opt-in full artifact lifecycle integration smoke (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`) covering `assets:export -> tasks get/poll -> tasks download -> tasks fetch` | Export/download payloads are previewed and can drift by tenant; a dedicated lifecycle smoke path reduces regression blind spots | `source .venv/bin/activate && pytest -q tests/test_integration_smoke.py::test_integration_smoke_server_export_task_artifact_fetch -q` (pass; skipped by default without env/credentials) | 5fed728 | high | trusted
+- 2026-02-11 | Harden `query_facet_filter` with `noprint` support and consistent structured return payload across print/csv/json modes | Remaining stdout-heavy helper paths were still risky for automation; this closes a high-friction library UX gap while keeping default interactive behavior | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_query_facet_filter_supports_noprint_and_structured_return tests/test_mdeasm_helpers.py::test_query_facet_filter_csv_json_outputs_and_return_payload tests/test_mdeasm_helpers.py::test_query_facet_filter_requires_precomputed_filters` (pass) | 5fed728 | high | trusted
+- 2026-02-11 | Prioritize artifact lifecycle smoke + facet-query stdout hardening from cycle 5 bounded market scan | Microsoft Defender EASM task download + data-connection docs and peer ASM API guidance keep export-task reliability and automation-safe output as near-term parity expectations | Cycle 5 scan and gap map captured in `CLONE_FEATURES.md` with source links (Microsoft Learn, runZero, Shodan) | n/a | medium | untrusted
 - 2026-02-11 | Add `mdeasm assets schema diff --baseline` with optional `--fail-on-drift` exit behavior | Production export pipelines need a first-class drift check that can be wired into CI gates without brittle shell diff logic | `source .venv/bin/activate && pytest -q tests/test_cli_export.py::test_cli_assets_schema_diff_json_no_drift tests/test_cli_export.py::test_cli_assets_schema_diff_lines_fail_on_drift tests/test_cli_export.py::test_cli_assets_schema_diff_requires_baseline` (pass); `source .venv/bin/activate && python -m mdeasm_cli assets schema diff --help >/dev/null` (pass) | 914c015 | high | trusted
 - 2026-02-11 | Add explicit `tasks fetch` retry-on status policy (`--retry-on-statuses`) while keeping jittered backoff | Retries should target transient failures only; retrying permanent statuses (for example 404) wastes time and obscures root causes | `source .venv/bin/activate && pytest -q tests/test_cli_tasks.py::test_cli_tasks_fetch_retries_on_transient_status tests/test_cli_tasks.py::test_cli_tasks_fetch_does_not_retry_non_retryable_status` (pass) | 914c015 | high | trusted
 - 2026-02-11 | Add scheduled/manual smoke workflow for `mdeasm doctor --probe` with secret-gated execution | Gives early tenant/api drift signal without blocking push-time CI when secrets are not configured | `.github/workflows/smoke-doctor-probe.yml` + `gh run watch 21901545206 -R sarveshkapre/MDEASM --exit-status` (pass for push CI after workflow addition) | 3d6dfb3 | high | trusted
@@ -80,14 +83,23 @@
 ## Known Risks
 
 ## Next Prioritized Tasks
-- Complete residual `noprint` gating in remaining noisy helpers (notably `query_facet_filter` print/file-output paths) while preserving default interactive behavior.
-- Add real-tenant validation for `mdeasm tasks fetch` against Defender EASM artifact URL variants (SAS vs protected URL); blocked locally because EASM credentials are not configured.
-- Add opt-in integration coverage for full artifact lifecycle (`assets:export -> tasks get -> tasks download -> tasks fetch`) using live credentials.
+- Complete residual `noprint` gating in remaining noisy helpers (notably label CRUD/read helpers) while preserving default interactive behavior.
+- Add real-tenant validation for `mdeasm tasks fetch` protected-URL bearer fallback path (`MDEASM_INTEGRATION_TASK_ARTIFACT=1`); blocked locally because EASM credentials are not configured.
 - Add `mdeasm data-connections ...` management commands for Log Analytics/ADX parity workflows.
+- Start typed helper exception migration for validation/workspace-not-found/auth paths to reduce broad `Exception` handling.
 - Evaluate default `EASM_DP_API_VERSION` bump strategy after wider tenant validation of `2024-10-01-preview`.
 
 ## Verification Evidence
 - Template: YYYY-MM-DD | Command | Key output | Status (pass/fail)
+- 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
+- 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | latest CI runs on `main` were successful before cycle 5 push | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check API/mdeasm.py tests/test_mdeasm_helpers.py tests/test_integration_smoke.py` | `All checks passed!` | pass
+- 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_mdeasm_helpers.py::test_query_facet_filter_supports_noprint_and_structured_return tests/test_mdeasm_helpers.py::test_query_facet_filter_csv_json_outputs_and_return_payload tests/test_mdeasm_helpers.py::test_query_facet_filter_requires_precomputed_filters tests/test_integration_smoke.py::test_integration_smoke_server_export_task_artifact_fetch` | `...s` (focused tests pass; integration smoke skipped by default) | pass
+- 2026-02-11 | `source .venv/bin/activate && ruff check . && pytest -q && python -m compileall API && make verify` | `All checks passed!`; `96 passed, 5 skipped`; compile + maintainer smoke commands passed | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli doctor --format json --out -` | expected missing-env diagnostics (`TENANT_ID`, `SUBSCRIPTION_ID`, `CLIENT_ID`, `CLIENT_SECRET`) with exit code 1 | pass
+- 2026-02-11 | `source .venv/bin/activate && python -m mdeasm_cli tasks fetch --help >/dev/null` | command help path exits cleanly | pass
+- 2026-02-11 | `git push origin main` | pushed commit `5fed728` to `origin/main` | pass
+- 2026-02-11 | `gh run watch 21902366672 -R sarveshkapre/MDEASM --exit-status` | CI succeeded on `main` for commit `5fed728` | pass
 - 2026-02-11 | `gh issue list -R sarveshkapre/MDEASM --limit 100 --json number,title,author,state,url,createdAt,updatedAt` | repository has issues disabled (no owner/bot issue backlog available) | pass
 - 2026-02-11 | `gh run list -R sarveshkapre/MDEASM --limit 20 --json databaseId,workflowName,displayTitle,headSha,status,conclusion,createdAt,updatedAt,url` | recent CI runs on `main` all successful before cycle 4 pushes | pass
 - 2026-02-11 | `source .venv/bin/activate && pytest -q tests/test_cli_export.py::test_cli_assets_schema_diff_json_no_drift tests/test_cli_export.py::test_cli_assets_schema_diff_lines_fail_on_drift tests/test_cli_export.py::test_cli_assets_schema_diff_requires_baseline` | `...` | pass
